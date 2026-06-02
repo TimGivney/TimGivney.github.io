@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+.vite/
+*.tsbuildinfo
+
+# Never commit Manus project config (contains credentials)
+.project-config.json
