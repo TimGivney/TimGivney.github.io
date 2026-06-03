@@ -180,6 +180,14 @@ export default function Home() {
     {
       image: '/assets/macaw_1c65cbdd.webp',
       alt: 'Australian wildlife'
+    },
+    {
+      image: '/assets/hawk-photo_ce2b499d.jpg',
+      alt: 'Australian bird of prey'
+    },
+    {
+      image: '/assets/cockatoo-photo_7153e368.jpg',
+      alt: 'Cockatoo in the wild'
     }
   ];
 
