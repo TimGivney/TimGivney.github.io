@@ -44,6 +44,7 @@ export default function Home() {
     {
       id: 'ap50',
       title: 'AP+ AP50 Diaphragm Pump',
+      searchQuery: 'AP+ AP50 Diaphragm Pump Partsbender',
       subtitle: 'Lead Designer & Product Development',
       description: 'Precision vacuum diaphragm pump designed for industrial applications. Engineered high-performance 50CFM pump with optimised casting, FEA analysis, and precision manufacturing workflows.',
       tags: ['CAD', 'FEA', 'Manufacturing', 'Product Design'],
@@ -53,6 +54,7 @@ export default function Home() {
     {
       id: '2c440',
       title: 'AP+ 2C440 Air Compressor',
+      searchQuery: 'AP+ 2C440 Air Compressor Partsbender',
       subtitle: 'Design & Development',
       description: 'Advanced air compressor system with precision engineering and thermal optimization. Developed through iterative testing and FEA analysis to deliver high-performance industrial compression.',
       tags: ['Air Compressor', 'Thermal Analysis', 'Manufacturing', 'FEA'],
@@ -62,6 +64,7 @@ export default function Home() {
     {
       id: 'skapa',
       title: 'SKAPA Sunglasses',
+      searchQuery: 'skapa designs sunglasses instagram',
       subtitle: 'Product Design & Manufacturing',
       description: 'High-performance sunglasses engineered for durability and style. Designed with precision manufacturing techniques and optimised for comfort and visual clarity in demanding environments.',
       tags: ['Product Design', 'Manufacturing', 'Materials', 'CAD'],
