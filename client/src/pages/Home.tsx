@@ -64,12 +64,12 @@ export default function Home() {
     {
       id: 'skapa',
       title: 'SKAPA Sunglasses',
-      searchQuery: 'skapa designs sunglasses instagram',
+      directLink: true,
       subtitle: 'Product Design & Manufacturing',
       description: 'High-performance sunglasses engineered for durability and style. Designed with precision manufacturing techniques and optimised for comfort and visual clarity in demanding environments.',
       tags: ['Product Design', 'Manufacturing', 'Materials', 'CAD'],
       image: '/assets/instagram-image-1_7d10d541.jpg',
-      link: 'https://partsbender.com',
+      link: 'https://www.instagram.com/skapa.designs/',
       nativeRatio: true
     },
     {
