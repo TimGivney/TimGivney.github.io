@@ -1,8 +1,8 @@
-# Tim Givney — Personal Resume Website
+# Tim Givney — Personal Website
 
-Source for [timgivney.github.io](https://timgivney.github.io) — a single-page resume site for Tim Givney, mechanical engineer (Newcastle, NSW Australia).
+Source for [timgivney.github.io](https://timgivney.github.io) — the personal website of Tim Givney, mechanical engineer (Newcastle, NSW Australia).
 
-Built with **React 19 + Vite + Tailwind CSS v4**. All images and the resume PDF are bundled locally under `client/public/assets/` — the site has no external/runtime dependencies and no third-party branding.
+Built with **React 19 + Vite + Tailwind CSS v4**. All images and the downloadable PDF are bundled locally under `client/public/assets/` — the site has no external/runtime dependencies and no third-party branding.
 
 ## Develop
 
@@ -31,10 +31,10 @@ No manual steps required after the initial Pages "Source: GitHub Actions" settin
 client/
   index.html          ← document head: SEO meta, Open Graph, JSON-LD, favicons
   public/             ← static assets served at site root
-    assets/           ← images + resume PDF
+    assets/           ← images + downloadable PDF
     favicon.*, og-image.png, robots.txt, sitemap.xml, site.webmanifest
   src/
-    pages/Home.tsx    ← the resume page content
+    pages/Home.tsx    ← the website page content
     pages/NotFound.tsx
     components/        ← UI primitives (shadcn/ui) + ThemeContext, ErrorBoundary
     index.css         ← Tailwind + design tokens (cobalt #1B3F6B / gold #C9A84C)

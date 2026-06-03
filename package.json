@@ -1,9 +1,9 @@
 {
-  "name": "tim-givney-resume",
+  "name": "tim-givney-website",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Personal resume website for Tim Givney, mechanical engineer.",
+  "description": "Personal website for Tim Givney, mechanical engineer.",
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "vite --host",
