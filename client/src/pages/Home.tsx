@@ -197,8 +197,8 @@ export default function Home() {
             {/* Download Button */}
             <div className="mt-12">
               <a 
-                href="/assets/Tim-Givney-Resume_92e1d389.pdf" 
-                download="Tim-Givney.pdf"
+                href="/timgivney-website.zip" 
+                download="timgivney-website.zip"
                 className="inline-block px-8 py-3 font-semibold rounded transition-all duration-200"
                 style={{ backgroundColor: '#1B3F6B', color: '#FFFFFF' }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}

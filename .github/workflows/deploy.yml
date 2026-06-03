@@ -41,6 +41,23 @@ jobs:
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
 
+      - name: Package downloadable site ZIP
+        run: |
+          cat > dist/HOW-TO-OPEN.txt <<'EOF'
+          Tim Givney - website (offline copy)
+
+          This folder is the complete website. Because it is a modern web app,
+          double-clicking index.html may not render due to browser security on
+          local files. To view it, run a simple web server from this folder:
+
+            python3 -m http.server 8000
+
+          then open http://localhost:8000 in your browser.
+          EOF
+          (cd dist && zip -r -q ../timgivney-website.zip . -x "*.zip")
+          rm dist/HOW-TO-OPEN.txt
+          mv timgivney-website.zip dist/timgivney-website.zip
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
