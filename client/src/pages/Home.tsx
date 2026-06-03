@@ -81,6 +81,7 @@ export default function Home() {
     {
       id: 'wled',
       title: 'WLED Smart Lighting',
+      searchQuery: 'How to Easily Control Addressable LEDs with an ESP32 or ESP8266',
       subtitle: 'Technical Education & IoT',
       description: 'How to Easily Control Addressable LEDs with an ESP32 or ESP8266 | WLED Project. Comprehensive guide reaching 580k+ views, demonstrating custom pixel art and LED effects without coding.',
       tags: ['ESP32', 'IoT', 'Electronics', 'Education'],
@@ -333,14 +334,14 @@ export default function Home() {
                   </div>
                   {project.link && (
                     <a 
-                      href={project.link} 
+                      href={`https://letmegooglethat.com/?q=${encodeURIComponent(project.searchQuery ?? project.title)}`}
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="inline-block text-sm font-semibold transition-colors duration-200"
                       style={{ color: '#C9A84C' }}
                       onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
                       onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-                      aria-label={`View ${project.title}`}
+                      aria-label={`Search for ${project.title}`}
                     >
                       View Project →
                     </a>
