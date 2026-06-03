@@ -555,9 +555,15 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="text-sm label mb-2">Phone</p>
-                  <a href="tel:0432504302" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
-                    0432504302
+                  <a href="tel:+61432504302" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
+                    +61 432 504 302
                   </a>
+                </div>
+                <div>
+                  <p className="text-sm label mb-2">Location</p>
+                  <p className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
+                    NSW, Australia
+                  </p>
                 </div>
               </div>
             </div>
