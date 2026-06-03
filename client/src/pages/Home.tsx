@@ -204,7 +204,7 @@ export default function Home() {
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
               >
-                Download Website
+                Download
               </a>
             </div>
           </div>
