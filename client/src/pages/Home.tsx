@@ -44,7 +44,7 @@ export default function Home() {
     {
       id: 'ap50',
       title: 'AP+ AP50 Diaphragm Pump',
-      searchQuery: 'AP+ AP50 Diaphragm Pump Partsbender',
+      directLink: true,
       subtitle: 'Lead Designer & Product Development',
       description: 'Precision vacuum diaphragm pump designed for industrial applications. Engineered high-performance 50CFM pump with optimised casting, FEA analysis, and precision manufacturing workflows.',
       tags: ['CAD', 'FEA', 'Manufacturing', 'Product Design'],
@@ -54,12 +54,12 @@ export default function Home() {
     {
       id: '2c440',
       title: 'AP+ 2C440 Air Compressor',
-      searchQuery: 'AP+ 2C440 Air Compressor Partsbender',
+      directLink: true,
       subtitle: 'Design & Development',
       description: 'Advanced air compressor system with precision engineering and thermal optimization. Developed through iterative testing and FEA analysis to deliver high-performance industrial compression.',
       tags: ['Air Compressor', 'Thermal Analysis', 'Manufacturing', 'FEA'],
       image: '/assets/AP-AP37-CFM-2C440-Air-Compressor-Crankcase-Cut-In-Half-Checking-Porisity-First-Samples_Jun2025_3_d9586f9d.jpg',
-      link: 'https://partsbender.com'
+      link: 'https://partsbender.com/product/ap-air-compressor-37-cfm-coming-soon/'
     },
     {
       id: 'skapa',
@@ -345,14 +345,14 @@ export default function Home() {
                   </div>
                   {project.link && (
                     <a 
-                      href={`https://letmegooglethat.com/?q=${encodeURIComponent(project.searchQuery ?? project.title)}`}
+                      href={project.directLink ? project.link : `https://letmegooglethat.com/?q=${encodeURIComponent(project.searchQuery ?? project.title)}`}
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="inline-block text-sm font-semibold transition-colors duration-200"
                       style={{ color: '#C9A84C' }}
                       onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
                       onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-                      aria-label={`Search for ${project.title}`}
+                      aria-label={project.directLink ? `View ${project.title}` : `Search for ${project.title}`}
                     >
                       View Project →
                     </a>
