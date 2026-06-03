@@ -36,9 +36,8 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: SPA + Jekyll fallbacks
+      - name: Jekyll fallback
         run: |
-          cp dist/index.html dist/404.html
           touch dist/.nojekyll
 
       - name: Package downloadable site ZIP
