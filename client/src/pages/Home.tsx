@@ -534,7 +534,7 @@ export default function Home() {
           </div>
           
           {/* Rock Climbing Image */}
-          <div className="mt-16 rounded-lg overflow-hidden shadow-md">
+          <div className="mt-16 rounded-lg overflow-hidden shadow-md transition-transform duration-300 hover:scale-105">
             <img 
               src="/assets/rock-climbing-finish_a009e264.jpg" 
               alt="Tim Givney rock climbing"
