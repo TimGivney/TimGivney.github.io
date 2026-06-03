@@ -62,6 +62,7 @@ export default function Home() {
     {
       id: 'skapa',
       title: 'SKAPA Sunglasses',
+      searchQuery: 'skapa designs sunglasses instagram',
       subtitle: 'Product Design & Manufacturing',
       description: 'High-performance sunglasses engineered for durability and style. Designed with precision manufacturing techniques and optimised for comfort and visual clarity in demanding environments.',
       tags: ['Product Design', 'Manufacturing', 'Materials', 'CAD'],
