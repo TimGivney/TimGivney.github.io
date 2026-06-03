@@ -194,17 +194,17 @@ export default function Home() {
               </div>
             </div>
             
-            {/* Download Resume Button */}
+            {/* Download Button */}
             <div className="mt-12">
               <a 
                 href="/assets/Tim-Givney-Resume_92e1d389.pdf" 
-                download="Tim-Givney-Resume.pdf"
+                download="Tim-Givney.pdf"
                 className="inline-block px-8 py-3 font-semibold rounded transition-all duration-200"
                 style={{ backgroundColor: '#1B3F6B', color: '#FFFFFF' }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
               >
-                Download Resume
+                Download Website
               </a>
             </div>
           </div>
