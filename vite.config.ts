@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { defineConfig } from "vite";
 
-// Served from the root of https://timgivney.github.io, so base is "/".
+// Served from the root of https://timgivney.com, so base is "/".
 export default defineConfig({
   base: "/",
   plugins: [react(), tailwindcss()],

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://timgivney.github.io/sitemap.xml
+Sitemap: https://timgivney.com/sitemap.xml

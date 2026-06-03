@@ -1,6 +1,6 @@
 # Tim Givney — Personal Website
 
-Source for [timgivney.github.io](https://timgivney.github.io) — the personal website of Tim Givney, mechanical engineer (Newcastle, NSW Australia).
+Source for [timgivney.com](https://timgivney.com) — the personal website of Tim Givney, mechanical engineer (Newcastle, NSW Australia).
 
 Built with **React 19 + Vite + Tailwind CSS v4**. All images and the downloadable PDF are bundled locally under `client/public/assets/` — the site has no external/runtime dependencies and no third-party branding.
 
@@ -22,7 +22,7 @@ pnpm run preview       # preview the production build
 ## Deployment
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the site
-and publishes `dist/` to **GitHub Pages** (`https://timgivney.github.io`).
+and publishes `dist/` to **GitHub Pages** (`https://timgivney.com`).
 No manual steps required after the initial Pages "Source: GitHub Actions" setting.
 
 ## Project structure
