@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 /**
  * Industrial Modernism Design — Single Page Scroll
@@ -8,8 +8,37 @@ import { useState } from 'react';
  * - Leadership section, detailed Technical Capabilities, Interests & Passions
  */
 
+// Web3Forms public access key (client-side beacon, not a secret).
+const WEB3FORMS_ACCESS_KEY = '7d55d5f3-5904-4d30-bc13-be0b0b63936f';
+
 export default function Home() {
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
+  const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  async function handleContactSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    setFormStatus('submitting');
+    const formData = new FormData(form);
+    formData.append('access_key', WEB3FORMS_ACCESS_KEY);
+    formData.append('subject', 'New message from timgivney.com');
+    formData.append('from_name', 'timgivney.com contact form');
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFormStatus('success');
+        form.reset();
+      } else {
+        setFormStatus('error');
+      }
+    } catch {
+      setFormStatus('error');
+    }
+  }
 
   const projects = [
     {
@@ -512,24 +541,86 @@ export default function Home() {
             <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
           </div>
           
-          <div className="max-w-2xl">
-            <p className="text-lg text-gray-700 mb-8">Whether it's manufacturing, product development, technical systems, or solving real-world engineering problems, I'm always interested in meaningful projects and new challenges. Feel free to get in touch if you are too.</p>
-            
-            <p className="text-lg text-gray-700 mb-12">Contact Details Below.</p>
-            
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm label mb-2">Email</p>
-                <a href="mailto:timgivney@gmail.com" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
-                  timgivney@gmail.com
-                </a>
+          <div className="grid lg:grid-cols-3 gap-12 items-start">
+            {/* Left: intro + direct contact details */}
+            <div className="lg:col-span-1">
+              <p className="text-lg text-gray-700 mb-10">Whether it's manufacturing, product development, technical systems, or solving real-world engineering problems, I'm always interested in meaningful projects and new challenges. Feel free to get in touch if you are too.</p>
+
+              <div className="space-y-6">
+                <div>
+                  <p className="text-sm label mb-2">Email</p>
+                  <a href="mailto:timgivney@gmail.com" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
+                    timgivney@gmail.com
+                  </a>
+                </div>
+                <div>
+                  <p className="text-sm label mb-2">Phone</p>
+                  <a href="tel:0432504302" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
+                    0432504302
+                  </a>
+                </div>
               </div>
-              <div>
-                <p className="text-sm label mb-2">Phone</p>
-                <a href="tel:0432504302" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
-                  0432504302
-                </a>
-              </div>
+            </div>
+
+            {/* Right: contact form */}
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6 sm:p-8">
+              <h3 className="text-xl font-bold mb-6" style={{ color: '#1B3F6B' }}>Send a message</h3>
+              {formStatus === 'success' ? (
+                <div role="status" className="rounded-md bg-green-50 border border-green-200 p-4 text-green-800">
+                  Thanks for reaching out — your message has been sent. I'll get back to you soon.
+                </div>
+              ) : (
+                <form onSubmit={handleContactSubmit} className="space-y-5">
+                  {/* Honeypot anti-spam field (hidden from users) */}
+                  <input type="checkbox" name="botcheck" tabIndex={-1} autoComplete="off" style={{ display: 'none' }} />
+                  <div>
+                    <label htmlFor="contact-name" className="block text-sm label mb-2">Name</label>
+                    <input
+                      id="contact-name"
+                      name="name"
+                      type="text"
+                      required
+                      autoComplete="name"
+                      className="w-full rounded-md border border-gray-300 px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C9A84C] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="contact-email" className="block text-sm label mb-2">Email</label>
+                    <input
+                      id="contact-email"
+                      name="email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      className="w-full rounded-md border border-gray-300 px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C9A84C] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="contact-message" className="block text-sm label mb-2">Message</label>
+                    <textarea
+                      id="contact-message"
+                      name="message"
+                      rows={5}
+                      required
+                      className="w-full rounded-md border border-gray-300 px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C9A84C] focus:border-transparent resize-y"
+                    />
+                  </div>
+                  {formStatus === 'error' && (
+                    <p className="text-red-600 text-sm">
+                      Something went wrong. Please email me directly at{' '}
+                      <a href="mailto:timgivney@gmail.com" className="underline">timgivney@gmail.com</a>.
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={formStatus === 'submitting'}
+                    className="inline-flex items-center justify-center rounded-md px-6 py-3 font-semibold text-white transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: '#1B3F6B' }}
+                  >
+                    {formStatus === 'submitting' ? 'Sending…' : 'Send message'}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
           
