@@ -55,7 +55,7 @@ export default function Home() {
       id: '2c440',
       title: 'AP+ 2C440 Air Compressor',
       directLink: true,
-      subtitle: 'Design & Development',
+      subtitle: 'Lead Design & Development',
       description: 'Advanced air compressor system with precision engineering and thermal optimization. Developed through iterative testing and FEA analysis to deliver high-performance industrial compression.',
       tags: ['Air Compressor', 'Thermal Analysis', 'Manufacturing', 'FEA'],
       image: '/assets/AP-AP37-CFM-2C440-Air-Compressor-Crankcase-Cut-In-Half-Checking-Porisity-First-Samples_Jun2025_3_d9586f9d.jpg',
