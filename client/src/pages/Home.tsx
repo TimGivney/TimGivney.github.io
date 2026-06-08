@@ -97,8 +97,8 @@ export default function Home() {
   const experience = [
     {
       company: 'PartsBender',
-      role: 'Engineering & Operations Support',
-      period: '2023 – Present',
+      role: 'Engineer and Operations',
+      period: '2024 – Present',
       description: 'Supporting industrial engineering and manufacturing operations across product development, CAD systems, production preparation, inventory coordination, and technical e-commerce.'
     },
     {
