@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
 
 /**
- * Industrial Modernism Design — Single Page Scroll
+ * Industrial Modernism Design - Single Page Scroll
  * - Deep cobalt blue (#1B3F6B) + warm gold (#C9A84C)
  * - Playfair Display for headings, Source Sans 3 for body, JetBrains Mono for labels
- * - Clean hero with content left, image right — no text overlay
+ * - Clean hero with content left, image right - no text overlay
  * - Leadership section, detailed Technical Capabilities, Interests & Passions
  */
 
@@ -199,7 +199,7 @@ export default function Home() {
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <a href="#about" className="text-2xl font-bold" style={{ color: '#1B3F6B' }} aria-label="Tim Givney — home">Tim Givney</a>
+          <a href="#about" className="text-2xl font-bold" style={{ color: '#1B3F6B' }} aria-label="Tim Givney - home">Tim Givney</a>
           <div className="flex gap-8 text-sm">
             <a href="#about" className="hover:text-blue-700 transition-colors">About</a>
             <a href="#experience" className="hover:text-blue-700 transition-colors">Experience</a>
@@ -210,7 +210,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero Section — Clean layout, no text overlay */}
+      {/* Hero Section - Clean layout, no text overlay */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Left: Content */}
@@ -365,7 +365,7 @@ export default function Home() {
                     <div className="w-full max-w-sm overflow-hidden rounded-lg shadow-lg" style={{ borderTop: '4px solid #C9A84C' }}>
                       <img 
                         src={project.image} 
-                        alt={`${project.title} — ${project.subtitle}`}
+                        alt={`${project.title} - ${project.subtitle}`}
                         loading="lazy" decoding="async"
                         className="w-full object-cover transition-transform duration-300"
                         style={{
@@ -377,7 +377,7 @@ export default function Home() {
                     <div className="w-full max-w-sm aspect-square overflow-hidden rounded-lg shadow-lg" style={{ borderTop: '4px solid #C9A84C' }}>
                       <img 
                         src={project.image} 
-                        alt={`${project.title} — ${project.subtitle}`}
+                        alt={`${project.title} - ${project.subtitle}`}
                         loading="lazy" decoding="async"
                         className="w-full h-full object-cover transition-transform duration-300"
                         style={{
@@ -405,7 +405,7 @@ export default function Home() {
             <div className="border-l-4 pl-6" style={{ borderColor: '#C9A84C' }}>
               <h3 className="text-2xl font-bold mb-2" style={{ color: '#1B3F6B' }}>Save Our Coast</h3>
               <p className="text-sm label mb-4">Board Director & Treasurer (Volunteer) | 2019 – Present</p>
-              <p className="text-gray-700 mb-4">Environmental leadership and strategic planning for marine conservation. Direct financial records, corporate governance, and strategic funding initiatives—including securing grants from Patagonia Inc.'s 1% Program.</p>
+              <p className="text-gray-700 mb-4">Environmental leadership and strategic planning for marine conservation. Direct financial records, corporate governance, and strategic funding initiatives-including securing grants from Patagonia Inc.'s 1% Program.</p>
               <p className="text-gray-700 mb-4">Spearheaded operations for large-scale public events drawing 1,500+ attendees. Contributed to historic grassroots conservation victories, including collecting 77,000+ signatures that successfully halted offshore seismic testing and fossil fuel exploration (PEP11) along the NSW coastline.</p>
               <div className="flex flex-wrap gap-2">
                 <span className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FFFFFF', color: '#1B3F6B', border: '1px solid #C9A84C' }}>Environmental Leadership</span>
@@ -417,7 +417,7 @@ export default function Home() {
             <div className="flex justify-center">
               <img 
                 src="/assets/Save_Our_Coast_2-1024x326_bf737df2.webp" 
-                alt="Save Our Coast — marine conservation organisation" 
+                alt="Save Our Coast - marine conservation organisation" 
                 loading="lazy" decoding="async"
                 className="w-full rounded-lg shadow-lg transition-transform duration-300 hover:scale-105"
               />
@@ -516,7 +516,7 @@ export default function Home() {
           </div>
           
           <div className="mb-8">
-            <p className="text-gray-700 text-lg mb-8">Outside engineering, I spend time rock climbing, skiing, restoring vehicles, exploring fabrication projects, and photographing Australian birdlife — interests that continue to shape my attention to detail, patience, and observation.</p>
+            <p className="text-gray-700 text-lg mb-8">Outside engineering, I spend time rock climbing, skiing, restoring vehicles, exploring fabrication projects, and photographing Australian birdlife - interests that continue to shape my attention to detail, patience, and observation.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -585,7 +585,7 @@ export default function Home() {
               <h3 className="text-xl font-bold mb-6" style={{ color: '#1B3F6B' }}>Send a message</h3>
               {formStatus === 'success' ? (
                 <div role="status" className="rounded-md bg-green-50 border border-green-200 p-4 text-green-800">
-                  Thanks for reaching out — your message has been sent. I'll get back to you soon.
+                  Thanks for reaching out - your message has been sent. I'll get back to you soon.
                 </div>
               ) : (
                 <form onSubmit={handleContactSubmit} className="space-y-5">
