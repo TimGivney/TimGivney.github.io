@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
+import HomeCubeWidget from '@/components/HomeCubeWidget';
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -643,15 +644,18 @@ export default function Home() {
             </div>
           </div>
           
-          {/* Rock Climbing Image */}
-          <div className="mt-16 rounded-lg overflow-hidden shadow-md transition-transform duration-300 hover:scale-105">
-            <img 
-              src="/assets/rock-climbing-finish_a009e264.jpg" 
-              alt="Tim Givney rock climbing"
-              loading="lazy" decoding="async"
-              className="w-full h-96 object-contain"
-              style={{ backgroundColor: '#f5f5f5' }}
-            />
+          {/* Rock climbing photo + interactive Rubik's cube */}
+          <div className="mt-16 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="overflow-hidden rounded-xl">
+              <img 
+                src="/assets/rock-climbing-finish_a009e264.jpg" 
+                alt="Tim Givney rock climbing"
+                loading="lazy" decoding="async"
+                className="h-full max-h-[30rem] w-full object-contain"
+                style={{ backgroundColor: '#f5f5f5' }}
+              />
+            </div>
+            <HomeCubeWidget />
           </div>
         </div>
       </section>
