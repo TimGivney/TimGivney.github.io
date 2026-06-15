@@ -4,6 +4,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Restore a deep-linked client-side route saved by 404.html before the app mounts.
+      (function () {
+        var r = sessionStorage.getItem("spaRedirect");
+        if (r) {
+          sessionStorage.removeItem("spaRedirect");
+          history.replaceState(null, "", r);
+        }
+      })();
+    </script>
     <meta name="google-site-verification" content="rgfFR9eMLHP2g_1XtJmyGdm2LSYrEOv0tDoAaCSzXA0" />
 
     <!-- Primary Meta Tags -->
