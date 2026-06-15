@@ -34,6 +34,7 @@ interface Cubie {
 export interface CubeViewOptions {
   onMove?: (move: Move) => void; // fired when a user drag completes a turn
   onSolvedChange?: (solved: boolean) => void;
+  distanceScale?: number; // <1 zooms the camera in so the cube fills more of the view
 }
 
 export class CubeView {
@@ -93,7 +94,7 @@ export class CubeView {
       0.1,
       100
     );
-    const dist = n * 2.0 + 3;
+    const dist = (n * 2.0 + 3) * (opts.distanceScale ?? 1);
     this.camera.position.set(dist * 0.85, dist * 0.7, dist * 0.95);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -471,7 +472,7 @@ export class CubeView {
 
   resetView() {
     const n = this.n;
-    const dist = n * 2.0 + 3;
+    const dist = (n * 2.0 + 3) * (this.opts.distanceScale ?? 1);
     this.camera.position.set(dist * 0.85, dist * 0.7, dist * 0.95);
     this.controls.target.set(0, 0, 0);
     this.controls.update();

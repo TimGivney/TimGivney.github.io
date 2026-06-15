@@ -10,10 +10,10 @@ import {
 } from "@/lib/cube/engine";
 import type { CubeView } from "@/lib/cube/CubeView";
 
-const N = 3;
+const N = 5;
 
 /**
- * Compact, interactive 3x3 cube for the homepage. Three.js is loaded lazily
+ * Compact, interactive 5x5 cube for the homepage. Three.js is loaded lazily
  * (only once the widget scrolls into view) so it never weighs down the initial
  * page load. The full NxN studio lives at /cube.
  */
@@ -39,6 +39,7 @@ export default function HomeCubeWidget() {
         const { CubeView } = await import("@/lib/cube/CubeView");
         if (cancelled || !mountRef.current) return;
         viewRef.current = new CubeView(mountRef.current, N, {
+          distanceScale: 0.7,
           onMove: m => {
             historyRef.current.push(m);
             setHasMoves(true);
@@ -63,8 +64,8 @@ export default function HomeCubeWidget() {
     if (!view || busy) return;
     setBusy(true);
     setStatus("Scrambled");
-    for (const m of randomScramble(N, 20)) {
-      await view.animateMove(m, 110);
+    for (const m of randomScramble(N, 30)) {
+      await view.animateMove(m, 95);
       historyRef.current.push(m);
     }
     setHasMoves(true);
@@ -106,7 +107,7 @@ export default function HomeCubeWidget() {
       </div>
 
       <div className="relative flex-1 overflow-hidden rounded-xl bg-gradient-to-b from-gray-50 to-gray-100 ring-1 ring-gray-200">
-        <div ref={mountRef} className="h-full min-h-[18rem] w-full" />
+        <div ref={mountRef} className="h-full min-h-[24rem] w-full" />
         {!ready && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-gray-400">
             Loading cube…
