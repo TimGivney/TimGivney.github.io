@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'wouter';
 import HomeCubeWidget from '@/components/HomeCubeWidget';
 
 /**
@@ -665,15 +664,6 @@ export default function Home() {
         <div className="max-w-6xl mx-auto text-center text-gray-600 text-sm">
           <p>© 2026 Tim Givney. All rights reserved.</p>
           <p className="mt-2">Dedicated to precision, reliability, and continuous improvement.</p>
-          <p className="mt-4">
-            <Link
-              href="/cube"
-              className="inline-flex items-center gap-1.5 font-medium transition-opacity hover:opacity-70"
-              style={{ color: '#1B3F6B' }}
-            >
-              <span aria-hidden>🧊</span> Cube Studio — an interactive 3D Rubik’s cube solver
-            </Link>
-          </p>
         </div>
       </footer>
     </div>
