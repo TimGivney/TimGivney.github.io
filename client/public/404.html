@@ -3,6 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // SPA fallback: GitHub Pages serves this file for unknown paths. For known
+      // client-side routes, bounce to the app (which restores the URL); otherwise
+      // show the branded 404 below.
+      (function () {
+        var spaRoutes = ["/cube"];
+        var path = location.pathname.replace(/\/$/, "");
+        if (spaRoutes.indexOf(path) !== -1) {
+          sessionStorage.setItem("spaRedirect", path + location.search + location.hash);
+          location.replace("/");
+        }
+      })();
+    </script>
     <title>Page Not Found - Tim Givney</title>
     <meta name="robots" content="noindex, follow" />
     <meta name="theme-color" content="#1B3F6B" />
