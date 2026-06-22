@@ -94,7 +94,26 @@ export default function Fractal() {
     });
   }, [maxIter, palette, colorScale, colorShift, julia, juliaIdx]);
 
-  const reset = useCallback(() => viewRef.current?.reset(), []);
+  const setMode = useCallback((toJulia: boolean) => {
+    setJulia(toJulia);
+    // Reframe so the set is on-screen: Julia is centred on the origin,
+    // the Mandelbrot on its usual seat at (-0.5, 0).
+    viewRef.current?.setState({
+      centerX: toJulia ? 0 : -0.5,
+      centerY: 0,
+      scale: 2.6,
+    });
+  }, []);
+
+  const reset = useCallback(
+    () =>
+      viewRef.current?.setState({
+        centerX: julia ? 0 : -0.5,
+        centerY: 0,
+        scale: 2.6,
+      }),
+    [julia]
+  );
   const zoomIn = useCallback(() => viewRef.current?.zoomBy(0.5), []);
   const zoomOut = useCallback(() => viewRef.current?.zoomBy(2), []);
 
@@ -149,7 +168,7 @@ export default function Fractal() {
 
         <div className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1 backdrop-blur">
           <button
-            onClick={() => setJulia(false)}
+            onClick={() => setMode(false)}
             className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
               !julia
                 ? "bg-[#C9A84C] text-[#1a1a2e]"
@@ -159,7 +178,7 @@ export default function Fractal() {
             Mandelbrot
           </button>
           <button
-            onClick={() => setJulia(true)}
+            onClick={() => setMode(true)}
             className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
               julia
                 ? "bg-[#C9A84C] text-[#1a1a2e]"

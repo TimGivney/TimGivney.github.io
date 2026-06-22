@@ -54,25 +54,26 @@ vec3 cosPalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
   return a + b * cos(6.28318530718 * (c * t + d));
 }
 
+// Glow palettes: each fades up from black (t=0) through its theme, so the
+// low-iteration outer halo recedes and the detail near the set blooms.
+vec3 glow(float t, vec3 freq) {
+  return 0.5 + 0.5 * cos(6.28318530718 * (freq * t + 0.5));
+}
+
 vec3 palette(float t) {
-  t = fract(t);
   if (u_palette == 0) {
-    // Ember: warm gold/orange on deep space
-    return cosPalette(t, vec3(0.5), vec3(0.5),
-                       vec3(1.0, 0.9, 0.6), vec3(0.0, 0.15, 0.35));
+    // Ember: black -> red -> orange -> gold/white
+    return glow(t, vec3(1.0, 0.7, 0.4));
   } else if (u_palette == 1) {
-    // Ice: cobalt -> cyan -> white
-    return cosPalette(t, vec3(0.45, 0.5, 0.55), vec3(0.45, 0.45, 0.5),
-                      vec3(1.0, 1.0, 1.0), vec3(0.0, 0.25, 0.55));
+    // Ice: black -> cobalt -> cyan -> white
+    return glow(t, vec3(0.4, 0.7, 1.0));
   } else if (u_palette == 2) {
-    // Spectrum: full rainbow
+    // Spectrum: full rolling rainbow
     return cosPalette(t, vec3(0.5), vec3(0.5),
                       vec3(1.0), vec3(0.0, 0.33, 0.67));
   } else {
-    // Mono: monochrome gold (matches site accent)
-    vec3 gold = vec3(0.788, 0.659, 0.298);
-    return mix(vec3(0.02, 0.03, 0.05), gold, smoothstep(0.0, 1.0, t))
-           + 0.25 * gold * sin(t * 6.28318530718);
+    // Gold: black -> warm gold -> white (matches site accent)
+    return glow(t, vec3(0.85, 0.70, 0.40));
   }
 }
 
