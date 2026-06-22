@@ -12,7 +12,10 @@ const SPOTS: { cx: number; cy: number; scale: number }[] = [
   { cx: -0.235125, cy: 0.827215, scale: 0.004 }, // Tendrils
 ];
 
-const PALETTE_NAMES = ["Ember", "Ice", "Spectrum", "Gold"];
+const PALETTE_NAMES = ["Ember", "Ice", "Spectrum", "Gold", "Azure"];
+
+// Soft sky-blue "Azure" palette, picked to match the site's light theme.
+const DEFAULT_PALETTE = 4;
 
 /**
  * Compact, interactive fractal for the homepage. The WebGL renderer is loaded
@@ -23,7 +26,7 @@ export default function HomeFractalWidget() {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<FractalView | null>(null);
   const [ready, setReady] = useState(false);
-  const [palette, setPalette] = useState(2);
+  const [palette, setPalette] = useState(DEFAULT_PALETTE);
 
   useEffect(() => {
     const el = mountRef.current;
@@ -36,7 +39,11 @@ export default function HomeFractalWidget() {
         const { FractalView } = await import("@/lib/fractal/FractalView");
         if (cancelled || !mountRef.current) return;
         const view = new FractalView(mountRef.current, {});
-        view.setParams({ palette: 2, maxIter: 400, colorScale: 1.2 });
+        view.setParams({
+          palette: DEFAULT_PALETTE,
+          maxIter: 500,
+          colorScale: 1.4,
+        });
         view.setState({ centerX: -0.743644, centerY: 0.131826, scale: 0.012 });
         viewRef.current = view;
         setReady(true);
@@ -87,10 +94,10 @@ export default function HomeFractalWidget() {
         <span className="text-xs text-gray-400">{PALETTE_NAMES[palette]}</span>
       </div>
 
-      <div className="relative flex-1 overflow-hidden rounded-xl bg-[#05060a] ring-1 ring-gray-200">
+      <div className="relative flex-1 overflow-hidden rounded-xl bg-[#dceaf7] ring-1 ring-gray-200">
         <div ref={mountRef} className="h-full min-h-[24rem] w-full" />
         {!ready && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-gray-400">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-gray-500">
             Loading fractal…
           </div>
         )}
