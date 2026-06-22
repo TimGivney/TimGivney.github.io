@@ -15,6 +15,7 @@ export interface FractalParams {
   colorScale: number; // density of colour banding
   julia: boolean;
   juliaC: [number, number];
+  deep: boolean; // emulated double precision for extra-deep zooms (slower)
 }
 
 export interface FractalState {
@@ -39,15 +40,48 @@ precision highp float;
 
 uniform vec2 u_resolution;
 uniform vec2 u_center;
+uniform vec2 u_cx;         // df64 (hi, lo) of centre X for deep mode
+uniform vec2 u_cy;         // df64 (hi, lo) of centre Y for deep mode
 uniform float u_scale;     // vertical extent of the view in complex units
 uniform int u_maxIter;
 uniform int u_palette;
 uniform float u_colorShift;
 uniform float u_colorScale;
 uniform bool u_julia;
+uniform bool u_deep;       // emulated double precision
 uniform vec2 u_juliaC;
 
 const int ITER_CAP = 1500;
+
+// ---- "double-single" (df64) arithmetic ------------------------------------
+// Each value is a vec2 (hi, lo) carrying ~2x the mantissa bits of a 32-bit
+// float, which pushes the usable zoom roughly from ~1e-5 to ~1e-13.
+vec2 ds_set(float a) { return vec2(a, 0.0); }
+vec2 ds_neg(vec2 a) { return vec2(-a.x, -a.y); }
+
+vec2 ds_add(vec2 a, vec2 b) {
+  float s = a.x + b.x;
+  float v = s - a.x;
+  float e = (a.x - (s - v)) + (b.x - v);
+  float lo = a.y + b.y + e;
+  float hi = s + lo;
+  return vec2(hi, lo - (hi - s));
+}
+
+vec2 ds_mul(vec2 a, vec2 b) {
+  float split = 8193.0; // 2^13 + 1
+  float ca = split * a.x;
+  float cb = split * b.x;
+  float ahi = ca - (ca - a.x);
+  float alo = a.x - ahi;
+  float bhi = cb - (cb - b.x);
+  float blo = b.x - bhi;
+  float p = a.x * b.x;
+  float e = ((ahi * bhi - p) + ahi * blo + alo * bhi) + alo * blo;
+  float lo = a.x * b.y + a.y * b.x + e;
+  float hi = p + lo;
+  return vec2(hi, lo - (hi - p));
+}
 
 // Inigo Quilez cosine gradient palette.
 vec3 cosPalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
@@ -80,25 +114,57 @@ vec3 palette(float t) {
 void main() {
   vec2 uv = gl_FragCoord.xy - 0.5 * u_resolution;
   float pixel = u_scale / u_resolution.y;
-  vec2 c = u_center + uv * pixel;
-
-  vec2 z;
-  vec2 k;
-  if (u_julia) { z = c; k = u_juliaC; }
-  else { z = vec2(0.0); k = c; }
 
   float n = 0.0;
   bool escaped = false;
-  for (int i = 0; i < ITER_CAP; i++) {
-    if (i >= u_maxIter) break;
-    // z = z^2 + k
-    z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + k;
-    float m2 = dot(z, z);
-    if (m2 > 256.0) {
-      // smooth iteration count
-      n = float(i) + 1.0 - log(log(sqrt(m2)) / log(2.0)) / log(2.0);
-      escaped = true;
-      break;
+
+  if (u_deep) {
+    // Emulated double precision: build c and iterate entirely in df64.
+    vec2 px = ds_set(pixel);
+    vec2 cx = ds_add(u_cx, ds_mul(ds_set(uv.x), px));
+    vec2 cy = ds_add(u_cy, ds_mul(ds_set(uv.y), px));
+
+    vec2 zx, zy, kx, ky;
+    if (u_julia) {
+      zx = cx; zy = cy;
+      kx = ds_set(u_juliaC.x); ky = ds_set(u_juliaC.y);
+    } else {
+      zx = ds_set(0.0); zy = ds_set(0.0);
+      kx = cx; ky = cy;
+    }
+
+    for (int i = 0; i < ITER_CAP; i++) {
+      if (i >= u_maxIter) break;
+      vec2 zx2 = ds_mul(zx, zx);
+      vec2 zy2 = ds_mul(zy, zy);
+      float m2 = zx2.x + zy2.x;
+      if (m2 > 256.0) {
+        n = float(i) + 1.0 - log(log(sqrt(m2)) / log(2.0)) / log(2.0);
+        escaped = true;
+        break;
+      }
+      vec2 xy = ds_mul(zx, zy);
+      zx = ds_add(ds_add(zx2, ds_neg(zy2)), kx);
+      zy = ds_add(ds_add(xy, xy), ky);
+    }
+  } else {
+    vec2 c = u_center + uv * pixel;
+    vec2 z;
+    vec2 k;
+    if (u_julia) { z = c; k = u_juliaC; }
+    else { z = vec2(0.0); k = c; }
+
+    for (int i = 0; i < ITER_CAP; i++) {
+      if (i >= u_maxIter) break;
+      // z = z^2 + k
+      z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + k;
+      float m2 = dot(z, z);
+      if (m2 > 256.0) {
+        // smooth iteration count
+        n = float(i) + 1.0 - log(log(sqrt(m2)) / log(2.0)) / log(2.0);
+        escaped = true;
+        break;
+      }
     }
   }
 
@@ -142,6 +208,7 @@ export class FractalView {
     colorScale: 1,
     julia: false,
     juliaC: [-0.8, 0.156],
+    deep: false,
   };
 
   private dirty = true;
@@ -208,12 +275,15 @@ export class FractalView {
     for (const name of [
       "u_resolution",
       "u_center",
+      "u_cx",
+      "u_cy",
       "u_scale",
       "u_maxIter",
       "u_palette",
       "u_colorShift",
       "u_colorScale",
       "u_julia",
+      "u_deep",
       "u_juliaC",
     ]) {
       this.uniforms[name] = gl.getUniformLocation(program, name);
@@ -380,12 +450,18 @@ export class FractalView {
       this.canvas.height
     );
     gl.uniform2f(this.uniforms.u_center, this.state.centerX, this.state.centerY);
+    // df64 split of the centre for the deep-precision path
+    const hx = Math.fround(this.state.centerX);
+    const hy = Math.fround(this.state.centerY);
+    gl.uniform2f(this.uniforms.u_cx, hx, this.state.centerX - hx);
+    gl.uniform2f(this.uniforms.u_cy, hy, this.state.centerY - hy);
     gl.uniform1f(this.uniforms.u_scale, this.state.scale);
     gl.uniform1i(this.uniforms.u_maxIter, Math.round(this.params.maxIter));
     gl.uniform1i(this.uniforms.u_palette, this.params.palette);
     gl.uniform1f(this.uniforms.u_colorShift, this.params.colorShift);
     gl.uniform1f(this.uniforms.u_colorScale, this.params.colorScale);
     gl.uniform1i(this.uniforms.u_julia, this.params.julia ? 1 : 0);
+    gl.uniform1i(this.uniforms.u_deep, this.params.deep ? 1 : 0);
     gl.uniform2f(
       this.uniforms.u_juliaC,
       this.params.juliaC[0],

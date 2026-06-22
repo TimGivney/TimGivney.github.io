@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import {
   ArrowLeft,
   Download,
+  Github,
+  Microscope,
   Minus,
   Plus,
   RotateCcw,
@@ -60,6 +62,7 @@ export default function Fractal() {
   const [colorScale, setColorScale] = useState(1);
   const [colorShift, setColorShift] = useState(0);
   const [juliaIdx, setJuliaIdx] = useState(2);
+  const [deep, setDeep] = useState(false);
   const [view, setView] = useState<FractalState>({
     centerX: -0.5,
     centerY: 0,
@@ -91,8 +94,9 @@ export default function Fractal() {
       colorShift,
       julia,
       juliaC: JULIA_PRESETS[juliaIdx].c,
+      deep,
     });
-  }, [maxIter, palette, colorScale, colorShift, julia, juliaIdx]);
+  }, [maxIter, palette, colorScale, colorShift, julia, juliaIdx, deep]);
 
   const setMode = useCallback((toJulia: boolean) => {
     setJulia(toJulia);
@@ -295,6 +299,18 @@ export default function Fractal() {
             </div>
 
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setDeep(d => !d)}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition ${
+                  deep
+                    ? "bg-[#C9A84C] text-[#1a1a2e]"
+                    : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
+                }`}
+                title="Emulated double precision for extra-deep zooms (slower)"
+              >
+                <Microscope className="h-3.5 w-3.5" /> Deep
+                {deep ? " on" : ""}
+              </button>
               <button onClick={zoomOut} className={pill} title="Zoom out">
                 <Minus className="h-3.5 w-3.5" />
               </button>
@@ -321,7 +337,20 @@ export default function Fractal() {
 
           <p className="text-center font-mono text-[10px] text-zinc-500">
             <Sparkles className="mr-1 inline h-3 w-3 text-[#C9A84C]" />
-            Drag to pan · scroll or pinch to zoom toward the cursor
+            Drag to pan · scroll or pinch to zoom toward the cursor ·{" "}
+            {deep ? "deep precision on (~1e-13)" : "toggle Deep for extra-deep zooms"}
+          </p>
+
+          <p className="text-center font-mono text-[10px] text-zinc-600">
+            Made by Tim, for Tim ·{" "}
+            <a
+              href="https://github.com/TimGivney/TimGivney.github.io"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
+            >
+              <Github className="h-3 w-3" /> Open source on GitHub
+            </a>
           </p>
         </div>
       </div>
