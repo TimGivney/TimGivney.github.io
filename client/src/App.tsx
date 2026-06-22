@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 
 const Cube = lazy(() => import("./pages/Cube"));
 const Fractal = lazy(() => import("./pages/Fractal"));
+const Sky = lazy(() => import("./pages/Sky"));
 
 function Router() {
   return (
@@ -34,6 +35,17 @@ function Router() {
           }
         >
           <Fractal />
+        </Suspense>
+      </Route>
+      <Route path={"/sky"}>
+        <Suspense
+          fallback={
+            <div className="flex h-[100dvh] w-full items-center justify-center bg-[#05060a] font-mono text-sm text-zinc-400">
+              Loading Night Sky…
+            </div>
+          }
+        >
+          <Sky />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
