@@ -91,9 +91,9 @@ export default function Sky() {
     let cancelled = false;
     const base = import.meta.env.BASE_URL;
     Promise.all([
-      fetch(`${base}sky/sky-stars.json`).then(r => r.json()),
-      fetch(`${base}sky/sky-constellations.json`).then(r => r.json()),
-      fetch(`${base}sky/sky-messier.json`).then(r => r.json()),
+      fetch(`${base}sky-data/sky-stars.json`).then(r => r.json()),
+      fetch(`${base}sky-data/sky-constellations.json`).then(r => r.json()),
+      fetch(`${base}sky-data/sky-messier.json`).then(r => r.json()),
     ])
       .then(([stars, constellations, messier]) => {
         if (!cancelled) setData({ stars, constellations, messier });
