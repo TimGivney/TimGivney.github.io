@@ -45,6 +45,14 @@ const MANDEL_PRESETS: {
   { label: "Tendrils", centerX: -0.235125, centerY: 0.827215, scale: 0.004 },
 ];
 
+// Export resolutions for the Save button. longEdge is the target length of the
+// image's longer side in pixels; 0 = grab the current screen size as-is.
+const RES_OPTIONS: { label: string; longEdge: number }[] = [
+  { label: "Screen", longEdge: 0 },
+  { label: "4K", longEdge: 3840 },
+  { label: "8K", longEdge: 7680 },
+];
+
 function formatZoom(scale: number): string {
   const z = 2.6 / scale; // relative to the default view extent
   if (z < 1000) return z.toFixed(z < 10 ? 2 : 0) + "×";
@@ -63,6 +71,8 @@ export default function Fractal() {
   const [colorShift, setColorShift] = useState(0);
   const [juliaIdx, setJuliaIdx] = useState(2);
   const [deep, setDeep] = useState(false);
+  const [resIdx, setResIdx] = useState(1);
+  const [saving, setSaving] = useState(false);
   const [view, setView] = useState<FractalState>({
     centerX: -0.5,
     centerY: 0,
@@ -123,13 +133,25 @@ export default function Fractal() {
 
   const saveImage = useCallback(() => {
     const v = viewRef.current;
-    if (!v) return;
-    const url = v.screenshot();
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `fractal-${Date.now()}.png`;
-    a.click();
-  }, []);
+    if (!v || saving) return;
+    const opt = RES_OPTIONS[resIdx];
+    setSaving(true);
+    // Let the "Saving…" state paint before the (synchronous, possibly heavy)
+    // hi-res render blocks the main thread.
+    setTimeout(() => {
+      try {
+        const url = opt.longEdge
+          ? v.exportPNG(opt.longEdge).url
+          : v.screenshot();
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `fractal-${opt.label.toLowerCase()}-${Date.now()}.png`;
+        a.click();
+      } finally {
+        setSaving(false);
+      }
+    }, 60);
+  }, [resIdx, saving]);
 
   const label = "font-mono text-[10px] uppercase tracking-wider text-zinc-400";
   const pill =
@@ -325,12 +347,31 @@ export default function Fractal() {
                 <RotateCcw className="mr-1 inline h-3.5 w-3.5" />
                 Reset
               </button>
+              <div
+                className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 p-0.5"
+                title="Export resolution"
+              >
+                {RES_OPTIONS.map((opt, i) => (
+                  <button
+                    key={opt.label}
+                    onClick={() => setResIdx(i)}
+                    className={`rounded px-1.5 py-1 font-mono text-[10px] transition ${
+                      i === resIdx
+                        ? "bg-[#C9A84C] text-[#1a1a2e]"
+                        : "text-zinc-300 hover:bg-white/10"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={saveImage}
-                className="inline-flex items-center gap-1 rounded-md bg-[#C9A84C] px-2.5 py-1.5 font-mono text-xs font-medium text-[#1a1a2e] transition hover:brightness-110"
-                title="Save PNG"
+                disabled={saving}
+                className="inline-flex items-center gap-1 rounded-md bg-[#C9A84C] px-2.5 py-1.5 font-mono text-xs font-medium text-[#1a1a2e] transition hover:brightness-110 disabled:opacity-60"
+                title={`Save ${RES_OPTIONS[resIdx].label} PNG`}
               >
-                <Download className="h-3.5 w-3.5" /> Save
+                <Download className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>
