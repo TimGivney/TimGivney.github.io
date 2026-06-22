@@ -447,6 +447,59 @@ export class FractalView {
     return this.canvas.toDataURL("image/png");
   }
 
+  /**
+   * Re-render the *current view* into a much larger buffer and return a PNG
+   * data URL — a true high-resolution export rather than a screen grab. Every
+   * pixel is recomputed by the shader, so there is no upscaling. `longEdge` is
+   * the target length of the image's longer side in pixels (e.g. 3840 for 4K);
+   * the on-screen aspect ratio is preserved so the framing is identical.
+   * Iterations are boosted so fine boundary detail stays crisp at high
+   * resolution. The live view is restored afterwards.
+   */
+  exportPNG(
+    longEdge = 3840,
+    iterBoost = 2
+  ): { url: string; width: number; height: number } {
+    const gl = this.gl;
+    const prevW = this.canvas.width;
+    const prevH = this.canvas.height;
+    const prevIter = this.params.maxIter;
+
+    // Clamp the target to what the GPU/browser can actually allocate.
+    const maxDims = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
+    const hardCap = Math.min(maxDims[0] || 8192, maxDims[1] || 8192, 8192);
+
+    const aspect = prevW / prevH;
+    let w: number;
+    let h: number;
+    if (aspect >= 1) {
+      w = Math.min(longEdge, hardCap);
+      h = Math.round(w / aspect);
+    } else {
+      h = Math.min(longEdge, hardCap);
+      w = Math.round(h * aspect);
+    }
+    w = Math.max(1, Math.min(w, hardCap));
+    h = Math.max(1, Math.min(h, hardCap));
+
+    this.canvas.width = w;
+    this.canvas.height = h;
+    gl.viewport(0, 0, w, h);
+    this.params.maxIter = Math.min(1500, Math.round(prevIter * iterBoost));
+
+    this.render();
+    const url = this.canvas.toDataURL("image/png");
+
+    // Restore the live, on-screen view.
+    this.canvas.width = prevW;
+    this.canvas.height = prevH;
+    gl.viewport(0, 0, prevW, prevH);
+    this.params.maxIter = prevIter;
+    this.dirty = true;
+
+    return { url, width: w, height: h };
+  }
+
   private render() {
     const gl = this.gl;
     gl.useProgram(this.program);
