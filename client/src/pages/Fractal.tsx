@@ -15,7 +15,7 @@ import {
   type FractalState,
 } from "@/lib/fractal/FractalView";
 
-const PALETTES = ["Ember", "Ice", "Spectrum", "Gold"] as const;
+const PALETTES = ["Ember", "Ice", "Spectrum", "Gold", "Azure"] as const;
 
 // A few hand-picked Julia constants worth exploring.
 const JULIA_PRESETS: { label: string; c: [number, number] }[] = [
