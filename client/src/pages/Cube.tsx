@@ -444,6 +444,18 @@ export default function Cube() {
             Drag the background to orbit · drag a face to turn it · scroll to
             zoom · keys U D L R F B (hold Shift to reverse)
           </p>
+
+          <p className="text-center text-[11px] text-zinc-600">
+            Made by Tim, for Tim ·{" "}
+            <a
+              href="https://github.com/TimGivney/TimGivney.github.io"
+              target="_blank"
+              rel="noreferrer"
+              className="text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
+            >
+              Open source on GitHub
+            </a>
+          </p>
         </div>
       </div>
     </div>

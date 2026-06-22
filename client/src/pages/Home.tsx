@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import HomeCubeWidget from '@/components/HomeCubeWidget';
+import HomeFractalWidget from '@/components/HomeFractalWidget';
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -655,6 +656,16 @@ export default function Home() {
               />
             </div>
             <HomeCubeWidget />
+          </div>
+
+          {/* Interactive fractal explorer */}
+          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Fractal Lab</h3>
+              <p className="mt-3 text-gray-700">A GPU-accelerated Mandelbrot &amp; Julia explorer. Drag to pan, scroll to zoom toward the cursor, jump to famous landmarks, and recolour with live palettes — all rendered in real time in a WebGL shader.</p>
+              <p className="mt-3 text-sm text-gray-500">Tinker with the live preview, or open the full explorer for iteration depth, Julia constants, colour controls and a deep-zoom mode.</p>
+            </div>
+            <HomeFractalWidget />
           </div>
         </div>
       </section>
