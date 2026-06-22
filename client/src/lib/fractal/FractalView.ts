@@ -105,9 +105,15 @@ vec3 palette(float t) {
     // Spectrum: full rolling rainbow
     return cosPalette(t, vec3(0.5), vec3(0.5),
                       vec3(1.0), vec3(0.0, 0.33, 0.67));
-  } else {
+  } else if (u_palette == 3) {
     // Gold: black -> warm gold -> white (matches site accent)
     return glow(t, vec3(0.85, 0.70, 0.40));
+  } else {
+    // Azure: soft, airy sky-blue. A pale blue base with gentle banding so the
+    // smooth exterior stays light (matching the site's light theme) while the
+    // boundary filaments still shimmer through cyan, white and rose.
+    return vec3(0.62, 0.78, 0.95)
+         + vec3(0.34, 0.20, 0.05) * cos(6.28318530718 * (t + vec3(0.0, 0.10, 0.22)));
   }
 }
 
