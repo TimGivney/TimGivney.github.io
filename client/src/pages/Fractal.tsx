@@ -22,6 +22,25 @@ const JULIA_PRESETS: { label: string; c: [number, number] }[] = [
   { label: "Spiral", c: [-0.8, 0.156] },
   { label: "San Marco", c: [-0.75, 0] },
   { label: "Galaxies", c: [-0.391, -0.587] },
+  { label: "Lightning", c: [0.285, 0.01] },
+  { label: "Nebula", c: [-0.4, 0.6] },
+  { label: "Feather", c: [-0.7269, 0.1889] },
+];
+
+// Famous Mandelbrot landmarks: { center, vertical scale }.
+const MANDEL_PRESETS: {
+  label: string;
+  centerX: number;
+  centerY: number;
+  scale: number;
+}[] = [
+  { label: "Home", centerX: -0.5, centerY: 0, scale: 2.6 },
+  { label: "Seahorse", centerX: -0.743644, centerY: 0.131826, scale: 0.012 },
+  { label: "Elephant", centerX: 0.275, centerY: 0.007, scale: 0.06 },
+  { label: "Triple Spiral", centerX: -0.088, centerY: 0.654, scale: 0.05 },
+  { label: "Mini-brot", centerX: -1.749, centerY: 0, scale: 0.02 },
+  { label: "Scepter", centerX: -1.36, centerY: 0.005, scale: 0.04 },
+  { label: "Tendrils", centerX: -0.235125, centerY: 0.827215, scale: 0.004 },
 ];
 
 function formatZoom(scale: number): string {
@@ -163,24 +182,39 @@ export default function Fractal() {
       {/* Bottom controls */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur">
-          {/* Julia presets */}
-          {julia && (
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              {JULIA_PRESETS.map((p, i) => (
-                <button
-                  key={p.label}
-                  onClick={() => setJuliaIdx(i)}
-                  className={`rounded-md px-2.5 py-1.5 font-mono text-xs transition ${
-                    i === juliaIdx
-                      ? "bg-[#C9A84C] text-[#1a1a2e]"
-                      : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Presets */}
+          <div className="flex flex-wrap items-center justify-center gap-1.5">
+            <span className={label}>{julia ? "Constant" : "Landmark"}</span>
+            {julia
+              ? JULIA_PRESETS.map((p, i) => (
+                  <button
+                    key={p.label}
+                    onClick={() => setJuliaIdx(i)}
+                    className={`rounded-md px-2.5 py-1.5 font-mono text-xs transition ${
+                      i === juliaIdx
+                        ? "bg-[#C9A84C] text-[#1a1a2e]"
+                        : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))
+              : MANDEL_PRESETS.map(p => (
+                  <button
+                    key={p.label}
+                    onClick={() =>
+                      viewRef.current?.setState({
+                        centerX: p.centerX,
+                        centerY: p.centerY,
+                        scale: p.scale,
+                      })
+                    }
+                    className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-xs text-zinc-200 transition hover:bg-white/15"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+          </div>
 
           {/* Sliders */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
