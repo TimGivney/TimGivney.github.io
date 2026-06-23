@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Compass,
   Github,
   Pause,
   Play,
@@ -13,20 +14,18 @@ import {
 } from "lucide-react";
 import type { SelectedInfo, SkyData, SkyView } from "@/lib/sky/SkyView";
 
-const LOCATIONS = [
-  {
-    name: "Vivonne Bay",
-    sub: "Kangaroo Island, SA",
-    lat: -35.9838,
-    lon: 137.1767,
-  },
-  {
-    name: "Vivonne Bay Beach",
-    sub: "Kangaroo Island, SA",
-    lat: -35.9815,
-    lon: 137.1835,
-  },
-];
+// This view is grounded at the beach end of Vivonne Bay (Point Ellen), where the
+// dark southern sky is at its best — not the house.
+const BEACH = {
+  name: "Vivonne Bay Beach",
+  sub: "Kangaroo Island, SA",
+  lat: -35.9815,
+  lon: 137.1835,
+};
+
+// The matching 360° surroundings panorama on 360cities (Point Ellen, looking
+// over Vivonne Bay), embedded via their official iframe with attribution.
+const PANORAMA_SLUG = "point-ellen-kangaroo-island-south-australia";
 
 // South Australia: ACST (UTC+9:30), ACDT (UTC+10:30) during daylight saving
 // (first Sunday of October to first Sunday of April).
@@ -58,7 +57,6 @@ export default function Sky() {
 
   const [data, setData] = useState<SkyData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loc, setLoc] = useState(0);
   const [minutes, setMinutes] = useState(21 * 60); // 9pm by default
   const [dayOffset, setDayOffset] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -68,6 +66,7 @@ export default function Sky() {
   const [showLabels, setShowLabels] = useState(true);
   const [showPlanets, setShowPlanets] = useState(true);
   const [showDSO, setShowDSO] = useState(true);
+  const [show360, setShow360] = useState(false);
 
   // The actual instant (UTC) for the selected local time + day.
   const { when, localDate } = useMemo(() => {
@@ -113,9 +112,9 @@ export default function Sky() {
       .then(({ SkyView: SV }) => {
         if (cancelled || !mountRef.current) return;
         view = new SV(mountRef.current, data, {
-          lat: LOCATIONS[loc].lat,
-          lon: LOCATIONS[loc].lon,
-          locationName: LOCATIONS[loc].name,
+          lat: BEACH.lat,
+          lon: BEACH.lon,
+          locationName: BEACH.name,
           showConstellations,
           showLabels,
           showPlanets,
@@ -140,15 +139,15 @@ export default function Sky() {
 
   useEffect(() => {
     viewRef.current?.setOptions({
-      lat: LOCATIONS[loc].lat,
-      lon: LOCATIONS[loc].lon,
-      locationName: LOCATIONS[loc].name,
+      lat: BEACH.lat,
+      lon: BEACH.lon,
+      locationName: BEACH.name,
       showConstellations,
       showLabels,
       showPlanets,
       showDSO,
     });
-  }, [loc, showConstellations, showLabels, showPlanets, showDSO]);
+  }, [showConstellations, showLabels, showPlanets, showDSO]);
 
   // Time-lapse animation.
   useEffect(() => {
@@ -218,27 +217,19 @@ export default function Sky() {
             <h1 className="font-mono text-sm font-semibold tracking-tight sm:text-base">
               Night Sky
             </h1>
-            <p className="hidden text-[11px] text-zinc-400 sm:block">
-              Looking up from {LOCATIONS[loc].name} · {LOCATIONS[loc].sub}
+            <p className="text-[11px] text-zinc-400">
+              Looking up from {BEACH.name} · {BEACH.sub}
             </p>
           </div>
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1 backdrop-blur">
-          {LOCATIONS.map((l, i) => (
-            <button
-              key={l.name}
-              onClick={() => setLoc(i)}
-              className={`h-7 rounded-md px-2.5 font-mono text-[11px] transition ${
-                i === loc
-                  ? "bg-[#C9A84C] text-[#1a1a2e]"
-                  : "text-zinc-300 hover:bg-white/10"
-              }`}
-            >
-              {i === 0 ? "House" : "Beach"}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={() => setShow360(true)}
+          className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 backdrop-blur transition hover:bg-white/15"
+          title="See the beach surroundings in 360°"
+        >
+          <Compass className="h-3.5 w-3.5" /> 360° Beach
+        </button>
       </header>
 
       {/* Selected object card */}
@@ -277,6 +268,47 @@ export default function Sky() {
               {selected.myth}
             </p>
           )}
+        </div>
+      )}
+
+      {/* 360° panorama of the surroundings */}
+      {show360 && (
+        <div className="absolute inset-0 z-30 flex flex-col bg-black/90 backdrop-blur">
+          <div className="flex items-start justify-between gap-3 px-4 py-3 sm:px-6">
+            <div>
+              <p className="font-mono text-sm font-semibold text-zinc-100">
+                Vivonne Bay Beach · 360°
+              </p>
+              <p className="text-[11px] text-zinc-400">
+                Point Ellen, looking over Vivonne Bay — drag to look around
+              </p>
+            </div>
+            <button
+              onClick={() => setShow360(false)}
+              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 transition hover:bg-white/15"
+            >
+              <X className="h-4 w-4" /> Close
+            </button>
+          </div>
+          <div className="relative flex-1">
+            <iframe
+              title="360° panorama of Vivonne Bay Beach (Point Ellen)"
+              src={`https://www.360cities.net/embed_iframe/${PANORAMA_SLUG}`}
+              className="absolute inset-0 h-full w-full border-0"
+              allowFullScreen
+            />
+          </div>
+          <p className="px-4 py-2 text-center font-mono text-[10px] text-zinc-500 sm:px-6">
+            360° panorama “Point Ellen and Vivonne Bay” by Klaus Mayer ·{" "}
+            <a
+              href={`https://www.360cities.net/image/${PANORAMA_SLUG}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
+            >
+              360cities.net
+            </a>
+          </p>
         </div>
       )}
 
