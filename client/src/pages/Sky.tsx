@@ -16,7 +16,17 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { SelectedInfo, SkyData, SkyView } from "@/lib/sky/SkyView";
+import type { SelectedInfo, SkyData, SkyOptions } from "@/lib/sky/SkyView";
+
+// Both renderers expose the same small surface, so the page can hold either.
+interface SkyLikeView {
+  setTime(t: Date): void;
+  setOptions(p: Partial<SkyOptions>): void;
+  clearSelection(): void;
+  dispose(): void;
+}
+
+type ViewMode = "horizon" | "dome";
 
 // This view is grounded at the beach end of Vivonne Bay (Point Ellen), where the
 // dark southern sky is at its best — not the house.
@@ -57,7 +67,7 @@ const MONTHS = [
 export default function Sky() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<SkyView | null>(null);
+  const viewRef = useRef<SkyLikeView | null>(null);
 
   const [data, setData] = useState<SkyData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +80,7 @@ export default function Sky() {
   const [showLabels, setShowLabels] = useState(true);
   const [showPlanets, setShowPlanets] = useState(true);
   const [showDSO, setShowDSO] = useState(true);
+  const [mode, setMode] = useState<ViewMode>("horizon");
   const [showLocation, setShowLocation] = useState(false);
   const [hideUI, setHideUI] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -109,26 +120,40 @@ export default function Sky() {
     };
   }, []);
 
-  // Build the view once data + mount are ready.
+  // Build the view once data + mount are ready (rebuilds when the mode changes).
   useEffect(() => {
     if (!data || !mountRef.current) return;
-    let view: SkyView | null = null;
+    const mount = mountRef.current;
+    let view: SkyLikeView | null = null;
     let cancelled = false;
-    import("@/lib/sky/SkyView")
-      .then(({ SkyView: SV }) => {
-        if (cancelled || !mountRef.current) return;
-        view = new SV(mountRef.current, data, {
-          lat: BEACH.lat,
-          lon: BEACH.lon,
-          locationName: BEACH.name,
-          showConstellations,
-          showLabels,
-          showPlanets,
-          showDSO,
-          onSelect: info => setSelected(info),
-        });
-        view.setTime(when);
-        viewRef.current = view;
+    setSelected(null);
+    const opts = {
+      lat: BEACH.lat,
+      lon: BEACH.lon,
+      locationName: BEACH.name,
+      showConstellations,
+      showLabels,
+      showPlanets,
+      showDSO,
+      onSelect: (info: SelectedInfo | null) => setSelected(info),
+    };
+    const loader =
+      mode === "horizon"
+        ? import("@/lib/sky/HorizonView").then(
+            ({ HorizonView }) => new HorizonView(mount, data, opts)
+          )
+        : import("@/lib/sky/SkyView").then(
+            ({ SkyView }) => new SkyView(mount, data, opts)
+          );
+    loader
+      .then(v => {
+        if (cancelled) {
+          v.dispose();
+          return;
+        }
+        view = v;
+        v.setTime(when);
+        viewRef.current = v;
       })
       .catch(err => setError(String(err)));
     return () => {
@@ -137,7 +162,7 @@ export default function Sky() {
       viewRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, mode]);
 
   useEffect(() => {
     viewRef.current?.setTime(when);
@@ -265,7 +290,27 @@ export default function Sky() {
             </div>
           </div>
 
-          <div className="pointer-events-auto flex items-center gap-1.5">
+          <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5">
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 backdrop-blur">
+              {(["horizon", "dome"] as ViewMode[]).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`h-7 rounded-md px-2.5 font-mono text-[11px] capitalize transition ${
+                    mode === m
+                      ? "bg-[#C9A84C] text-[#1a1a2e]"
+                      : "text-zinc-300 hover:bg-white/10"
+                  }`}
+                  title={
+                    m === "horizon"
+                      ? "Stand on the beach and look around"
+                      : "Overhead dome (looking straight up)"
+                  }
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => setShowLocation(true)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 backdrop-blur transition hover:bg-white/15"
@@ -514,8 +559,10 @@ export default function Sky() {
 
           <p className="text-center font-mono text-[10px] text-zinc-500">
             <Sparkles className="mr-1 inline h-3 w-3 text-[#C9A84C]" />
-            Tap any star, planet or cluster to identify it · zenith is centre,
-            horizon is the rim (N up, E left)
+            Tap any star, planet or cluster to identify it ·{" "}
+            {mode === "horizon"
+              ? "drag to look around, scroll to zoom"
+              : "zenith is centre, horizon is the rim (N up, E left)"}
           </p>
 
           <p className="text-center font-mono text-[10px] text-zinc-600">
