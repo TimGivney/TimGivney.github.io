@@ -197,12 +197,12 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen overflow-x-hidden bg-white">
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <a href="#about" className="text-2xl font-bold" style={{ color: '#1B3F6B' }} aria-label="Tim Givney - home">Tim Givney</a>
-          <div className="flex gap-8 text-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <a href="#about" className="shrink-0 whitespace-nowrap text-xl sm:text-2xl font-bold" style={{ color: '#1B3F6B' }} aria-label="Tim Givney - home">Tim Givney</a>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm sm:flex-nowrap sm:gap-8">
             <a href="#about" className="hover:text-blue-700 transition-colors">About</a>
             <a href="#experience" className="hover:text-blue-700 transition-colors">Experience</a>
             <a href="#projects" className="hover:text-blue-700 transition-colors">Projects</a>
