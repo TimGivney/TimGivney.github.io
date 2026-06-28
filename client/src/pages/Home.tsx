@@ -667,6 +667,26 @@ export default function Home() {
             </div>
             <HomeFractalWidget />
           </div>
+
+          {/* More to explore: Night Sky + Meridian */}
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            <a
+              href="/sky"
+              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Night Sky</h3>
+              <p className="mt-3 text-gray-700">Stand on Vivonne Bay Beach and look up. An interactive planetarium of the real night sky over Kangaroo Island — drag to look around, scrub time to watch the stars wheel overhead, and tap any star, planet or cluster to identify it, mythology and all.</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Open Night Sky →</span>
+            </a>
+            <a
+              href="/meridian/"
+              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Meridian</h3>
+              <p className="mt-3 text-gray-700">The Custodian Lottery Republic — a speculative model of government by civic lottery (sortition). A research archive of essays, case studies and implementation pathways exploring how it might work in practice.</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Explore Meridian →</span>
+            </a>
+          </div>
         </div>
       </section>
 
