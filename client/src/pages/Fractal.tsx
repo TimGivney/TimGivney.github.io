@@ -3,8 +3,12 @@ import { Link } from "wouter";
 import {
   ArrowLeft,
   Download,
+  Eye,
+  EyeOff,
   Github,
+  Maximize,
   Microscope,
+  Minimize,
   Minus,
   Plus,
   RotateCcw,
@@ -60,10 +64,13 @@ function formatZoom(scale: number): string {
 }
 
 export default function Fractal() {
+  const rootRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<FractalView | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [uiHidden, setUiHidden] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [julia, setJulia] = useState(false);
   const [maxIter, setMaxIter] = useState(300);
   const [palette, setPalette] = useState(0);
@@ -131,6 +138,39 @@ export default function Fractal() {
   const zoomIn = useCallback(() => viewRef.current?.zoomBy(0.5), []);
   const zoomOut = useCallback(() => viewRef.current?.zoomBy(2), []);
 
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      rootRef.current?.requestFullscreen?.();
+    }
+  }, []);
+
+  // Keep state in sync with the actual fullscreen status (Esc, F11, etc.).
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  // Keyboard shortcuts: F = fullscreen, H = hide/show the UI.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === "h" || e.key === "H") {
+        e.preventDefault();
+        setUiHidden(v => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFullscreen]);
+
   const saveImage = useCallback(() => {
     const v = viewRef.current;
     if (!v || saving) return;
@@ -158,9 +198,23 @@ export default function Fractal() {
     "rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-xs text-zinc-100 backdrop-blur transition hover:bg-white/15 disabled:opacity-40";
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#05060a] text-zinc-100">
+    <div
+      ref={rootRef}
+      className="relative h-[100dvh] w-full overflow-hidden bg-[#05060a] text-zinc-100"
+    >
       {/* Fractal canvas */}
       <div ref={mountRef} className="absolute inset-0" />
+
+      {/* When the UI is hidden, a single discreet button brings it back. */}
+      {uiHidden && !error && (
+        <button
+          onClick={() => setUiHidden(false)}
+          className="pointer-events-auto absolute right-4 top-3 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 font-mono text-[11px] text-zinc-300 backdrop-blur transition hover:bg-white/10 sm:right-6"
+          title="Show controls (H)"
+        >
+          <Eye className="h-3.5 w-3.5" /> Show UI
+        </button>
+      )}
 
       {error && (
         <div className="absolute inset-0 z-20 flex items-center justify-center px-6 text-center">
@@ -174,6 +228,7 @@ export default function Fractal() {
       )}
 
       {/* Top bar */}
+      {!uiHidden && (
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="pointer-events-auto flex items-center gap-3">
           <Link
@@ -192,39 +247,63 @@ export default function Fractal() {
           </div>
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1 backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1 backdrop-blur">
+            <button
+              onClick={() => setMode(false)}
+              className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
+                !julia
+                  ? "bg-[#C9A84C] text-[#1a1a2e]"
+                  : "text-zinc-300 hover:bg-white/10"
+              }`}
+            >
+              Mandelbrot
+            </button>
+            <button
+              onClick={() => setMode(true)}
+              className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
+                julia
+                  ? "bg-[#C9A84C] text-[#1a1a2e]"
+                  : "text-zinc-300 hover:bg-white/10"
+              }`}
+            >
+              Julia
+            </button>
+          </div>
           <button
-            onClick={() => setMode(false)}
-            className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
-              !julia
-                ? "bg-[#C9A84C] text-[#1a1a2e]"
-                : "text-zinc-300 hover:bg-white/10"
-            }`}
+            onClick={() => setUiHidden(true)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 backdrop-blur transition hover:bg-white/10"
+            title="Hide controls (H)"
           >
-            Mandelbrot
+            <EyeOff className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setMode(true)}
-            className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
-              julia
-                ? "bg-[#C9A84C] text-[#1a1a2e]"
-                : "text-zinc-300 hover:bg-white/10"
-            }`}
+            onClick={toggleFullscreen}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 backdrop-blur transition hover:bg-white/10"
+            title={fullscreen ? "Exit fullscreen (F)" : "Fullscreen (F)"}
           >
-            Julia
+            {fullscreen ? (
+              <Minimize className="h-4 w-4" />
+            ) : (
+              <Maximize className="h-4 w-4" />
+            )}
           </button>
         </div>
       </header>
+      )}
 
       {/* Zoom / coordinate readout */}
+      {!uiHidden && (
       <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2">
         <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 font-mono text-[11px] text-zinc-300 backdrop-blur">
           {formatZoom(view.scale)} · re {view.centerX.toFixed(6)} · im{" "}
           {view.centerY.toFixed(6)}
         </span>
       </div>
+      )}
 
       {/* Bottom controls */}
+      {!uiHidden && (
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur">
           {/* Presets */}
@@ -378,8 +457,8 @@ export default function Fractal() {
 
           <p className="text-center font-mono text-[10px] text-zinc-500">
             <Sparkles className="mr-1 inline h-3 w-3 text-[#C9A84C]" />
-            Drag to pan · scroll or pinch to zoom toward the cursor ·{" "}
-            {deep ? "deep precision on (~1e-13)" : "toggle Deep for extra-deep zooms"}
+            Drag to pan · scroll, pinch or double-click to zoom toward the cursor ·{" "}
+            F fullscreen · H hide UI
           </p>
 
           <p className="text-center font-mono text-[10px] text-zinc-600">
@@ -395,6 +474,7 @@ export default function Fractal() {
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }
