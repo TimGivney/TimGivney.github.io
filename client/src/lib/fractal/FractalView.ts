@@ -299,10 +299,12 @@ export class FractalView {
     this.onPointerMove = this.onPointerMove.bind(this);
     this.onPointerUp = this.onPointerUp.bind(this);
     this.onWheel = this.onWheel.bind(this);
+    this.onDblClick = this.onDblClick.bind(this);
     this.canvas.addEventListener("pointerdown", this.onPointerDown);
     window.addEventListener("pointermove", this.onPointerMove);
     window.addEventListener("pointerup", this.onPointerUp);
     this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
+    this.canvas.addEventListener("dblclick", this.onDblClick);
 
     this.resizeObserver = new ResizeObserver(() => {
       this.resize();
@@ -398,14 +400,22 @@ export class FractalView {
 
   private onWheel(e: WheelEvent) {
     e.preventDefault();
-    const [cx, cy] = this.toComplex(e.clientX, e.clientY);
-    const factor = Math.exp(e.deltaY * 0.0015);
-    this.state.scale *= factor;
-    this.state.scale = Math.min(this.state.scale, 6);
-    // keep the complex point under the cursor fixed
+    this.zoomAtClient(e.clientX, e.clientY, Math.exp(e.deltaY * 0.0015));
+  }
+
+  // Double-tap / double-click zooms in toward the clicked point.
+  private onDblClick(e: MouseEvent) {
+    e.preventDefault();
+    this.zoomAtClient(e.clientX, e.clientY, 0.4);
+  }
+
+  /** Zoom about a screen point, keeping the complex value under it fixed. */
+  private zoomAtClient(clientX: number, clientY: number, factor: number) {
+    const [cx, cy] = this.toComplex(clientX, clientY);
+    this.state.scale = Math.min(this.state.scale * factor, 6);
     const rect = this.canvas.getBoundingClientRect();
-    const px = (e.clientX - rect.left) * this.dpr;
-    const py = (rect.height - (e.clientY - rect.top)) * this.dpr;
+    const px = (clientX - rect.left) * this.dpr;
+    const py = (rect.height - (clientY - rect.top)) * this.dpr;
     const pixel = this.state.scale / this.canvas.height;
     this.state.centerX = cx - (px - this.canvas.width / 2) * pixel;
     this.state.centerY = cy - (py - this.canvas.height / 2) * pixel;
@@ -546,6 +556,7 @@ export class FractalView {
     window.removeEventListener("pointermove", this.onPointerMove);
     window.removeEventListener("pointerup", this.onPointerUp);
     this.canvas.removeEventListener("wheel", this.onWheel);
+    this.canvas.removeEventListener("dblclick", this.onDblClick);
     const ext = this.gl.getExtension("WEBGL_lose_context");
     ext?.loseContext();
     if (this.canvas.parentElement) {
