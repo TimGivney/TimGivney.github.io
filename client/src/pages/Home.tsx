@@ -197,12 +197,12 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen overflow-x-hidden bg-white">
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <a href="#about" className="text-2xl font-bold" style={{ color: '#1B3F6B' }} aria-label="Tim Givney - home">Tim Givney</a>
-          <div className="flex gap-8 text-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <a href="#about" className="shrink-0 whitespace-nowrap text-xl sm:text-2xl font-bold" style={{ color: '#1B3F6B' }} aria-label="Tim Givney - home">Tim Givney</a>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm sm:flex-nowrap sm:gap-8">
             <a href="#about" className="hover:text-blue-700 transition-colors">About</a>
             <a href="#experience" className="hover:text-blue-700 transition-colors">Experience</a>
             <a href="#projects" className="hover:text-blue-700 transition-colors">Projects</a>
@@ -666,6 +666,26 @@ export default function Home() {
               <p className="mt-3 text-sm text-gray-500">Tinker with the live preview, or open the full explorer for iteration depth, Julia constants, colour controls and a deep-zoom mode.</p>
             </div>
             <HomeFractalWidget />
+          </div>
+
+          {/* More to explore: Night Sky + Meridian */}
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            <a
+              href="/sky"
+              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Night Sky</h3>
+              <p className="mt-3 text-gray-700">Stand on Vivonne Bay Beach and look up. An interactive planetarium of the real night sky over Kangaroo Island — drag to look around, scrub time to watch the stars wheel overhead, and tap any star, planet or cluster to identify it, mythology and all.</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Open Night Sky →</span>
+            </a>
+            <a
+              href="/meridian/"
+              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Meridian</h3>
+              <p className="mt-3 text-gray-700">The Custodian Lottery Republic — a speculative model of government by civic lottery (sortition). A research archive of essays, case studies and implementation pathways exploring how it might work in practice.</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Explore Meridian →</span>
+            </a>
           </div>
         </div>
       </section>
