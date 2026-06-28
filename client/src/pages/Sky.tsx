@@ -5,8 +5,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Compass,
+  Eye,
+  EyeOff,
   Github,
+  MapPin,
+  Maximize,
+  Minimize,
   Pause,
   Play,
   Sparkles,
@@ -23,9 +27,8 @@ const BEACH = {
   lon: 137.1835,
 };
 
-// The matching 360° surroundings panorama on 360cities (Point Ellen, looking
-// over Vivonne Bay), embedded via their official iframe with attribution.
-const PANORAMA_SLUG = "point-ellen-kangaroo-island-south-australia";
+// Google Maps link to the exact observing spot (the river mouth at Point Ellen).
+const MAPS_URL = `https://www.google.com/maps/search/?api=1&query=${BEACH.lat},${BEACH.lon}`;
 
 // South Australia: ACST (UTC+9:30), ACDT (UTC+10:30) during daylight saving
 // (first Sunday of October to first Sunday of April).
@@ -52,6 +55,7 @@ const MONTHS = [
 ];
 
 export default function Sky() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<SkyView | null>(null);
 
@@ -66,7 +70,9 @@ export default function Sky() {
   const [showLabels, setShowLabels] = useState(true);
   const [showPlanets, setShowPlanets] = useState(true);
   const [showDSO, setShowDSO] = useState(true);
-  const [show360, setShow360] = useState(false);
+  const [showLocation, setShowLocation] = useState(false);
+  const [hideUI, setHideUI] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // The actual instant (UTC) for the selected local time + day.
   const { when, localDate } = useMemo(() => {
@@ -165,6 +171,38 @@ export default function Sky() {
     return () => window.clearInterval(id);
   }, [playing]);
 
+  const toggleFullscreen = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === "h" || e.key === "H") {
+        e.preventDefault();
+        setHideUI(v => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFullscreen]);
+
   const goNow = useCallback(() => {
     setPlaying(false);
     const approxLocal = new Date(Date.now() + 9.5 * 3600_000);
@@ -187,7 +225,10 @@ export default function Sky() {
     "border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15";
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#05060a] text-zinc-100">
+    <div
+      ref={containerRef}
+      className="relative h-[100dvh] w-full overflow-hidden bg-[#05060a] text-zinc-100"
+    >
       <div ref={mountRef} className="absolute inset-0" />
 
       {!data && !error && (
@@ -205,35 +246,84 @@ export default function Sky() {
       )}
 
       {/* Top bar */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 px-4 py-3 sm:px-6">
-        <div className="pointer-events-auto flex items-center gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur transition hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Home
-          </Link>
-          <div>
-            <h1 className="font-mono text-sm font-semibold tracking-tight sm:text-base">
-              Night Sky
-            </h1>
-            <p className="text-[11px] text-zinc-400">
-              Looking up from {BEACH.name} · {BEACH.sub}
-            </p>
+      {!hideUI && (
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="pointer-events-auto flex items-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur transition hover:bg-white/10"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Home
+            </Link>
+            <div>
+              <h1 className="font-mono text-sm font-semibold tracking-tight sm:text-base">
+                Night Sky
+              </h1>
+              <p className="text-[11px] text-zinc-400">
+                Looking up from {BEACH.name} · {BEACH.sub}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <button
-          onClick={() => setShow360(true)}
-          className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 backdrop-blur transition hover:bg-white/15"
-          title="See the beach surroundings in 360°"
-        >
-          <Compass className="h-3.5 w-3.5" /> 360° Beach
-        </button>
-      </header>
+          <div className="pointer-events-auto flex items-center gap-1.5">
+            <button
+              onClick={() => setShowLocation(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 backdrop-blur transition hover:bg-white/15"
+              title="See where this is on the map"
+            >
+              <MapPin className="h-3.5 w-3.5" /> Location
+            </button>
+            <button
+              onClick={() => setHideUI(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 backdrop-blur transition hover:bg-white/15"
+              title="Hide controls (H)"
+            >
+              <EyeOff className="h-3.5 w-3.5" /> Hide UI
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 backdrop-blur transition hover:bg-white/15"
+              title="Fullscreen (F)"
+            >
+              {isFullscreen ? (
+                <Minimize className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {isFullscreen ? "Exit" : "Fullscreen"}
+              </span>
+            </button>
+          </div>
+        </header>
+      )}
+
+      {/* Restore-UI control when hidden */}
+      {hideUI && (
+        <div className="absolute right-4 top-3 z-10 flex items-center gap-1.5 sm:right-6">
+          <button
+            onClick={toggleFullscreen}
+            className="inline-flex items-center justify-center rounded-md border border-white/10 bg-black/40 p-2 text-zinc-200 backdrop-blur transition hover:bg-white/15"
+            title="Fullscreen (F)"
+          >
+            {isFullscreen ? (
+              <Minimize className="h-4 w-4" />
+            ) : (
+              <Maximize className="h-4 w-4" />
+            )}
+          </button>
+          <button
+            onClick={() => setHideUI(false)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 backdrop-blur transition hover:bg-white/15"
+            title="Show controls (H)"
+          >
+            <Eye className="h-3.5 w-3.5" /> Show UI
+          </button>
+        </div>
+      )}
 
       {/* Selected object card */}
-      {selected && (
+      {selected && !hideUI && (
         <div className="absolute left-4 top-20 z-10 w-72 max-w-[calc(100%-2rem)] rounded-xl border border-white/10 bg-black/55 p-4 backdrop-blur sm:left-6">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -271,48 +361,68 @@ export default function Sky() {
         </div>
       )}
 
-      {/* 360° panorama of the surroundings */}
-      {show360 && (
+      {/* Location: aerial photo with a pin on the exact spot */}
+      {showLocation && (
         <div className="absolute inset-0 z-30 flex flex-col bg-black/90 backdrop-blur">
           <div className="flex items-start justify-between gap-3 px-4 py-3 sm:px-6">
             <div>
               <p className="font-mono text-sm font-semibold text-zinc-100">
-                Vivonne Bay Beach · 360°
+                Vivonne Bay Beach · Location
               </p>
               <p className="text-[11px] text-zinc-400">
-                Point Ellen, looking over Vivonne Bay — drag to look around
+                The pin marks exactly where you’re standing — the river mouth at
+                Point Ellen, {BEACH.lat}, {BEACH.lon}
               </p>
             </div>
             <button
-              onClick={() => setShow360(false)}
+              onClick={() => setShowLocation(false)}
               className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 transition hover:bg-white/15"
             >
               <X className="h-4 w-4" /> Close
             </button>
           </div>
-          <div className="relative flex-1">
-            <iframe
-              title="360° panorama of Vivonne Bay Beach (Point Ellen)"
-              src={`https://www.360cities.net/embed_iframe/${PANORAMA_SLUG}`}
-              className="absolute inset-0 h-full w-full border-0"
-              allowFullScreen
+          <div className="relative flex-1 overflow-hidden">
+            <img
+              src={`${import.meta.env.BASE_URL}assets/vivonne-bay-beach-aerial.jpg`}
+              alt="Aerial view of Vivonne Bay Beach, Kangaroo Island"
+              className="absolute inset-0 h-full w-full object-cover"
             />
-          </div>
-          <p className="px-4 py-2 text-center font-mono text-[10px] text-zinc-500 sm:px-6">
-            360° panorama “Point Ellen and Vivonne Bay” by Klaus Mayer ·{" "}
+            {/* Pin on the river mouth */}
             <a
-              href={`https://www.360cities.net/image/${PANORAMA_SLUG}`}
+              href={MAPS_URL}
               target="_blank"
               rel="noreferrer"
-              className="text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
+              className="group absolute -translate-x-1/2 -translate-y-full"
+              style={{ left: "52%", top: "9%" }}
+              title="Open in Google Maps"
             >
-              360cities.net
+              <span className="absolute left-1/2 top-full h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-[#C9A84C]/70" />
+              <MapPin
+                className="relative h-9 w-9 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] transition group-hover:scale-110"
+                strokeWidth={2.5}
+                style={{ color: "#C9A84C", fill: "#1a1a2e" }}
+              />
+              <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-black/70 px-2 py-0.5 font-mono text-[10px] text-zinc-100 backdrop-blur">
+                You are here
+              </span>
+            </a>
+          </div>
+          <p className="px-4 py-2 text-center font-mono text-[10px] text-zinc-500 sm:px-6">
+            Aerial of Vivonne Bay Beach, Kangaroo Island ·{" "}
+            <a
+              href={MAPS_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
+            >
+              <MapPin className="h-3 w-3" /> View on Google Maps
             </a>
           </p>
         </div>
       )}
 
       {/* Bottom controls */}
+      {!hideUI && (
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-white/10 bg-black/45 p-3 backdrop-blur">
           {/* Time row */}
@@ -421,6 +531,7 @@ export default function Sky() {
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }
