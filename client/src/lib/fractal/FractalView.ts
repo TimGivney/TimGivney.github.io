@@ -218,6 +218,7 @@ export class FractalView {
   };
 
   private dirty = true;
+  private colorCycle = false;
   private raf = 0;
   private disposed = false;
   private resizeObserver: ResizeObserver;
@@ -432,6 +433,12 @@ export class FractalView {
     this.dirty = true;
   }
 
+  // Slowly rotate the palette so colours flow while you explore.
+  setColorCycle(on: boolean) {
+    this.colorCycle = on;
+    this.dirty = true;
+  }
+
   setState(s: Partial<FractalState>) {
     this.state = { ...this.state, ...s };
     this.markChanged();
@@ -541,6 +548,10 @@ export class FractalView {
 
   private loop = () => {
     if (this.disposed) return;
+    if (this.colorCycle) {
+      this.params.colorShift = (this.params.colorShift + 0.0022) % 1;
+      this.dirty = true;
+    }
     if (this.dirty) {
       this.dirty = false;
       this.render();

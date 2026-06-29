@@ -309,6 +309,7 @@ export class Fractal3DView {
 
   private autoRotate = false;
   private animate = false;
+  private colorCycle = false;
 
   private moving = false;
   private moveTimer = 0;
@@ -511,6 +512,12 @@ export class Fractal3DView {
     this.dirty = true;
   }
 
+  // Slowly drift the palette (and glow) so colours flow while you explore.
+  setColorCycle(on: boolean) {
+    this.colorCycle = on;
+    this.dirty = true;
+  }
+
   private camPos(): [number, number, number] {
     const { yaw, pitch, dist } = this.cam;
     const cp = Math.cos(pitch);
@@ -579,6 +586,10 @@ export class Fractal3DView {
       this.dirty = true;
     }
     if (this.animate) this.dirty = true;
+    if (this.colorCycle) {
+      this.params.colorShift = (this.params.colorShift + 0.0022) % 1;
+      this.dirty = true;
+    }
     if (this.dirty) {
       this.dirty = false;
       this.render(animTime);
