@@ -668,8 +668,16 @@ export default function Home() {
             <HomeFractalWidget />
           </div>
 
-          {/* More to explore: Night Sky + Meridian */}
-          <div className="mt-6 grid gap-6 md:grid-cols-2">
+          {/* More to explore: Fractal Lab 3D + Night Sky + Meridian */}
+          <div className="mt-6 grid gap-6 md:grid-cols-3">
+            <a
+              href="/fractal3d"
+              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Fractal Lab 3D</h3>
+              <p className="mt-3 text-gray-700">Step into three dimensions. A real-time ray-marched explorer for the Mandelbulb, Mandelbox and quaternion Julia sets — orbit the shape, morph its parameters, recolour it live, and export 4K/8K stills, all rendered in a WebGL shader.</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Open Fractal Lab 3D →</span>
+            </a>
             <a
               href="/sky"
               className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
