@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   Fractal3DView,
+  defaultDistanceFor,
   type Fractal3DCamera,
   type Fractal3DType,
 } from "@/lib/fractal/Fractal3DView";
@@ -133,6 +134,11 @@ export default function Fractal3D() {
     glow,
     quality,
   ]);
+
+  // Frame each fractal from a sensible distance (the Mandelbox is much bigger).
+  useEffect(() => {
+    viewRef.current?.setCamera({ dist: defaultDistanceFor(type) });
+  }, [type]);
 
   useEffect(() => {
     viewRef.current?.setAutoRotate(autoRotate);

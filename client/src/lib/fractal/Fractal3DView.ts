@@ -62,6 +62,7 @@ uniform float u_colorShift;
 uniform float u_glow;
 uniform int u_maxSteps;
 uniform float u_detail;      // min surface distance (smaller = crisper, slower)
+uniform float u_far;         // ray far plane (depends on fractal size)
 
 const int ITER_CAP = 24;
 const int STEP_CAP = 160;
@@ -206,7 +207,7 @@ void main() {
     if (d < u_detail * t) { hit = true; break; }
     t += d;
     steps += 1.0;
-    if (t > 8.0) break;
+    if (t > u_far) break;
   }
 
   vec3 col;
@@ -223,7 +224,7 @@ void main() {
     vec3 base = palette(trap * 1.5 + u_colorShift);
     col = base * (0.25 + 0.85 * diff * sh) * ao;
     col += fres * 0.4 * base;
-    col = mix(col, bg, clamp(t / 8.0, 0.0, 1.0)); // distance fog
+    col = mix(col, bg, clamp(t / u_far, 0.0, 1.0)); // distance fog
   } else {
     // glow toward the centre where the fractal sits
     float g = u_glow * pow(max(0.0, 1.0 - length(uv) * 0.9), 3.0);
@@ -263,7 +264,25 @@ const UNIFORMS = [
   "u_glow",
   "u_maxSteps",
   "u_detail",
+  "u_far",
 ] as const;
+
+// The Mandelbox bulk is much larger than the unit-ish Mandelbulb / Julia, so it
+// needs a farther camera and a longer ray far-plane to frame it.
+const DEFAULT_DIST: Record<Fractal3DType, number> = {
+  mandelbulb: 2.8,
+  mandelbox: 7,
+  julia: 2.6,
+};
+const FAR: Record<Fractal3DType, number> = {
+  mandelbulb: 8,
+  mandelbox: 16,
+  julia: 8,
+};
+
+export function defaultDistanceFor(type: Fractal3DType): number {
+  return DEFAULT_DIST[type];
+}
 
 export class Fractal3DView {
   private container: HTMLElement;
@@ -427,7 +446,7 @@ export class Fractal3DView {
       if (this.pinchStartDist > 0) {
         this.cam.dist = Math.max(
           1.2,
-          Math.min(6, this.pinchStartZoom * (this.pinchStartDist / Math.max(dist, 1)))
+          Math.min(14, this.pinchStartZoom * (this.pinchStartDist / Math.max(dist, 1)))
         );
         this.markMoving();
       }
@@ -456,7 +475,7 @@ export class Fractal3DView {
     e.preventDefault();
     this.cam.dist = Math.max(
       1.2,
-      Math.min(6, this.cam.dist * Math.exp(e.deltaY * 0.0015))
+      Math.min(14, this.cam.dist * Math.exp(e.deltaY * 0.0015))
     );
     this.markMoving();
   }
@@ -478,7 +497,7 @@ export class Fractal3DView {
   }
 
   resetCamera() {
-    this.cam = { ...DEFAULT_CAM };
+    this.cam = { ...DEFAULT_CAM, dist: DEFAULT_DIST[this.params.type] };
     this.markMoving();
   }
 
@@ -547,6 +566,7 @@ export class Fractal3DView {
     gl.uniform1f(this.uniforms.u_glow, this.params.glow);
     gl.uniform1i(this.uniforms.u_maxSteps, this.maxSteps());
     gl.uniform1f(this.uniforms.u_detail, this.detail());
+    gl.uniform1f(this.uniforms.u_far, FAR[this.params.type]);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
