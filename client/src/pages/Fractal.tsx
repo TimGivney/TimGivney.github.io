@@ -10,6 +10,8 @@ import {
   Microscope,
   Minimize,
   Minus,
+  Pause,
+  Play,
   Plus,
   RotateCcw,
   Sparkles,
@@ -79,6 +81,7 @@ export default function Fractal() {
   const [juliaIdx, setJuliaIdx] = useState(2);
   const [deep, setDeep] = useState(false);
   const [resIdx, setResIdx] = useState(1);
+  const [colorCycle, setColorCycle] = useState(false);
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState<FractalState>({
     centerX: -0.5,
@@ -114,6 +117,11 @@ export default function Fractal() {
       deep,
     });
   }, [maxIter, palette, colorScale, colorShift, julia, juliaIdx, deep]);
+
+  // Slowly drift the palette while exploring (off by default).
+  useEffect(() => {
+    viewRef.current?.setColorCycle(colorCycle);
+  }, [colorCycle]);
 
   const setMode = useCallback((toJulia: boolean) => {
     setJulia(toJulia);
@@ -397,6 +405,22 @@ export default function Fractal() {
                   {p}
                 </button>
               ))}
+              <button
+                onClick={() => setColorCycle(c => !c)}
+                className={`ml-1 inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition ${
+                  colorCycle
+                    ? "bg-[#C9A84C] text-[#1a1a2e]"
+                    : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
+                }`}
+                title="Slowly drift the colours as you explore"
+              >
+                {colorCycle ? (
+                  <Pause className="h-3.5 w-3.5" />
+                ) : (
+                  <Play className="h-3.5 w-3.5" />
+                )}
+                Drift
+              </button>
             </div>
 
             <div className="flex items-center gap-1.5">

@@ -9,6 +9,7 @@ import {
   Maximize,
   Minimize,
   Orbit,
+  Pause,
   Play,
   RotateCcw,
   Sparkles,
@@ -87,6 +88,7 @@ export default function Fractal3D() {
 
   const [autoRotate, setAutoRotate] = useState(false);
   const [animate, setAnimate] = useState(false);
+  const [colorCycle, setColorCycle] = useState(false);
   const [resIdx, setResIdx] = useState(1);
   const [saving, setSaving] = useState(false);
   const [, setCam] = useState<Fractal3DCamera>({
@@ -147,6 +149,11 @@ export default function Fractal3D() {
   useEffect(() => {
     viewRef.current?.setAnimate(animate);
   }, [animate]);
+
+  // Slowly drift the palette while exploring (off by default).
+  useEffect(() => {
+    viewRef.current?.setColorCycle(colorCycle);
+  }, [colorCycle]);
 
   const reset = useCallback(() => viewRef.current?.resetCamera(), []);
 
@@ -466,6 +473,22 @@ export default function Fractal3D() {
                     <Play className="h-3.5 w-3.5" />
                   )}
                   Animate
+                </button>
+                <button
+                  onClick={() => setColorCycle(v => !v)}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition ${
+                    colorCycle
+                      ? "bg-[#C9A84C] text-[#1a1a2e]"
+                      : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
+                  }`}
+                  title="Slowly drift the colours as you explore"
+                >
+                  {colorCycle ? (
+                    <Pause className="h-3.5 w-3.5" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  Drift
                 </button>
                 <button onClick={reset} className={pill} title="Reset view">
                   <RotateCcw className="mr-1 inline h-3.5 w-3.5" />

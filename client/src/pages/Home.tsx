@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import HomeCubeWidget from '@/components/HomeCubeWidget';
 import HomeFractalWidget from '@/components/HomeFractalWidget';
+import HomeFractal3DWidget from '@/components/HomeFractal3DWidget';
+import HomeSkyWidget from '@/components/HomeSkyWidget';
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -644,21 +646,26 @@ export default function Home() {
             </div>
           </div>
           
-          {/* Rock climbing photo + interactive Rubik's cube */}
-          <div className="mt-16 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
-            <div className="overflow-hidden rounded-xl">
-              <img 
-                src="/assets/rock-climbing-finish_a009e264.jpg" 
-                alt="Tim Givney rock climbing"
-                loading="lazy" decoding="async"
-                className="h-full max-h-[30rem] w-full object-contain"
-                style={{ backgroundColor: '#f5f5f5' }}
-              />
+          {/* Extracurricular — interactive playgrounds and side projects */}
+          <div className="mt-20 flex items-center gap-4 mb-4">
+            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Extracurricular</h2>
+            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+          </div>
+          <p className="mb-10 max-w-3xl text-gray-600">
+            A few things I build for the joy of it — interactive toys rendered live in the browser. Have a play with the previews, or open the full version of each.
+          </p>
+
+          {/* Cube Studio */}
+          <div className="grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Cube Studio</h3>
+              <p className="mt-3 text-gray-700">An interactive 3D Rubik&apos;s cube. Scramble it, then watch the solver unwind it move by move — every turn animated in real time with Three.js. Drag to rotate the cube in your hands.</p>
+              <p className="mt-3 text-sm text-gray-500">Try the live 5×5 preview, or open the full studio for the complete 2×2–5×5 simulator and solver.</p>
             </div>
             <HomeCubeWidget />
           </div>
 
-          {/* Interactive fractal explorer */}
+          {/* Fractal Lab */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
               <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Fractal Lab</h3>
@@ -668,32 +675,45 @@ export default function Home() {
             <HomeFractalWidget />
           </div>
 
-          {/* More to explore: Fractal Lab 3D + Night Sky + Meridian */}
-          <div className="mt-6 grid gap-6 md:grid-cols-3">
-            <a
-              href="/fractal3d"
-              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-            >
+          {/* Fractal Lab 3D */}
+          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
               <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Fractal Lab 3D</h3>
-              <p className="mt-3 text-gray-700">Step into three dimensions. A real-time ray-marched explorer for the Mandelbulb, Mandelbox and quaternion Julia sets — orbit the shape, morph its parameters, recolour it live, and export 4K/8K stills, all rendered in a WebGL shader.</p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Open Fractal Lab 3D →</span>
-            </a>
-            <a
-              href="/sky"
-              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-            >
+              <p className="mt-3 text-gray-700">Step into three dimensions. A real-time ray-marched explorer for the Mandelbulb, Mandelbox and quaternion Julia sets — orbit the shape, morph its parameters and recolour it live, all rendered in a WebGL shader.</p>
+              <p className="mt-3 text-sm text-gray-500">Spin the live preview, or open the full explorer for presets, fullscreen, colour drift and 4K/8K stills.</p>
+            </div>
+            <HomeFractal3DWidget />
+          </div>
+
+          {/* Night Sky */}
+          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
               <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Night Sky</h3>
               <p className="mt-3 text-gray-700">Stand on Vivonne Bay Beach and look up. An interactive planetarium of the real night sky over Kangaroo Island — drag to look around, scrub time to watch the stars wheel overhead, and tap any star, planet or cluster to identify it, mythology and all.</p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Open Night Sky →</span>
-            </a>
-            <a
-              href="/meridian/"
-              className="group flex flex-col rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Meridian</h3>
-              <p className="mt-3 text-gray-700">The Custodian Lottery Republic — a speculative model of government by civic lottery (sortition). A research archive of essays, case studies and implementation pathways exploring how it might work in practice.</p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Explore Meridian →</span>
-            </a>
+              <p className="mt-3 text-sm text-gray-500">Watch the live preview wheel through the night, or open the full planetarium for the time slider, horizon view and click-to-identify.</p>
+            </div>
+            <HomeSkyWidget />
+          </div>
+
+          {/* Meridian (no live preview) */}
+          <a
+            href="/meridian/"
+            className="group mt-6 block rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Meridian</h3>
+            <p className="mt-3 max-w-3xl text-gray-700">The Custodian Lottery Republic — a speculative model of government by civic lottery (sortition). A research archive of essays, case studies and implementation pathways exploring how it might work in practice.</p>
+            <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Explore Meridian →</span>
+          </a>
+
+          {/* Rock climbing photo — caps off the section */}
+          <div className="mt-6 overflow-hidden rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100">
+            <img
+              src="/assets/rock-climbing-finish_a009e264.jpg"
+              alt="Tim Givney rock climbing"
+              loading="lazy" decoding="async"
+              className="mx-auto max-h-[34rem] w-full rounded-xl object-contain"
+              style={{ backgroundColor: '#f5f5f5' }}
+            />
           </div>
         </div>
       </section>
