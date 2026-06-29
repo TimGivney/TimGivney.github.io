@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowLeft,
+  Boxes,
   Download,
   Eye,
   EyeOff,
@@ -21,6 +22,7 @@ import {
   type Fractal3DCamera,
   type Fractal3DType,
 } from "@/lib/fractal/Fractal3DView";
+import type { MeshRequest, MeshResponse } from "@/lib/fractal/meshWorker";
 
 const PALETTES = ["Ember", "Ice", "Spectrum", "Gold", "Azure"] as const;
 
@@ -52,18 +54,27 @@ const BOX_PRESETS: { label: string; boxScale: number }[] = [
   { label: "Positive", boxScale: 2.0 },
 ];
 
-const JULIA_PRESETS: { label: string; c: [number, number, number, number] }[] = [
-  { label: "Nebula", c: [-0.45, 0.6, 0.2, 0.0] },
-  { label: "Bulbs", c: [-0.2, 0.4, -0.4, -0.4] },
-  { label: "Tendrils", c: [-0.59, 0.2, 0.2, 0.1] },
-  { label: "Quartz", c: [-0.125, -0.256, 0.847, 0.0895] },
-  { label: "Bloom", c: [0.18, 0.88, 0.0, 0.0] },
-];
+const JULIA_PRESETS: { label: string; c: [number, number, number, number] }[] =
+  [
+    { label: "Nebula", c: [-0.45, 0.6, 0.2, 0.0] },
+    { label: "Bulbs", c: [-0.2, 0.4, -0.4, -0.4] },
+    { label: "Tendrils", c: [-0.59, 0.2, 0.2, 0.1] },
+    { label: "Quartz", c: [-0.125, -0.256, 0.847, 0.0895] },
+    { label: "Bloom", c: [0.18, 0.88, 0.0, 0.0] },
+  ];
 
 const RES_OPTIONS: { label: string; longEdge: number }[] = [
   { label: "Screen", longEdge: 0 },
   { label: "4K", longEdge: 3840 },
   { label: "8K", longEdge: 7680 },
+];
+
+// Voxel grid resolution for the 3D-printable mesh export.
+const MESH_RES: { label: string; res: number }[] = [
+  { label: "Draft", res: 64 },
+  { label: "Standard", res: 128 },
+  { label: "High", res: 192 },
+  { label: "Ultra", res: 256 },
 ];
 
 export default function Fractal3D() {
@@ -78,8 +89,9 @@ export default function Fractal3D() {
   const [type, setType] = useState<Fractal3DType>("mandelbulb");
   const [power, setPower] = useState(8);
   const [boxScale, setBoxScale] = useState(-1.8);
-  const [juliaC, setJuliaC] =
-    useState<[number, number, number, number]>([-0.45, 0.6, 0.2, 0.0]);
+  const [juliaC, setJuliaC] = useState<[number, number, number, number]>([
+    -0.45, 0.6, 0.2, 0.0,
+  ]);
   const [iterations, setIterations] = useState(8);
   const [palette, setPalette] = useState(0);
   const [colorShift, setColorShift] = useState(0);
@@ -91,6 +103,12 @@ export default function Fractal3D() {
   const [colorCycle, setColorCycle] = useState(false);
   const [resIdx, setResIdx] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [meshFormat, setMeshFormat] = useState<"stl" | "obj">("stl");
+  const [meshResIdx, setMeshResIdx] = useState(1);
+  const [meshBusy, setMeshBusy] = useState(false);
+  const [meshProgress, setMeshProgress] = useState(0);
+  const [meshNote, setMeshNote] = useState<string | null>(null);
+  const meshWorkerRef = useRef<Worker | null>(null);
   const [, setCam] = useState<Fractal3DCamera>({
     yaw: 0.7,
     pitch: -0.35,
@@ -155,6 +173,85 @@ export default function Fractal3D() {
     viewRef.current?.setColorCycle(colorCycle);
   }, [colorCycle]);
 
+  // Extract a watertight triangle mesh of the current fractal in a Web Worker,
+  // then download it as STL (best for slicers) or OBJ.
+  const exportMesh = useCallback(() => {
+    if (meshBusy) return;
+    setMeshNote(null);
+    setMeshBusy(true);
+    setMeshProgress(0);
+    const worker = new Worker(
+      new URL("../lib/fractal/meshWorker.ts", import.meta.url),
+      { type: "module" }
+    );
+    meshWorkerRef.current = worker;
+    const finish = () => {
+      setMeshBusy(false);
+      setMeshProgress(0);
+      worker.terminate();
+      meshWorkerRef.current = null;
+    };
+    worker.onmessage = (e: MessageEvent<MeshResponse>) => {
+      const msg = e.data;
+      if (msg.kind === "progress") {
+        setMeshProgress(msg.frac);
+      } else if (msg.kind === "done") {
+        let blob: Blob | null = null;
+        if (msg.format === "stl" && msg.stl) {
+          blob = new Blob([msg.stl], { type: "model/stl" });
+        } else if (msg.format === "obj" && msg.obj !== undefined) {
+          blob = new Blob([msg.obj], { type: "text/plain" });
+        }
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `fractal3d-${type}-${Date.now()}.${msg.format}`;
+          a.click();
+          URL.revokeObjectURL(url);
+          setMeshNote(`${msg.triangles.toLocaleString()} triangles`);
+        }
+        finish();
+      } else {
+        setMeshNote(msg.message);
+        finish();
+      }
+    };
+    worker.onerror = e => {
+      setMeshNote(e.message || "Mesh export failed");
+      finish();
+    };
+    const req: MeshRequest = {
+      params: {
+        type,
+        power,
+        boxScale,
+        juliaC,
+        iterations,
+        resolution: MESH_RES[meshResIdx].res,
+      },
+      format: meshFormat,
+    };
+    worker.postMessage(req);
+  }, [
+    meshBusy,
+    type,
+    power,
+    boxScale,
+    juliaC,
+    iterations,
+    meshResIdx,
+    meshFormat,
+  ]);
+
+  useEffect(
+    () => () => {
+      meshWorkerRef.current?.terminate();
+      meshWorkerRef.current = null;
+    },
+    []
+  );
+
   const reset = useCallback(() => viewRef.current?.resetCamera(), []);
 
   const toggleFullscreen = useCallback(() => {
@@ -192,7 +289,9 @@ export default function Fractal3D() {
     setSaving(true);
     setTimeout(() => {
       try {
-        const url = opt.longEdge ? v.exportPNG(opt.longEdge).url : v.screenshot();
+        const url = opt.longEdge
+          ? v.exportPNG(opt.longEdge).url
+          : v.screenshot();
         const a = document.createElement("a");
         a.href = url;
         a.download = `fractal3d-${type}-${opt.label.toLowerCase()}-${Date.now()}.png`;
@@ -227,7 +326,9 @@ export default function Fractal3D() {
       {error && (
         <div className="absolute inset-0 z-20 flex items-center justify-center px-6 text-center">
           <div className="max-w-md rounded-xl border border-white/10 bg-black/60 p-6 backdrop-blur">
-            <p className="font-mono text-sm text-rose-300">Couldn’t start WebGL</p>
+            <p className="font-mono text-sm text-rose-300">
+              Couldn’t start WebGL
+            </p>
             <p className="mt-2 text-xs text-zinc-400">{error}</p>
           </div>
         </div>
@@ -391,7 +492,9 @@ export default function Fractal3D() {
               )}
               {type === "julia" && (
                 <label className="flex flex-col gap-1">
-                  <span className={label}>Constant w · {juliaC[3].toFixed(2)}</span>
+                  <span className={label}>
+                    Constant w · {juliaC[3].toFixed(2)}
+                  </span>
                   <input
                     type="range"
                     min={-1}
@@ -399,7 +502,12 @@ export default function Fractal3D() {
                     step={0.01}
                     value={juliaC[3]}
                     onChange={e =>
-                      setJuliaC([juliaC[0], juliaC[1], juliaC[2], Number(e.target.value)])
+                      setJuliaC([
+                        juliaC[0],
+                        juliaC[1],
+                        juliaC[2],
+                        Number(e.target.value),
+                      ])
                     }
                     className="accent-[#C9A84C]"
                   />
@@ -418,7 +526,9 @@ export default function Fractal3D() {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className={label}>Quality · {Math.round(quality * 100)}%</span>
+                <span className={label}>
+                  Quality · {Math.round(quality * 100)}%
+                </span>
                 <input
                   type="range"
                   min={0.2}
@@ -518,7 +628,64 @@ export default function Fractal3D() {
                   className="inline-flex items-center gap-1 rounded-md bg-[#C9A84C] px-2.5 py-1.5 font-mono text-xs font-medium text-[#1a1a2e] transition hover:brightness-110 disabled:opacity-60"
                   title={`Save ${RES_OPTIONS[resIdx].label} PNG`}
                 >
-                  <Download className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
+                  <Download className="h-3.5 w-3.5" />{" "}
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+
+            {/* 3D-printable mesh export */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={label}>3D print</span>
+                <div className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 p-0.5">
+                  {(["stl", "obj"] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setMeshFormat(f)}
+                      className={`rounded px-1.5 py-1 font-mono text-[10px] uppercase transition ${
+                        meshFormat === f
+                          ? "bg-[#C9A84C] text-[#1a1a2e]"
+                          : "text-zinc-300 hover:bg-white/10"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 p-0.5">
+                  {MESH_RES.map((opt, i) => (
+                    <button
+                      key={opt.label}
+                      onClick={() => setMeshResIdx(i)}
+                      className={`rounded px-1.5 py-1 font-mono text-[10px] transition ${
+                        i === meshResIdx
+                          ? "bg-[#C9A84C] text-[#1a1a2e]"
+                          : "text-zinc-300 hover:bg-white/10"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {meshNote && (
+                  <span className="font-mono text-[10px] text-zinc-400">
+                    {meshNote}
+                  </span>
+                )}
+                <button
+                  onClick={exportMesh}
+                  disabled={meshBusy}
+                  className="inline-flex items-center gap-1 rounded-md border border-[#C9A84C]/60 bg-[#C9A84C]/15 px-2.5 py-1.5 font-mono text-xs font-medium text-[#C9A84C] transition hover:bg-[#C9A84C]/25 disabled:opacity-60"
+                  title="Export a 3D-printable mesh of the current fractal"
+                >
+                  <Boxes className="h-3.5 w-3.5" />{" "}
+                  {meshBusy
+                    ? `Meshing ${Math.round(meshProgress * 100)}%`
+                    : "Export model"}
                 </button>
               </div>
             </div>
