@@ -116,7 +116,7 @@ export default function Home() {
       company: 'Core Electronics',
       role: 'Creative Technologist / Engineer',
       period: '2020 – 2023',
-      description: 'Produced 100+ educational videos and technical resources for the maker community, accumulating 2M+ YouTube views. Facilitated workshops and technical communication.'
+      description: 'Produced 100+ educational videos and technical resources for the maker community, accumulating 6M+ YouTube views. Facilitated workshops and technical communication.'
     },
     {
       company: 'CASMAT Pty Ltd',
@@ -228,7 +228,7 @@ export default function Home() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8">
               <div>
-                <div className="text-4xl font-bold" style={{ color: '#C9A84C' }}>2M+</div>
+                <div className="text-4xl font-bold" style={{ color: '#C9A84C' }}>6M+</div>
                 <div className="text-xs label mt-2">YouTube Views</div>
               </div>
               <div>
@@ -281,7 +281,7 @@ export default function Home() {
             <div className="space-y-6 text-gray-700">
               <p>I'm a Mechanical Engineer building systems that survive the real world. My work sits between high-level design and hands-on execution, spanning CNC machining, industrial manufacturing, reverse engineering, and embedded electronics. I focus on practical engineering where reliability, usability, and manufacturability matter most.</p>
               
-              <p>Alongside engineering, I build technical education content. I produce technical content spanning embedded systems, microcontroller and microprocessor development, wireless communications (including long-range radio systems), computer vision and applied AI, electronics design, and 3D printing and fabrication workflows. This work has reached over 2 million views on YouTube globally.</p>
+              <p>Alongside engineering, I build technical education content. I produce technical content spanning embedded systems, microcontroller and microprocessor development, wireless communications (including long-range radio systems), computer vision and applied AI, electronics design, and 3D printing and fabrication workflows. This work has reached over 6 million views on YouTube globally.</p>
               
 
             </div>
