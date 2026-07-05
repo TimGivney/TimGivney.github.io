@@ -3,6 +3,7 @@ import HomeCubeWidget from '@/components/HomeCubeWidget';
 import HomeFractalWidget from '@/components/HomeFractalWidget';
 import HomeFractal3DWidget from '@/components/HomeFractal3DWidget';
 import HomeSkyWidget from '@/components/HomeSkyWidget';
+import HomeToxicWidget from '@/components/HomeToxicWidget';
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -210,6 +211,7 @@ export default function Home() {
             <a href="#projects" className="hover:text-blue-700 transition-colors">Projects</a>
             <a href="#leadership" className="hover:text-blue-700 transition-colors">Leadership</a>
             <a href="#education" className="hover:text-blue-700 transition-colors">Education</a>
+            <a href="#extracurricular" className="hover:text-blue-700 transition-colors">Extracurricular</a>
           </div>
         </div>
       </nav>
@@ -647,7 +649,7 @@ export default function Home() {
           </div>
           
           {/* Extracurricular — interactive playgrounds and side projects */}
-          <div className="mt-20 flex items-center gap-4 mb-4">
+          <div id="extracurricular" className="mt-20 flex scroll-mt-24 items-center gap-4 mb-4">
             <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Extracurricular</h2>
             <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
           </div>
@@ -693,6 +695,16 @@ export default function Home() {
               <p className="mt-3 text-sm text-gray-500">Watch the live preview wheel through the night, or open the full planetarium for the time slider, horizon view and click-to-identify.</p>
             </div>
             <HomeSkyWidget />
+          </div>
+
+          {/* Toxic */}
+          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Toxic</h3>
+              <p className="mt-3 text-gray-700">The dangerous and the beautiful, in 3D. A gallery of pathogens, allergenic pollens — and you — that you can orbit as 3D models, view as they look down the microscope, and measure against the human body on a powers-of-ten scale. A tribute to my dad, who spent his life growing these in a Petri dish and tracing communicable diseases back to their source.</p>
+              <p className="mt-3 text-sm text-gray-500">Spin a specimen in the live preview, or open the full gallery for the microscope and scale views — and export any of them to 3D print.</p>
+            </div>
+            <HomeToxicWidget />
           </div>
 
           {/* Meridian (no live preview) */}
