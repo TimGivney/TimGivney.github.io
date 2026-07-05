@@ -11,6 +11,7 @@ const Cube = lazy(() => import("./pages/Cube"));
 const Fractal = lazy(() => import("./pages/Fractal"));
 const Fractal3D = lazy(() => import("./pages/Fractal3D"));
 const Sky = lazy(() => import("./pages/Sky"));
+const Toxic = lazy(() => import("./pages/Toxic"));
 
 function Router() {
   return (
@@ -58,6 +59,17 @@ function Router() {
           }
         >
           <Sky />
+        </Suspense>
+      </Route>
+      <Route path={"/toxic"}>
+        <Suspense
+          fallback={
+            <div className="flex h-[100dvh] w-full items-center justify-center bg-[#05060a] font-mono text-sm text-zinc-400">
+              Loading Toxic…
+            </div>
+          }
+        >
+          <Toxic />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
