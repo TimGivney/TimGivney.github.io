@@ -56,7 +56,7 @@ export const SPECIMENS: Specimen[] = [
     spread:
       "Respiratory droplets and close contact — coughing, kissing, crowded living. Outbreaks cluster in dormitories and barracks.",
     detective:
-      "The classic public-health detective case: swab the throat, culture the diplococci on chocolate agar, serogroup them (A, B, C, W, Y), then ring-fence the outbreak with contact tracing and prophylactic antibiotics before it spreads. This was the kind of organism Tim's father grew, identified, and chased back to its source.",
+      "The classic public-health detective case: swab the throat, culture the diplococci on chocolate agar, serogroup them (A, B, C, W, Y), then ring-fence the outbreak with contact tracing and prophylactic antibiotics before it spreads.",
   },
   {
     id: "anthrax",
@@ -350,7 +350,7 @@ export const SPECIMENS: Specimen[] = [
     spread:
       "Walks around, builds things, and occasionally carries the rest of this catalogue with it.",
     detective:
-      "Tim's father spent his life on the other side of this fight — growing these organisms in a Petri dish, identifying them, and tracing communicable diseases back to their source to stop them spreading. This page is for him.",
+      "Disease detectives spend their lives on the other side of this fight — growing these organisms in a Petri dish, identifying them, and tracing communicable diseases back to their source to stop them spreading.",
   },
 ];
 
