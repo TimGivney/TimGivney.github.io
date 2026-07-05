@@ -392,7 +392,7 @@ export default function Toxic() {
 
             <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-2">
               <p className="font-mono text-[10px] text-zinc-500">
-                Made by Tim, for Tim — and for his dad, the disease detective.
+                Made by Tim, for Tim.
               </p>
               <a
                 href="https://github.com/TimGivney/TimGivney.github.io"
