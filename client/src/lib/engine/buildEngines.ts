@@ -6,6 +6,7 @@
 // stationary single with a great flywheel, and Sarich's orbital drum.
 
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { Engine, EngineModelSpec } from "./engines";
 
 const DEG = Math.PI / 180;
@@ -28,9 +29,17 @@ function shade(hex: string, f: number): string {
   return `#${c.getHexString()}`;
 }
 
+// bevelled box — rounded edges catch the light far better than hard cubes
 function box(w: number, h: number, d: number, m: THREE.Material): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-  return mesh;
+  const r = Math.min(Math.min(w, h, d) * 0.16, 0.05);
+  const geo = new RoundedBoxGeometry(w, h, d, 4, Math.max(r, 0.004));
+  return new THREE.Mesh(geo, m);
+}
+
+// sharp-edged box for thin cosmetic parts (blades, plates) where bevels add
+// polys for no visible gain
+function sbox(w: number, h: number, d: number, m: THREE.Material): THREE.Mesh {
+  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
 }
 
 // cylinder with its axis along +Y, centred at origin
@@ -39,9 +48,47 @@ function cyl(
   rBot: number,
   h: number,
   m: THREE.Material,
-  seg = 24
+  seg = 48
 ): THREE.Mesh {
   return new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg), m);
+}
+
+// a ring of small bolt heads in the XY plane (axis along +Z), centred at origin
+function boltRing(
+  count: number,
+  radius: number,
+  z: number,
+  size: number,
+  m: THREE.Material
+): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(size, size, size * 1.1, 6), m);
+    bolt.rotation.x = 90 * DEG;
+    bolt.position.set(Math.cos(a) * radius, Math.sin(a) * radius, z);
+    g.add(bolt);
+  }
+  return g;
+}
+
+// a row of bolt heads along X (pointing up in +Y), for cam-cover edges
+function boltRow(
+  count: number,
+  spanX: number,
+  y: number,
+  z: number,
+  size: number,
+  m: THREE.Material
+): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const x = (i - (count - 1) / 2) * (spanX / Math.max(1, count - 1));
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(size, size, size * 1.2, 6), m);
+    bolt.position.set(x, y, z);
+    g.add(bolt);
+  }
+  return g;
 }
 
 // an air-cooled cylinder: barrel + stacked cooling fins + a head block.
@@ -54,34 +101,40 @@ function finnedCylinder(
   finMat: THREE.Material
 ): THREE.Group {
   const g = new THREE.Group();
-  const barrel = cyl(rad, rad, len, bodyMat, 20);
+  const barrel = cyl(rad, rad, len, bodyMat, 40);
   barrel.position.y = len / 2;
   g.add(barrel);
-  const finR = rad * 1.5;
+  const finR = rad * 1.55;
   for (let i = 0; i < nFins; i++) {
-    const fin = cyl(finR, finR, len / (nFins * 3), finMat, 20);
+    const fin = cyl(finR, finR, len / (nFins * 3.4), finMat, 40);
     fin.position.y = (len * (i + 0.5)) / nFins;
     g.add(fin);
   }
-  // head at the top
+  // finned head at the top with rocker cover + a couple of valve stubs
   const head = box(rad * 2.6, rad * 1.1, rad * 2.6, bodyMat);
   head.position.y = len + rad * 0.45;
   g.add(head);
+  const rockerCover = box(rad * 1.5, rad * 0.5, rad * 1.5, finMat);
+  rockerCover.position.y = len + rad * 1.1;
+  g.add(rockerCover);
   return g;
 }
 
 // a spoked flywheel: rim disc + hub + spokes, axis along +X
 function flywheel(rad: number, thick: number, m: THREE.Material, hubMat: THREE.Material): THREE.Group {
   const g = new THREE.Group();
-  const rim = cyl(rad, rad, thick, m, 40);
-  rim.rotation.z = 90 * DEG; // axis -> X
+  // dished rim built from a lathe profile so it reads as a cast flywheel
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(rad * 0.86, thick * 0.9, 20, 72), m);
+  rim.rotation.y = 90 * DEG;
   g.add(rim);
-  const hub = cyl(rad * 0.22, rad * 0.22, thick * 1.6, hubMat, 20);
+  const web = cyl(rad * 0.9, rad * 0.9, thick * 0.4, m, 72);
+  web.rotation.z = 90 * DEG;
+  g.add(web);
+  const hub = cyl(rad * 0.22, rad * 0.22, thick * 1.8, hubMat, 28);
   hub.rotation.z = 90 * DEG;
   g.add(hub);
-  const spokeMat = hubMat;
   for (let i = 0; i < 6; i++) {
-    const spoke = box(thick * 0.5, rad * 1.7, rad * 0.13, spokeMat);
+    const spoke = cyl(rad * 0.07, rad * 0.07, rad * 1.5, hubMat, 12);
     spoke.rotation.x = i * 30 * DEG;
     g.add(spoke);
   }
@@ -104,7 +157,7 @@ function frontAccessories(x: number, m: THREE.Material, accMat: THREE.Material):
 
 function turboSnail(x: number, z: number, m: THREE.Material): THREE.Group {
   const g = new THREE.Group();
-  const snail = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.16, 16, 24), m);
+  const snail = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.16, 24, 48), m);
   snail.position.set(x, -0.1, z);
   g.add(snail);
   const inlet = cyl(0.14, 0.18, 0.4, m, 18);
@@ -143,6 +196,10 @@ function buildInline(n: number, spec: EngineModelSpec, c: string, c2: string): T
   const cover = box(blockW * 0.82, coverH, coverW, coverMat);
   cover.position.y = blockH / 2 + 0.34 + coverH / 2;
   g.add(cover);
+  // cam-cover hold-down bolts
+  const boltY = cover.position.y + coverH / 2;
+  g.add(boltRow(n + 1, blockW * 0.78, boltY, coverW / 2 - 0.03, 0.035, steel));
+  g.add(boltRow(n + 1, blockW * 0.78, boltY, -coverW / 2 + 0.03, 0.035, steel));
   if (spec.dohc) {
     for (const dz of [-coverW * 0.28, coverW * 0.28]) {
       const ridge = cyl(0.1, 0.1, blockW * 0.8, steel, 16);
@@ -292,7 +349,7 @@ function buildFlat(n: number, c: string, c2: string): THREE.Group {
   hub.position.x = caseLen / 2 + 0.24;
   g.add(hub);
   for (const s of [-1, 1]) {
-    const blade = box(0.06, 1.9, 0.24, mat("#3a3d42", { metalness: 0.3 }));
+    const blade = sbox(0.06, 1.9, 0.24, mat("#3a3d42", { metalness: 0.3 }));
     blade.position.set(caseLen / 2 + 0.26, s * 0.95, 0);
     blade.rotation.x = 12 * DEG;
     g.add(blade);
@@ -315,9 +372,11 @@ function buildRadial(n: number, c: string, c2: string): THREE.Group {
   const ring = 0.5; // crankcase radius
 
   // crankcase drum (axis along Z toward viewer)
-  const drum = cyl(ring, ring, 0.55 * rows, caseMat, 36);
+  const drum = cyl(ring, ring, 0.55 * rows, caseMat, 64);
   drum.rotation.x = 90 * DEG;
   g.add(drum);
+  // crankcase cover bolt circle facing the viewer
+  g.add(boltRing(perRow, ring * 0.62, (twinRow ? 0.6 : 0.32), 0.03, steel));
 
   for (let r = 0; r < rows; r++) {
     const z = twinRow ? (r - 0.5) * 0.5 : 0;
@@ -354,7 +413,7 @@ function buildRadial(n: number, c: string, c2: string): THREE.Group {
   const blades = twinRow ? 3 : 2;
   for (let i = 0; i < blades; i++) {
     const a = (i / blades) * Math.PI * 2;
-    const blade = box(0.26, 2.3, 0.06, mat("#3a3d42", { metalness: 0.3 }));
+    const blade = sbox(0.26, 2.3, 0.06, mat("#3a3d42", { metalness: 0.3 }));
     blade.position.set(Math.cos(a) * 1.15, Math.sin(a) * 1.15, noseZ + 0.05);
     blade.rotation.z = a;
     g.add(blade);
@@ -370,18 +429,18 @@ function buildTurbojet(c: string, c2: string): THREE.Group {
   const hot = mat(c2, { metalness: 0.7, roughness: 0.35 });
 
   // main casing (axis along X)
-  const casing = cyl(0.52, 0.58, 2.2, skin, 40);
+  const casing = cyl(0.52, 0.58, 2.2, skin, 72);
   casing.rotation.z = 90 * DEG;
   g.add(casing);
   // banding rings
   for (const x of [-0.6, 0, 0.6]) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.04, 12, 40), dark);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.04, 20, 72), dark);
     ring.rotation.y = 90 * DEG;
     ring.position.x = x;
     g.add(ring);
   }
   // intake lip + nose bullet (front = +X)
-  const lip = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.08, 16, 40), skin);
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.08, 24, 72), skin);
   lip.rotation.y = 90 * DEG;
   lip.position.x = 1.12;
   g.add(lip);
@@ -431,7 +490,7 @@ function buildStationary(twin: boolean, c: string, c2: string): THREE.Group {
   const hopper = box(0.78, 0.62, 0.86, iron2);
   hopper.position.set(-0.55, 0.42, 0);
   g.add(hopper);
-  const water = box(0.62, 0.06, 0.7, mat("#2a4a63", { metalness: 0.2, roughness: 0.3 }));
+  const water = sbox(0.62, 0.06, 0.7, mat("#2a4a63", { metalness: 0.2, roughness: 0.3 }));
   water.position.set(-0.55, 0.7, 0);
   g.add(water);
   // cylinder head end cap + rocker gear (-X end)
@@ -467,15 +526,16 @@ function buildOrbital(c: string, c2: string): THREE.Group {
   const accent = mat(c2, { metalness: 0.55 });
 
   // main orbital chamber: a drum (axis along Z)
-  const drum = cyl(0.62, 0.62, 0.66, housingMat, 44);
+  const drum = cyl(0.62, 0.62, 0.66, housingMat, 72);
   drum.rotation.x = 90 * DEG;
   g.add(drum);
-  // front/back cover plates
+  // front/back cover plates with a bolt circle
   for (const z of [-0.36, 0.36]) {
-    const cover = cyl(0.66, 0.66, 0.06, plate, 44);
+    const cover = cyl(0.66, 0.66, 0.06, plate, 72);
     cover.rotation.x = 90 * DEG;
     cover.position.z = z;
     g.add(cover);
+    g.add(boltRing(12, 0.54, z + (z > 0 ? 0.04 : -0.04), 0.028, steel));
   }
   // ribs around the housing
   for (let i = 0; i < 8; i++) {
