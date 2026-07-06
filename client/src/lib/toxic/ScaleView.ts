@@ -43,6 +43,8 @@ export class ScaleView {
   private raf = 0;
   private disposed = false;
   private t = 0;
+  // Left inset so the ruler + label card clear the floating specimen sidebar.
+  private insetLeft = 16;
 
   constructor(container: HTMLElement, id: string) {
     this.container = container;
@@ -63,6 +65,11 @@ export class ScaleView {
 
   setSpecimen(id: string) {
     this.spec = specimenById(id);
+  }
+
+  /** Reserve space on the left for the floating specimen sidebar (px). */
+  setInsetLeft(px: number) {
+    this.insetLeft = Math.max(12, px);
   }
 
   private resize() {
@@ -102,7 +109,13 @@ export class ScaleView {
 
     const top = 48;
     const bottom = h - 40;
-    const axisX = Math.min(w * 0.42, w - 220);
+    // Lay the whole ruler out in the region to the right of the sidebar.
+    const left = Math.min(this.insetLeft, w - 150);
+    const right = w - 12;
+    const region = Math.max(120, right - left);
+    // Axis ~42% across the region — leaves room for the label card + decade
+    // labels on its left and the reference labels on its right.
+    const axisX = left + Math.max(88, Math.min(region * 0.42, region - 180));
 
     // axis line
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
@@ -120,7 +133,7 @@ export class ScaleView {
       ctx.strokeStyle = "rgba(255,255,255,0.10)";
       ctx.beginPath();
       ctx.moveTo(axisX - 6, y);
-      ctx.lineTo(w - 12, y);
+      ctx.lineTo(right, y);
       ctx.stroke();
       ctx.fillStyle = "rgba(160,170,190,0.7)";
       ctx.textAlign = "right";
@@ -160,11 +173,12 @@ export class ScaleView {
     ctx.fill();
     ctx.stroke();
 
-    // label card top-left (kept clear of the page's top bar)
-    const cardX = 14;
+    // label card in the left gutter, clear of the sidebar and the top bar
+    const cardX = left;
     const cardY = 104;
+    const cardW = Math.max(120, Math.min(240, axisX - left - 26));
     ctx.fillStyle = "rgba(255,255,255,0.06)";
-    roundRect(ctx, cardX, cardY, Math.min(260, axisX - 40), 56, 8);
+    roundRect(ctx, cardX, cardY, cardW, 56, 8);
     ctx.fill();
     ctx.fillStyle = "#e8ecf3";
     ctx.font = "600 14px ui-monospace, monospace";
@@ -178,7 +192,7 @@ export class ScaleView {
     ctx.strokeStyle = "rgba(201,168,76,0.5)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cardX + 130, cardY + 56);
+    ctx.moveTo(cardX + Math.min(130, cardW - 8), cardY + 56);
     ctx.lineTo(axisX - 16, sy);
     ctx.stroke();
 
@@ -193,7 +207,7 @@ export class ScaleView {
         `≈ ${formatBig(ratio)} of these would span your height`,
         cardX + 2,
         cardY + 78,
-        Math.min(250, axisX - 40),
+        Math.max(120, axisX - left - 20),
         15
       );
     }

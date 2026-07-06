@@ -83,9 +83,16 @@ export default function Toxic() {
       microRef.current = new PetriView(microMount.current, id);
     }
     if (view === "scale" && scaleMount.current && !scaleRef.current) {
-      scaleRef.current = new ScaleView(scaleMount.current, id);
+      const v = new ScaleView(scaleMount.current, id);
+      v.setInsetLeft(uiHidden ? 16 : 208);
+      scaleRef.current = v;
     }
-  }, [view, id, autoRotate, colorDrift]);
+  }, [view, id, autoRotate, colorDrift, uiHidden]);
+
+  // Keep the scale ruler clear of the floating sidebar (which is hidden with UI).
+  useEffect(() => {
+    scaleRef.current?.setInsetLeft(uiHidden ? 16 : 208);
+  }, [uiHidden]);
 
   useEffect(() => {
     return () => {
@@ -319,8 +326,8 @@ export default function Toxic() {
 
       {/* Info + actions (bottom) */}
       {!uiHidden && (
-        <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
-          <div className="mx-auto flex max-w-3xl flex-col gap-2 rounded-xl border border-white/10 bg-black/50 p-3 backdrop-blur">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
+          <div className="pointer-events-auto mx-auto flex max-w-3xl flex-col gap-2 rounded-xl border border-white/10 bg-black/50 p-3 backdrop-blur">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div>
                 <h2 className="font-mono text-sm font-semibold text-zinc-100">
