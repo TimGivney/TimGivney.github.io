@@ -279,7 +279,9 @@ export function generateMesh(
 
   // Growable Float32Array for triangle vertices (9 floats per triangle). Using
   // a typed buffer instead of a plain number[] keeps memory in check so the
-  // high-resolution tiers stay feasible.
+  // high-resolution tiers stay feasible. A hard triangle budget guards against
+  // pathologically dense meshes exhausting browser memory.
+  const MAX_TRIANGLES = 14_000_000;
   let cap = 1 << 16;
   let data = new Float32Array(cap);
   let len = 0;
@@ -288,8 +290,15 @@ export function generateMesh(
     p1: [number, number, number],
     p2: [number, number, number]
   ) => {
+    if (len / 9 >= MAX_TRIANGLES) {
+      throw new Error(
+        "Mesh too detailed to export — pick a lower detail tier."
+      );
+    }
     if (len + 9 > cap) {
-      cap *= 2;
+      // Grow by 1.5× (rounded up to a multiple of 9) to limit the peak memory
+      // spike during reallocation on very large meshes.
+      cap = Math.max(cap + 9, Math.ceil((cap * 1.5) / 9) * 9);
       const nd = new Float32Array(cap);
       nd.set(data);
       data = nd;
