@@ -4,6 +4,7 @@ import HomeFractalWidget from '@/components/HomeFractalWidget';
 import HomeFractal3DWidget from '@/components/HomeFractal3DWidget';
 import HomeSkyWidget from '@/components/HomeSkyWidget';
 import HomeToxicWidget from '@/components/HomeToxicWidget';
+import HomeEngineWidget from '@/components/HomeEngineWidget';
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -705,6 +706,16 @@ export default function Home() {
               <p className="mt-3 text-sm text-gray-500">Spin a specimen in the live preview, or open the full gallery for the microscope and scale views — and export any of them to 3D print.</p>
             </div>
             <HomeToxicWidget />
+          </div>
+
+          {/* Aus Engines */}
+          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Aus Engines</h3>
+              <p className="mt-3 text-gray-700">An engineering hall of fame for engines designed and/or built in Australia — the Holden and Ford sixes and V8s, the Repco-Brabham V8 that won the 1966 Formula 1 World Championship, home-grown aero and radial engines, the stationary engines that ran the bush, and Ralph Sarich&apos;s orbital oddity. Orbit each one as a 3D model, read its story and specs, and place it on a century-long timeline.</p>
+              <p className="mt-3 text-sm text-gray-500">Spin an engine in the live preview, or open the full catalogue for the timeline — and export any of them to 3D print.</p>
+            </div>
+            <HomeEngineWidget />
           </div>
 
           {/* Meridian (no live preview) */}
