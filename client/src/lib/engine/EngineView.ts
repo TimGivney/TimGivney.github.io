@@ -7,6 +7,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { buildEngineModel } from "./buildEngines";
 import { engineById } from "./engines";
 
@@ -23,7 +24,7 @@ export class EngineView {
   private controls: OrbitControls;
   private model: THREE.Group | null = null;
   private modelId = "";
-  private dpr = Math.min(window.devicePixelRatio || 1, 2);
+  private dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
   private autoRotate: boolean;
   private colorDrift = false;
@@ -45,6 +46,10 @@ export class EngineView {
     });
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const canvas = this.renderer.domElement;
     canvas.style.width = "100%";
     canvas.style.height = "100%";
@@ -54,6 +59,11 @@ export class EngineView {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x07070b);
+    // image-based lighting so the metal actually reflects and reads as metal
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.55;
+    pmrem.dispose();
 
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100);
     this.camera.position.set(0.6, 0.7, 4.4);
@@ -70,6 +80,16 @@ export class EngineView {
 
     this.setupLights();
 
+    // soft ground shadow catcher
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(24, 24),
+      new THREE.ShadowMaterial({ opacity: 0.32 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -1.45;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
     this.resize();
@@ -77,15 +97,25 @@ export class EngineView {
   }
 
   private setupLights() {
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(4, 5, 4);
-    const fill = new THREE.DirectionalLight(0x88aaff, 0.7);
+    const key = new THREE.DirectionalLight(0xffffff, 2.2);
+    key.position.set(4, 6, 4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.near = 0.5;
+    key.shadow.camera.far = 30;
+    key.shadow.camera.left = -4;
+    key.shadow.camera.right = 4;
+    key.shadow.camera.top = 4;
+    key.shadow.camera.bottom = -4;
+    key.shadow.bias = -0.0004;
+    key.shadow.normalBias = 0.02;
+    key.shadow.radius = 4;
+    const fill = new THREE.DirectionalLight(0x88aaff, 0.55);
     fill.position.set(-4, -1, 2);
-    const rim = new THREE.DirectionalLight(0xffd38a, 0.8);
+    const rim = new THREE.DirectionalLight(0xffd38a, 0.7);
     rim.position.set(-2, 3, -5);
-    const amb = new THREE.AmbientLight(0x404a5c, 0.95);
-    // a soft ground so the metal reads
-    const hemi = new THREE.HemisphereLight(0x9fb4d8, 0x14161c, 0.6);
+    const amb = new THREE.AmbientLight(0x404a5c, 0.5);
+    const hemi = new THREE.HemisphereLight(0x9fb4d8, 0x14161c, 0.4);
     this.scene.add(key, fill, rim, amb, hemi);
   }
 
@@ -97,6 +127,13 @@ export class EngineView {
       this.disposeModel(this.model);
     }
     this.model = buildEngineModel(engineById(id));
+    this.model.traverse(obj => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
+    });
     this.scene.add(this.model);
     this.cacheBaseColors();
     this.applyHue();
