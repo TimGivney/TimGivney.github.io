@@ -4,13 +4,16 @@ import {
   ArrowLeft,
   Boxes,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   Github,
+  Images,
   Maximize,
   Minimize,
   Orbit,
   RotateCcw,
+  UserRound,
 } from "lucide-react";
 import { EngineView } from "@/lib/engine/EngineView";
 import { TimelineView } from "@/lib/engine/TimelineView";
@@ -19,14 +22,96 @@ import {
   CATEGORY_ORDER,
   ENGINES,
   engineById,
+  engineMediaById,
+  type EngineMediaImage,
+  type EnginePerson,
 } from "@/lib/engine/engines";
 
-type ViewMode = "model" | "timeline";
+type ViewMode = "model" | "timeline" | "photos";
 
 const VIEW_TABS: { id: ViewMode; label: string }[] = [
   { id: "model", label: "3D model" },
   { id: "timeline", label: "Timeline" },
+  { id: "photos", label: "Photos & people" },
 ];
+
+function MediaImageCard({ image }: { image: EngineMediaImage }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [image.src]);
+
+  return (
+    <article className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.035]">
+      <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-black/40">
+        <span className="absolute left-2 top-2 z-10 rounded bg-black/70 px-1.5 py-1 font-mono text-[8px] uppercase tracking-wider text-zinc-300 backdrop-blur">
+          {image.kind === "archive" ? "Archive" : "Photograph"}
+        </span>
+        {failed ? (
+          <div className="flex flex-col items-center gap-2 px-5 text-center text-zinc-500">
+            <Images className="h-7 w-7" />
+            <span className="font-mono text-[10px] uppercase tracking-wider">
+              Image unavailable
+            </span>
+          </div>
+        ) : (
+          <img
+            src={image.src}
+            alt={image.alt}
+            loading="lazy"
+            onError={() => setFailed(true)}
+            className={`h-full w-full ${
+              image.kind === "archive" ? "object-contain p-2" : "object-cover"
+            }`}
+          />
+        )}
+      </div>
+      <div className="space-y-2 p-3">
+        <p className="text-xs leading-relaxed text-zinc-300">{image.caption}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-zinc-500">
+          <span>
+            {image.credit} · {image.license}
+          </span>
+          <a
+            href={image.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[#C9A84C] transition hover:text-[#E7C766]"
+          >
+            Source <ExternalLink className="h-2.5 w-2.5" />
+          </a>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function PersonCard({ person }: { person: EnginePerson }) {
+  return (
+    <article className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.035]">
+      {person.portrait ? (
+        <MediaImageCard image={person.portrait} />
+      ) : (
+        <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-black/30 px-5 text-center">
+          <UserRound className="h-8 w-8 text-zinc-600" />
+          <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+            No freely licensed portrait found
+          </p>
+        </div>
+      )}
+      <div className="space-y-1 border-t border-white/10 p-3">
+        <h3 className="font-mono text-sm font-semibold text-zinc-100">
+          {person.name}
+        </h3>
+        <p className="font-mono text-[10px] uppercase tracking-wider text-[#C9A84C]">
+          {person.role}
+        </p>
+        <p className="pt-1 text-[11px] leading-relaxed text-zinc-400">
+          {person.contribution}
+        </p>
+      </div>
+    </article>
+  );
+}
 
 export default function AusEngine() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -44,6 +129,7 @@ export default function AusEngine() {
   const [error, setError] = useState<string | null>(null);
 
   const eng = useMemo(() => engineById(id), [id]);
+  const media = useMemo(() => engineMediaById(id), [id]);
 
   const grouped = useMemo(() => {
     return CATEGORY_ORDER.map(c => ({
@@ -168,6 +254,77 @@ export default function AusEngine() {
         style={{ display: view === "timeline" ? "block" : "none" }}
       />
 
+      {view === "photos" && (
+        <div
+          className={`absolute inset-0 overflow-y-auto bg-[radial-gradient(circle_at_65%_15%,rgba(201,168,76,0.10),transparent_38%)] ${
+            uiHidden
+              ? "px-4 pb-8 pt-16 sm:px-8"
+              : "pb-[29rem] pl-[10rem] pr-3 pt-28 sm:pb-[23rem] sm:pl-[13.5rem] sm:pr-6"
+          }`}
+        >
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#C9A84C]">
+                Real machines · real people
+              </p>
+              <h2 className="mt-1 font-mono text-xl font-semibold text-zinc-100">
+                {eng.name}
+              </h2>
+              <p className="mt-2 max-w-2xl text-xs leading-relaxed text-zinc-400">
+                Original photographs and archival material with creator, licence
+                and source preserved. Where no reusable image could be verified,
+                the gap is shown rather than filled with a substitute.
+              </p>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <section>
+                <div className="mb-2 flex items-center gap-2">
+                  <Images className="h-4 w-4 text-[#C9A84C]" />
+                  <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-200">
+                    Engine photographs &amp; archive
+                  </h3>
+                </div>
+                <div className="grid gap-3">
+                  {media.images.length > 0 ? (
+                    media.images.map(image => (
+                      <MediaImageCard key={image.src} image={image} />
+                    ))
+                  ) : (
+                    <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/10 bg-black/20 px-5 text-center">
+                      <Images className="h-8 w-8 text-zinc-600" />
+                      <div>
+                        <p className="font-mono text-[11px] text-zinc-300">
+                          No verified reusable photograph yet
+                        </p>
+                        <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                          The 3D model remains available; this space is reserved for
+                          a rights-cleared image of the real engine.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-2 flex items-center gap-2">
+                  <UserRound className="h-4 w-4 text-[#C9A84C]" />
+                  <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-200">
+                    Designers &amp; makers
+                  </h3>
+                </div>
+                <div className="grid gap-3">
+                  {media.people.map(person => (
+                    <PersonCard key={person.name} person={person} />
+                  ))}
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
       {uiHidden && (
         <button
           onClick={() => setUiHidden(false)}
@@ -268,7 +425,7 @@ export default function AusEngine() {
 
       {/* Engine selector (left) */}
       {!uiHidden && (
-        <div className="absolute left-3 top-28 bottom-28 z-10 w-44 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-2 backdrop-blur sm:left-6">
+        <div className="absolute left-3 top-28 bottom-28 z-10 w-36 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-2 backdrop-blur sm:left-6 sm:w-44">
           {grouped.map(group => (
             <div key={group.category} className="mb-2">
               <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
