@@ -51,6 +51,28 @@ export interface Engine {
   legacy: string; // where it ran / what it left behind
 }
 
+export interface EngineMediaImage {
+  src: string;
+  alt: string;
+  caption: string;
+  sourceUrl: string;
+  credit: string;
+  license: string;
+  kind?: "photo" | "archive";
+}
+
+export interface EnginePerson {
+  name: string;
+  role: string;
+  contribution: string;
+  portrait?: EngineMediaImage;
+}
+
+export interface EngineMedia {
+  images: EngineMediaImage[];
+  people: EnginePerson[];
+}
+
 export const CATEGORY_LABEL: Record<EngineCategory, string> = {
   six: "Straight sixes",
   v8: "V8s",
@@ -486,6 +508,396 @@ export const ENGINES: Engine[] = [
   },
 ];
 
+const commons = (
+  file: string,
+  alt: string,
+  caption: string,
+  sourceUrl: string,
+  credit: string,
+  license: string,
+  kind: "photo" | "archive" = "photo"
+): EngineMediaImage => ({
+  src: `/ausengine/media/${file}.webp`,
+  alt,
+  caption,
+  sourceUrl,
+  credit,
+  license,
+  kind,
+});
+
+const BRABHAM_PORTRAIT = commons(
+  "person-brabham",
+  "Jack Brabham in 1966",
+  "Jack Brabham during the Repco-powered 1966 championship season.",
+  "https://commons.wikimedia.org/wiki/File:BrabhamJack1966B.jpg",
+  "Lothar Spurzem",
+  "CC BY-SA 2.0 de"
+);
+
+const WACKETT_PORTRAIT = commons(
+  "person-wackett",
+  "Portrait of Lawrence Wackett",
+  "Sir Lawrence Wackett, founder and long-serving manager of CAC.",
+  "https://commons.wikimedia.org/wiki/File:Portrait_of_Lawrence_Wackett.jpg",
+  "E. A. Crome collection",
+  "Public domain"
+);
+
+export const ENGINE_MEDIA: Record<string, EngineMedia> = {
+  "holden-grey": {
+    images: [
+      commons(
+        "holden-grey-history",
+        "1948 launch of the Holden 48-215",
+        "The 1948 Holden 48-215 launch. Every first Holden carried the 2.2-litre Grey Motor.",
+        "https://commons.wikimedia.org/wiki/File:Queensland_launch_of_the_Holden_48-215_at_Eagers_Motors,_Brisbane,_1948.jpg",
+        "State Library Queensland",
+        "Public domain",
+        "archive"
+      ),
+    ],
+    people: [
+      {
+        name: "Sir Laurence Hartnett",
+        role: "GM-Holden managing director",
+        contribution:
+          "Championed the all-Australian car programme that became the 48-215 and its locally manufactured Grey Motor.",
+      },
+    ],
+  },
+  "holden-red": {
+    images: [
+      commons(
+        "holden-red",
+        "Holden 149 cubic-inch Red Motor",
+        "A 149 cu in Red Motor, the first capacity offered in the 1963 EH Holden.",
+        "https://commons.wikimedia.org/wiki/File:Holden_149_Red_motor.jpg",
+        "NJM2010",
+        "CC BY 3.0"
+      ),
+    ],
+    people: [
+      {
+        name: "Ed Silins",
+        role: "GM-Holden engine project engineer",
+        contribution:
+          "Led the clean-sheet Red Motor design, replacing the Grey with seven main bearings and a modern oiling system.",
+      },
+    ],
+  },
+  "chrysler-hemi6": {
+    images: [
+      commons(
+        "chrysler-hemi6",
+        "Chrysler Australia Hemi-6 engine",
+        "The Australian Hemi-6, with its US Slant-Six predecessor visible behind it.",
+        "https://commons.wikimedia.org/wiki/File:Chrysler_Australia_Hemi_six_cylinder_engine_(5053237639).jpg",
+        "sv1ambo",
+        "CC BY 2.0"
+      ),
+    ],
+    people: [
+      {
+        name: "Maurice Harcus and team",
+        role: "Chrysler Australia engineers",
+        contribution:
+          "A five-person Adelaide team led by Harcus turned Chrysler's abandoned D-engine programme into the production Hemi-6.",
+      },
+    ],
+  },
+  "ford-crossflow": {
+    images: [],
+    people: [
+      {
+        name: "Ford Australia powertrain team",
+        role: "Geelong engine engineering",
+        contribution:
+          "Reworked the long-running Falcon six around an Australian crossflow cylinder head, then developed alloy-head and EFI versions.",
+      },
+    ],
+  },
+  "ford-barra": {
+    images: [
+      commons(
+        "ford-barra",
+        "Ford Barra 245T turbo engine",
+        "A Barra 245T installed in a BF Falcon XR6 Turbo.",
+        "https://commons.wikimedia.org/wiki/File:Barra_245T_Engine.JPG",
+        "Redback",
+        "Public domain"
+      ),
+    ],
+    people: [
+      {
+        name: "Ford Australia and Tickford engineers",
+        role: "Barra development team",
+        contribution:
+          "Modernised the Falcon six with a 24-valve twin-cam head; Gordon Barfield led the small Tickford group behind the landmark turbo version.",
+      },
+    ],
+  },
+  "holden-v8": {
+    images: [
+      commons(
+        "holden-v8",
+        "Holden 308 V8 engine",
+        "A Holden 308 at the National Holden Motor Museum in Echuca.",
+        "https://commons.wikimedia.org/wiki/File:308_cu_in_Holden_V8_engine_(2015-08-29)_01.jpg",
+        "OSX",
+        "Public domain"
+      ),
+    ],
+    people: [
+      {
+        name: "Fred James and Ed Silins",
+        role: "GM-Holden engine designers",
+        contribution:
+          "Led the local design programme from 1965, combining the best lessons from contemporary GM V8s into Holden's own lighter engine.",
+      },
+    ],
+  },
+  "ford-cleveland": {
+    images: [
+      commons(
+        "ford-cleveland",
+        "Ford 351 Cleveland bare engine block",
+        "A bare 351 Cleveland block showing its cylinder banks and deep-skirt casting.",
+        "https://commons.wikimedia.org/wiki/File:Clevelandblock.jpg",
+        "Nick Johns",
+        "Public domain"
+      ),
+    ],
+    people: [
+      {
+        name: "Ford Australia powertrain team",
+        role: "Geelong foundry and engine plant",
+        contribution:
+          "Kept the Cleveland family alive after US production ended, casting Australian 302C and 351C blocks for local and export use.",
+      },
+    ],
+  },
+  "leyland-p76-v8": {
+    images: [
+      commons(
+        "leyland-p76-v8",
+        "Leyland P76 V8 engine bay",
+        "The Australian 4.4-litre alloy V8 installed in a Leyland P76.",
+        "https://commons.wikimedia.org/wiki/File:Leyland_P76_at_BVRC_Australia_day_rally.JPG",
+        "NJM2010",
+        "GFDL"
+      ),
+    ],
+    people: [
+      {
+        name: "Leyland Australia engineering team",
+        role: "Zetland vehicle and powertrain engineers",
+        contribution:
+          "Raised the deck and lengthened the stroke of the Rover-derived alloy V8 to create the P76's uniquely Australian 4.4-litre version.",
+      },
+    ],
+  },
+  "repco-rb620": {
+    images: [
+      commons(
+        "repco-rb620",
+        "Repco V8 in a Brabham BT24",
+        "A Repco V8 installed in the rear of a Brabham BT24 grand-prix car.",
+        "https://commons.wikimedia.org/wiki/File:Repco_engine_in_the_back_of_the_Brabham_BT24_(14665364245).jpg",
+        "Ben Sutherland",
+        "CC BY 2.0"
+      ),
+    ],
+    people: [
+      {
+        name: "Phil Irving",
+        role: "Engine designer",
+        contribution:
+          "Designed the light, reliable SOHC Repco V8 around the Oldsmobile alloy block — the pragmatic engine that won 1966.",
+      },
+      {
+        name: "Sir Jack Brabham",
+        role: "Driver, constructor and programme instigator",
+        contribution:
+          "Saw the opportunity in the new 3-litre rules, brought Repco into the project and won the title in the car bearing his name.",
+        portrait: BRABHAM_PORTRAIT,
+      },
+    ],
+  },
+  "repco-rb740": {
+    images: [
+      commons(
+        "repco-quadcam",
+        "Repco-Brabham 760-series quad-cam V8",
+        "A closely related Repco 760-series quad-cam V8; no verified reusable RB740 photograph was available.",
+        "https://commons.wikimedia.org/wiki/File:Repco_Brabham_760_series_V8.JPG",
+        "GTHO",
+        "CC BY-SA 3.0",
+        "archive"
+      ),
+    ],
+    people: [
+      {
+        name: "Repco-Brabham engine team",
+        role: "Maidstone design and development",
+        contribution:
+          "Advanced the championship V8 into a purpose-cast, four-cam, 32-valve engine as Formula One's power race accelerated.",
+      },
+    ],
+  },
+  "waggott-tc4v": {
+    images: [],
+    people: [
+      {
+        name: "Merv Waggott",
+        role: "Designer and engine builder",
+        contribution:
+          "Designed and built the TC-4V's twin-cam four-valve head and developed the complete racing engine in Sydney.",
+      },
+    ],
+  },
+  "jabiru-3300": {
+    images: [
+      commons(
+        "jabiru-3300",
+        "Jabiru 3300 flat-six aircraft engine",
+        "A Jabiru 3300: compact, direct-drive and machined for small-batch production.",
+        "https://commons.wikimedia.org/wiki/File:Jabiru3300.jpg",
+        "FlugKerl2",
+        "CC BY-SA 3.0"
+      ),
+    ],
+    people: [
+      {
+        name: "Rod Stiff",
+        role: "Jabiru founder and designer",
+        contribution:
+          "Led Jabiru's aircraft and engine design from Bundaberg, creating the 2200 and modular six-cylinder 3300 after imported supplies disappeared.",
+      },
+    ],
+  },
+  "rotec-r3600": {
+    images: [],
+    people: [
+      {
+        name: "Matthew and Paul Chernikeeff",
+        role: "Rotec founders and engine designers",
+        contribution:
+          "Designed the modern R2800 and R3600 radial engines and returned new-production radial craftsmanship to Australian aviation.",
+      },
+    ],
+  },
+  "cac-avon": {
+    images: [
+      commons(
+        "cac-avon",
+        "Rolls-Royce Avon turbojet at Temora Aviation Museum",
+        "An Avon turbojet displayed at Temora — the engine type CAC licence-built in Melbourne.",
+        "https://commons.wikimedia.org/wiki/File:Rolls-Royce_Avon_jet_engine_(Temora).jpg",
+        "Peter Ellis",
+        "CC BY-SA 3.0"
+      ),
+    ],
+    people: [
+      {
+        name: "Sir Lawrence Wackett",
+        role: "CAC founder and manager",
+        contribution:
+          "Built the Australian aircraft-manufacturing institution that later produced Avon turbojets under licence at Fishermans Bend.",
+        portrait: WACKETT_PORTRAIT,
+      },
+    ],
+  },
+  "cac-twin-wasp": {
+    images: [
+      commons(
+        "cac-twin-wasp",
+        "Pratt and Whitney R-1830 Twin Wasp engine",
+        "An R-1830 Twin Wasp of the same type licence-built in Australia for wartime Beaufort production.",
+        "https://commons.wikimedia.org/wiki/File:Pratt_%26_Whitney_R-1830_S1C3G_Twin_Wasp_2009-07-03.jpg",
+        "Myllyre",
+        "CC BY-SA 3.0"
+      ),
+    ],
+    people: [
+      {
+        name: "Sir Lawrence Wackett",
+        role: "CAC founder and manager",
+        contribution:
+          "Led CAC as it established Australian radial-engine manufacturing capability under wartime pressure.",
+        portrait: WACKETT_PORTRAIT,
+      },
+    ],
+  },
+  "ronaldson-austral": {
+    images: [],
+    people: [
+      {
+        name: "William Ronaldson and Alfred Tippett",
+        role: "Company founders",
+        contribution:
+          "Built Ronaldson Bros. & Tippett into one of the southern hemisphere's largest makers of agricultural and stationary engines.",
+      },
+    ],
+  },
+  "southern-cross": {
+    images: [],
+    people: [
+      {
+        name: "Toowoomba Foundry engineers",
+        role: "Southern Cross design and manufacturing team",
+        contribution:
+          "Developed petrol, kerosene and diesel engines alongside the firm's windmills, pumps and other rural machinery.",
+      },
+    ],
+  },
+  "sarich-orbital": {
+    images: [
+      commons(
+        "sarich-patent",
+        "Patent drawing of the Sarich orbital engine",
+        "Ralph Sarich's public-domain US patent drawing — an archival view of the real orbital mechanism.",
+        "https://commons.wikimedia.org/wiki/File:Sarich_orbital_engine_patent_drawing.jpeg",
+        "United States Patent and Trademark Office",
+        "Public domain",
+        "archive"
+      ),
+    ],
+    people: [
+      {
+        name: "Ralph Sarich",
+        role: "Inventor and Orbital Engine Company founder",
+        contribution:
+          "Invented the orbital engine and led its development before the company pivoted its work into successful direct-injection technology.",
+      },
+    ],
+  },
+  "holden-alloytec": {
+    images: [
+      commons(
+        "holden-alloytec",
+        "Holden Alloytec V6 in a VZ Commodore",
+        "A 3.6-litre Alloytec V6 installed in a 2006 VZ Commodore.",
+        "https://commons.wikimedia.org/wiki/File:Alloytec_V6_engine_of_a_2006_Holden_VZ_Commodore_SVZ_01.jpg",
+        "Senators at English Wikipedia",
+        "Public domain"
+      ),
+    ],
+    people: [
+      {
+        name: "GM Holden Powertrain engineers",
+        role: "Fishermans Bend development and manufacturing team",
+        contribution:
+          "Co-developed, localised and mass-produced GM's High Feature V6 for Australian vehicles and a worldwide export programme.",
+      },
+    ],
+  },
+};
+
 export function engineById(id: string): Engine {
   return ENGINES.find(e => e.id === id) || ENGINES[0];
+}
+
+export function engineMediaById(id: string): EngineMedia {
+  return ENGINE_MEDIA[id] || { images: [], people: [] };
 }
