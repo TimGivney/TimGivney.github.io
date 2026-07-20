@@ -13,6 +13,7 @@ const Fractal3D = lazy(() => import("./pages/Fractal3D"));
 const Sky = lazy(() => import("./pages/Sky"));
 const Toxic = lazy(() => import("./pages/Toxic"));
 const AusEngine = lazy(() => import("./pages/AusEngine"));
+const Foundation = lazy(() => import("./pages/Foundation"));
 
 function Router() {
   return (
@@ -82,6 +83,17 @@ function Router() {
           }
         >
           <AusEngine />
+        </Suspense>
+      </Route>
+      <Route path={"/foundation"}>
+        <Suspense
+          fallback={
+            <div className="flex h-[100dvh] w-full items-center justify-center bg-[#05060a] font-mono text-sm text-zinc-400">
+              Loading Foundation Studio…
+            </div>
+          }
+        >
+          <Foundation />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
