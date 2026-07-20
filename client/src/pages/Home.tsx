@@ -5,6 +5,7 @@ import HomeFractal3DWidget from '@/components/HomeFractal3DWidget';
 import HomeSkyWidget from '@/components/HomeSkyWidget';
 import HomeToxicWidget from '@/components/HomeToxicWidget';
 import HomeEngineWidget from '@/components/HomeEngineWidget';
+import HomeFoundationWidget from '@/components/HomeFoundationWidget';
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -716,6 +717,16 @@ export default function Home() {
               <p className="mt-3 text-sm text-gray-500">Spin an engine in the live preview, or open the full catalogue for the timeline — and export any of them to 3D print.</p>
             </div>
             <HomeEngineWidget />
+          </div>
+
+          {/* Terrain → Foundation */}
+          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Terrain → Foundation</h3>
+              <p className="mt-3 text-gray-700">Turn a site scan into a build-ready foundation in the browser. It reads a terrain point cloud — synthetic, or your own drone / LiDAR / total-station data — builds a ground model, then automatically places a pier grid, sizes every support&apos;s height and diameter, checks the beam spans and produces a foundation schedule and bill of materials. Aimed at the sloping-site niche: adjustable deck pedestals, modular and pole homes.</p>
+              <p className="mt-3 text-sm text-gray-500">Spin the live sample site, or open the full studio to upload a scan (CSV/XYZ/OBJ/PLY), tune the design, and export the schedule to CSV or a DXF setout plan.</p>
+            </div>
+            <HomeFoundationWidget />
           </div>
 
           {/* Meridian (no live preview) */}
