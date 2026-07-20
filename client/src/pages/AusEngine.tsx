@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import {
   ArrowLeft,
   Boxes,
+  ChevronDown,
   Download,
   ExternalLink,
   Eye,
@@ -87,18 +88,32 @@ function MediaImageCard({ image }: { image: EngineMediaImage }) {
 
 function PersonCard({ person }: { person: EnginePerson }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.035]">
+    <article className="flex min-h-32 overflow-hidden rounded-xl border border-white/10 bg-white/[0.035]">
       {person.portrait ? (
-        <MediaImageCard image={person.portrait} />
+        <a
+          href={person.portrait.sourceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="group relative w-28 shrink-0 overflow-hidden bg-black/30 sm:w-36"
+          title="Open portrait source"
+        >
+          <img
+            src={person.portrait.src}
+            alt={person.portrait.alt}
+            loading="lazy"
+            className="h-full w-full object-cover transition group-hover:scale-105"
+          />
+          <ExternalLink className="absolute bottom-2 right-2 h-3 w-3 text-white drop-shadow" />
+        </a>
       ) : (
-        <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-black/30 px-5 text-center">
-          <UserRound className="h-8 w-8 text-zinc-600" />
-          <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-            No freely licensed portrait found
+        <div className="flex w-20 shrink-0 flex-col items-center justify-center gap-2 bg-black/30 px-2 text-center sm:w-24">
+          <UserRound className="h-7 w-7 text-zinc-600" />
+          <p className="font-mono text-[8px] uppercase tracking-wider text-zinc-500">
+            No reusable portrait
           </p>
         </div>
       )}
-      <div className="space-y-1 border-t border-white/10 p-3">
+      <div className="flex min-w-0 flex-1 flex-col justify-center space-y-1 p-3">
         <h3 className="font-mono text-sm font-semibold text-zinc-100">
           {person.name}
         </h3>
@@ -108,6 +123,11 @@ function PersonCard({ person }: { person: EnginePerson }) {
         <p className="pt-1 text-[11px] leading-relaxed text-zinc-400">
           {person.contribution}
         </p>
+        {person.portrait && (
+          <p className="pt-1 font-mono text-[8px] text-zinc-600">
+            {person.portrait.credit} · {person.portrait.license}
+          </p>
+        )}
       </div>
     </article>
   );
@@ -126,10 +146,13 @@ export default function AusEngine() {
   const [colorDrift, setColorDrift] = useState(false);
   const [uiHidden, setUiHidden] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const eng = useMemo(() => engineById(id), [id]);
   const media = useMemo(() => engineMediaById(id), [id]);
+
+  useEffect(() => setDetailsOpen(false), [id]);
 
   const grouped = useMemo(() => {
     return CATEGORY_ORDER.map(c => ({
@@ -259,7 +282,7 @@ export default function AusEngine() {
           className={`absolute inset-0 overflow-y-auto bg-[radial-gradient(circle_at_65%_15%,rgba(201,168,76,0.10),transparent_38%)] ${
             uiHidden
               ? "px-4 pb-8 pt-16 sm:px-8"
-              : "pb-[29rem] pl-[10rem] pr-3 pt-28 sm:pb-[23rem] sm:pl-[13.5rem] sm:pr-6"
+              : "pb-8 pl-[10rem] pr-3 pt-28 sm:pl-[13.5rem] sm:pr-6"
           }`}
         >
           <div className="mx-auto max-w-5xl">
@@ -277,50 +300,48 @@ export default function AusEngine() {
               </p>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <Images className="h-4 w-4 text-[#C9A84C]" />
-                  <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-200">
-                    Engine photographs &amp; archive
-                  </h3>
-                </div>
-                <div className="grid gap-3">
-                  {media.images.length > 0 ? (
-                    media.images.map(image => (
-                      <MediaImageCard key={image.src} image={image} />
-                    ))
-                  ) : (
-                    <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/10 bg-black/20 px-5 text-center">
-                      <Images className="h-8 w-8 text-zinc-600" />
-                      <div>
-                        <p className="font-mono text-[11px] text-zinc-300">
-                          No verified reusable photograph yet
-                        </p>
-                        <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
-                          The 3D model remains available; this space is reserved for
-                          a rights-cleared image of the real engine.
-                        </p>
-                      </div>
+            <section>
+              <div className="mb-2 flex items-center gap-2">
+                <Images className="h-4 w-4 text-[#C9A84C]" />
+                <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-200">
+                  Engine photographs &amp; archive
+                </h3>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {media.images.length > 0 ? (
+                  media.images.map(image => (
+                    <MediaImageCard key={image.src} image={image} />
+                  ))
+                ) : (
+                  <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/10 bg-black/20 px-5 text-center">
+                    <Images className="h-8 w-8 text-zinc-600" />
+                    <div>
+                      <p className="font-mono text-[11px] text-zinc-300">
+                        No verified reusable photograph yet
+                      </p>
+                      <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                        The 3D model remains available; this space is reserved
+                        for a rights-cleared image of the real engine.
+                      </p>
                     </div>
-                  )}
-                </div>
-              </section>
+                  </div>
+                )}
+              </div>
+            </section>
 
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <UserRound className="h-4 w-4 text-[#C9A84C]" />
-                  <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-200">
-                    Designers &amp; makers
-                  </h3>
-                </div>
-                <div className="grid gap-3">
-                  {media.people.map(person => (
-                    <PersonCard key={person.name} person={person} />
-                  ))}
-                </div>
-              </section>
-            </div>
+            <section className="mt-7">
+              <div className="mb-2 flex items-center gap-2">
+                <UserRound className="h-4 w-4 text-[#C9A84C]" />
+                <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-200">
+                  Designers &amp; makers
+                </h3>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {media.people.map(person => (
+                  <PersonCard key={person.name} person={person} />
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       )}
@@ -425,7 +446,11 @@ export default function AusEngine() {
 
       {/* Engine selector (left) */}
       {!uiHidden && (
-        <div className="absolute left-3 top-28 bottom-28 z-10 w-36 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-2 backdrop-blur sm:left-6 sm:w-44">
+        <div
+          className={`absolute left-3 top-28 z-10 w-36 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-2 backdrop-blur sm:left-6 sm:w-44 ${
+            view === "photos" ? "bottom-4" : "bottom-40 sm:bottom-44"
+          }`}
+        >
           {grouped.map(group => (
             <div key={group.category} className="mb-2">
               <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
@@ -455,59 +480,55 @@ export default function AusEngine() {
         </div>
       )}
 
-      {/* Info + actions (bottom) */}
-      {!uiHidden && (
+      {/* Compact info + model actions */}
+      {!uiHidden && view !== "photos" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
-          <div className="pointer-events-auto mx-auto flex max-w-3xl flex-col gap-2 rounded-xl border border-white/10 bg-black/50 p-3 backdrop-blur">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <div>
+          <div className="pointer-events-auto mx-auto flex max-h-[38vh] max-w-4xl flex-col gap-2 overflow-y-auto rounded-xl border border-white/10 bg-black/60 p-3 backdrop-blur">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
                 <h2 className="font-mono text-sm font-semibold text-zinc-100">
                   {eng.name}
                 </h2>
-                <p className="font-mono text-[11px] text-zinc-400">
+                <p className="font-mono text-[10px] text-zinc-400 sm:text-[11px]">
                   {eng.maker} · {eng.origin} · {eng.years}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setColorDrift(v => !v)}
-                  className={`rounded-md px-2 py-1.5 font-mono text-[11px] transition ${
-                    colorDrift
-                      ? "bg-[#C9A84C] text-[#1a1a2e]"
-                      : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
-                  }`}
-                  title="Slowly drift the colours"
-                  disabled={view !== "model"}
-                >
-                  Drift
-                </button>
-                <button
-                  onClick={reset}
-                  className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 font-mono text-[11px] text-zinc-200 transition hover:bg-white/15"
-                  title="Reset view"
-                  disabled={view !== "model"}
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </button>
-                {view === "model" && (
-                  <>
-                    <button
-                      onClick={savePNG}
-                      className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 transition hover:bg-white/15"
-                      title="Save PNG"
-                    >
-                      <Download className="h-3.5 w-3.5" /> PNG
-                    </button>
-                    <button
-                      onClick={exportSTL}
-                      className="inline-flex items-center gap-1 rounded-md border border-[#C9A84C]/60 bg-[#C9A84C]/15 px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#C9A84C] transition hover:bg-[#C9A84C]/25"
-                      title="Export a 3D-printable STL"
-                    >
-                      <Boxes className="h-3.5 w-3.5" /> STL
-                    </button>
-                  </>
-                )}
-              </div>
+              {view === "model" && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setColorDrift(v => !v)}
+                    className={`rounded-md px-2 py-1.5 font-mono text-[11px] transition ${
+                      colorDrift
+                        ? "bg-[#C9A84C] text-[#1a1a2e]"
+                        : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
+                    }`}
+                    title="Slowly drift the colours"
+                  >
+                    Drift
+                  </button>
+                  <button
+                    onClick={reset}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 font-mono text-[11px] text-zinc-200 transition hover:bg-white/15"
+                    title="Reset view"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={savePNG}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 transition hover:bg-white/15"
+                    title="Save PNG"
+                  >
+                    <Download className="h-3.5 w-3.5" /> PNG
+                  </button>
+                  <button
+                    onClick={exportSTL}
+                    className="inline-flex items-center gap-1 rounded-md border border-[#C9A84C]/60 bg-[#C9A84C]/15 px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#C9A84C] transition hover:bg-[#C9A84C]/25"
+                    title="Export a 3D-printable STL"
+                  >
+                    <Boxes className="h-3.5 w-3.5" /> STL
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
@@ -516,35 +537,54 @@ export default function AusEngine() {
               <span className={chip}>{eng.power}</span>
             </div>
 
-            <p className="text-[12px] leading-relaxed text-zinc-300">
-              {eng.story}
-            </p>
-            <div className="grid gap-1.5 sm:grid-cols-2">
-              <p className="text-[11px] leading-relaxed text-zinc-400">
-                <span className={label}>Under the bonnet</span>
-                <br />
-                {eng.spec}
+            <div className="flex items-end gap-3">
+              <p
+                className={`min-w-0 flex-1 text-[11px] leading-relaxed text-zinc-300 sm:text-[12px] ${
+                  detailsOpen ? "" : "line-clamp-2"
+                }`}
+              >
+                {eng.story}
               </p>
-              <p className="text-[11px] leading-relaxed text-zinc-400">
-                <span className={label}>Legacy</span>
-                <br />
-                {eng.legacy}
-              </p>
+              <button
+                onClick={() => setDetailsOpen(v => !v)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 font-mono text-[10px] text-zinc-300 transition hover:bg-white/10"
+              >
+                {detailsOpen ? "Less" : "Details"}
+                <ChevronDown
+                  className={`h-3 w-3 transition ${detailsOpen ? "rotate-180" : ""}`}
+                />
+              </button>
             </div>
 
-            <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-2">
-              <p className="font-mono text-[10px] text-zinc-500">
-                Made by Tim, for Tim.
-              </p>
-              <a
-                href="https://github.com/TimGivney/TimGivney.github.io"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 transition hover:text-zinc-200"
-              >
-                <Github className="h-3 w-3" /> Open source on GitHub
-              </a>
-            </div>
+            {detailsOpen && (
+              <>
+                <div className="grid gap-2 border-t border-white/10 pt-2 sm:grid-cols-2">
+                  <p className="text-[11px] leading-relaxed text-zinc-400">
+                    <span className={label}>Under the bonnet</span>
+                    <br />
+                    {eng.spec}
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-zinc-400">
+                    <span className={label}>Legacy</span>
+                    <br />
+                    {eng.legacy}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between border-t border-white/10 pt-2">
+                  <p className="font-mono text-[10px] text-zinc-500">
+                    Made by Tim, for Tim.
+                  </p>
+                  <a
+                    href="https://github.com/TimGivney/TimGivney.github.io"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 transition hover:text-zinc-200"
+                  >
+                    <Github className="h-3 w-3" /> Open source on GitHub
+                  </a>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

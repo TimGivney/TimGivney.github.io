@@ -627,6 +627,22 @@ export const ENGINE_MEDIA: Record<string, EngineMedia> = {
         "Redback",
         "Public domain"
       ),
+      commons(
+        "ford-barra-270t",
+        "Ford Barra 270T turbo engine",
+        "The higher-output Barra 270T installed in an FPV F6 Typhoon.",
+        "https://commons.wikimedia.org/wiki/File:Barra_270T.jpg",
+        "RB30DE",
+        "CC BY-SA 3.0"
+      ),
+      commons(
+        "ford-barra-190",
+        "Ford Barra 190 naturally aspirated engine",
+        "A naturally aspirated Barra 190 in a BF Falcon XL Series II ute.",
+        "https://commons.wikimedia.org/wiki/File:Ford_Barra_190_inline-six_engine.jpg",
+        "Zzrbiker",
+        "CC BY-SA 4.0"
+      ),
     ],
     people: [
       {
@@ -644,6 +660,22 @@ export const ENGINE_MEDIA: Record<string, EngineMedia> = {
         "Holden 308 V8 engine",
         "A Holden 308 at the National Holden Motor Museum in Echuca.",
         "https://commons.wikimedia.org/wiki/File:308_cu_in_Holden_V8_engine_(2015-08-29)_01.jpg",
+        "OSX",
+        "Public domain"
+      ),
+      commons(
+        "holden-v8-02",
+        "Holden 308 V8 from the front quarter",
+        "A second museum view showing the 308's front dress and intake layout.",
+        "https://commons.wikimedia.org/wiki/File:308_cu_in_Holden_V8_engine_(2015-08-29)_02.jpg",
+        "OSX",
+        "Public domain"
+      ),
+      commons(
+        "holden-v8-03",
+        "Holden 308 V8 from the rear quarter",
+        "The same Holden-built 308 viewed from the opposite side.",
+        "https://commons.wikimedia.org/wiki/File:308_cu_in_Holden_V8_engine_(2015-08-29)_03.jpg",
         "OSX",
         "Public domain"
       ),
@@ -766,6 +798,14 @@ export const ENGINE_MEDIA: Record<string, EngineMedia> = {
         "FlugKerl2",
         "CC BY-SA 3.0"
       ),
+      commons(
+        "jabiru-3300-bottom",
+        "Underside of a Jabiru 3300 aircraft engine",
+        "The 3300 from below, exposing its opposed cylinders, exhausts and compact crankcase.",
+        "https://commons.wikimedia.org/wiki/File:Jabiru3300bottom.jpg",
+        "FlugKerl2",
+        "CC BY-SA 3.0"
+      ),
     ],
     people: [
       {
@@ -797,6 +837,14 @@ export const ENGINE_MEDIA: Record<string, EngineMedia> = {
         "Peter Ellis",
         "CC BY-SA 3.0"
       ),
+      commons(
+        "cac-avon-mk203",
+        "Rolls-Royce Avon Mk 203 turbojet",
+        "A preserved Avon Mk 203 showing the long axial-compressor casing shared by the engine family.",
+        "https://commons.wikimedia.org/wiki/File:Rolls_Royce_Avon_Mk203_Jet_Engine._(48827497941).jpg",
+        "Mohit S",
+        "CC BY 2.0"
+      ),
     ],
     people: [
       {
@@ -817,6 +865,22 @@ export const ENGINE_MEDIA: Record<string, EngineMedia> = {
         "https://commons.wikimedia.org/wiki/File:Pratt_%26_Whitney_R-1830_S1C3G_Twin_Wasp_2009-07-03.jpg",
         "Myllyre",
         "CC BY-SA 3.0"
+      ),
+      commons(
+        "cac-twin-wasp-side",
+        "Side view of an R-1830 Twin Wasp",
+        "A side view revealing the Twin Wasp's two cylinder rows and dense cooling-fin geometry.",
+        "https://commons.wikimedia.org/wiki/File:Pratt_and_Whitney_R1830_Twin_Wasp_side.jpg",
+        "Wikimedia Commons contributor",
+        "CC BY-SA 3.0"
+      ),
+      commons(
+        "cac-twin-wasp-detail",
+        "R-1830 Twin Wasp cylinder detail",
+        "A close view of the R-1830-36's cylinder heads, pushrods and ignition leads.",
+        "https://commons.wikimedia.org/wiki/File:Pratt_%26_Whitney_R-1830-36_Twin_Wasp_(detail).jpg",
+        "Alex Layzell",
+        "CC BY 2.0"
       ),
     ],
     people: [
@@ -862,6 +926,15 @@ export const ENGINE_MEDIA: Record<string, EngineMedia> = {
         "Public domain",
         "archive"
       ),
+      commons(
+        "sarich-patent-fig3",
+        "Sarich orbital engine patent figure 3",
+        "A second patent figure showing the orbital mechanism in a sectional engineering view.",
+        "https://commons.wikimedia.org/wiki/File:US3787150-3.png",
+        "Ralph Sarich",
+        "Public domain",
+        "archive"
+      ),
     ],
     people: [
       {
@@ -880,6 +953,22 @@ export const ENGINE_MEDIA: Record<string, EngineMedia> = {
         "A 3.6-litre Alloytec V6 installed in a 2006 VZ Commodore.",
         "https://commons.wikimedia.org/wiki/File:Alloytec_V6_engine_of_a_2006_Holden_VZ_Commodore_SVZ_01.jpg",
         "Senators at English Wikipedia",
+        "Public domain"
+      ),
+      commons(
+        "holden-alloytec-lpg",
+        "LPG Holden Alloytec V6",
+        "An LPG-fuelled Alloytec installation in a VE Commodore.",
+        "https://commons.wikimedia.org/wiki/File:Alloytec_V6_(LPG)_engine_of_a_2006-2008_Holden_VE_Commodore_1.jpg",
+        "PoweredByCNG",
+        "CC BY-SA 3.0"
+      ),
+      commons(
+        "holden-alloytec-powertrain",
+        "Holden Alloytec 190 V6 and automatic transmission",
+        "A museum display pairing the Alloytec 190 with GM's five-speed automatic transmission.",
+        "https://commons.wikimedia.org/wiki/File:3564_cc_Holden_Alloytec_190_V6_engine_with_5-speed_GM_5L40-E_automatic_transmission_(2015-08-29)_02.jpg",
+        "OSX",
         "Public domain"
       ),
     ],
