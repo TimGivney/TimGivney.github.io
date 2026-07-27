@@ -569,6 +569,11 @@ export default function AusEngine() {
                     <br />
                     {eng.legacy}
                   </p>
+                  <p className="text-[11px] leading-relaxed text-zinc-400 sm:col-span-2">
+                    <span className={label}>Workshop lore</span>
+                    <br />
+                    {eng.lore}
+                  </p>
                 </div>
                 <div className="flex items-center justify-between border-t border-white/10 pt-2">
                   <p className="font-mono text-[10px] text-zinc-500">

@@ -11,6 +11,7 @@ import {
   Minimize,
   Orbit,
   RotateCcw,
+  Search,
 } from "lucide-react";
 import { ToxicView } from "@/lib/toxic/ToxicView";
 import { PetriView } from "@/lib/toxic/PetriView";
@@ -35,6 +36,7 @@ const GROUP_ORDER: SpecimenKind[] = [
   "bacterium",
   "virus",
   "prion",
+  "protozoan",
   "fungus",
   "pollen",
   "human",
@@ -55,17 +57,25 @@ export default function Toxic() {
   const [colorDrift, setColorDrift] = useState(false);
   const [uiHidden, setUiHidden] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const spec = useMemo(() => specimenById(id), [id]);
 
   const grouped = useMemo(() => {
+    const needle = query.trim().toLowerCase();
     return GROUP_ORDER.map(k => ({
       kind: k,
       label: KIND_LABEL[k],
-      items: SPECIMENS.filter(s => s.kind === k),
+      items: SPECIMENS.filter(s => {
+        if (s.kind !== k) return false;
+        if (!needle) return true;
+        return [s.name, s.latin, s.tagline].some(value =>
+          value?.toLowerCase().includes(needle)
+        );
+      }),
     })).filter(g => g.items.length > 0);
-  }, []);
+  }, [query]);
 
   // Lazily create each view only when first shown (keeps it light).
   useEffect(() => {
@@ -295,6 +305,16 @@ export default function Toxic() {
       {/* Specimen selector (left) */}
       {!uiHidden && (
         <div className="absolute left-3 top-28 bottom-28 z-10 w-44 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-2 backdrop-blur sm:left-6">
+          <div className="sticky -top-2 z-10 -mx-2 mb-2 border-b border-white/10 bg-black/75 p-2 backdrop-blur">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-500" />
+            <input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Find specimen"
+              aria-label="Find specimen"
+              className="h-7 w-full rounded-md border border-white/10 bg-white/5 pl-7 pr-2 font-mono text-[10px] text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-[#C9A84C]/60"
+            />
+          </div>
           {grouped.map(group => (
             <div key={group.kind} className="mb-2">
               <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
@@ -321,6 +341,11 @@ export default function Toxic() {
               ))}
             </div>
           ))}
+          {grouped.length === 0 && (
+            <p className="px-2 py-3 font-mono text-[10px] text-zinc-500">
+              No matching specimen
+            </p>
+          )}
         </div>
       )}
 
