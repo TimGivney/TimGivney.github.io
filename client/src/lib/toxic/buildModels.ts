@@ -6,7 +6,10 @@
 
 import * as THREE from "three";
 
-function mat(color: string, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) {
+function mat(
+  color: string,
+  opts: Partial<THREE.MeshStandardMaterialParameters> = {}
+) {
   return new THREE.MeshStandardMaterial({
     color: new THREE.Color(color),
     roughness: 0.45,
@@ -84,7 +87,10 @@ function rod(
   radius: number,
   material: THREE.Material
 ): THREE.Mesh {
-  return new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 12, 24), material);
+  return new THREE.Mesh(
+    new THREE.CapsuleGeometry(radius, length, 12, 24),
+    material
+  );
 }
 
 function buildAnthrax(c: string, c2: string): THREE.Group {
@@ -103,7 +109,10 @@ function buildAnthrax(c: string, c2: string): THREE.Group {
     if (i === 1) {
       const spore = new THREE.Mesh(
         new THREE.SphereGeometry(0.22, 20, 16),
-        mat(c2, { emissive: new THREE.Color(c2).multiplyScalar(0.4), roughness: 0.3 })
+        mat(c2, {
+          emissive: new THREE.Color(c2).multiplyScalar(0.4),
+          roughness: 0.3,
+        })
       );
       spore.scale.set(1, 1.5, 1);
       spore.position.y = r.position.y;
@@ -180,7 +189,13 @@ function buildCholera(c: string, c2: string): THREE.Group {
     );
   }
   const flag = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(helixPts), 80, 0.04, 8, false),
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(helixPts),
+      80,
+      0.04,
+      8,
+      false
+    ),
     mat(c2, { roughness: 0.6 })
   );
   g.add(flag);
@@ -196,12 +211,142 @@ function buildBotulinum(c: string, c2: string): THREE.Group {
   g.add(r);
   const spore = new THREE.Mesh(
     new THREE.SphereGeometry(0.5, 24, 18),
-    mat(c2, { roughness: 0.35, emissive: new THREE.Color(c2).multiplyScalar(0.25) })
+    mat(c2, {
+      roughness: 0.35,
+      emissive: new THREE.Color(c2).multiplyScalar(0.25),
+    })
   );
   spore.position.y = 1.4 / 2 + 0.34;
   g.add(spore);
   g.rotation.z = 0.25;
   g.scale.setScalar(0.78);
+  return g;
+}
+
+function buildPneumococcus(c: string, c2: string): THREE.Group {
+  const g = new THREE.Group();
+  const body = mat(c, { roughness: 0.5 });
+  const capsule = mat(c2, { transparent: true, opacity: 0.28, roughness: 0.2 });
+  const pairs: [number, number, number, number][] = [
+    [0, 0, 0, 0.15],
+    [1.25, 0.65, -0.2, -0.35],
+    [-1.15, -0.7, 0.25, 0.45],
+  ];
+  for (const [x, y, z, rotation] of pairs) {
+    const pair = new THREE.Group();
+    for (const dx of [-0.34, 0.34]) {
+      const cell = new THREE.Mesh(new THREE.SphereGeometry(0.46, 28, 20), body);
+      cell.scale.set(0.72, 1, 0.82);
+      cell.position.x = dx;
+      cell.rotation.z = dx < 0 ? -0.22 : 0.22;
+      pair.add(cell);
+    }
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.86, 28, 20),
+      capsule
+    );
+    halo.scale.set(1.05, 0.75, 0.72);
+    pair.add(halo);
+    pair.position.set(x, y, z);
+    pair.rotation.z = rotation;
+    g.add(pair);
+  }
+  g.scale.setScalar(0.72);
+  return g;
+}
+
+function buildAcidFastRods(c: string, c2: string): THREE.Group {
+  const g = new THREE.Group();
+  const body = mat(c, { roughness: 0.7 });
+  const texture = mat(c2, { roughness: 0.65 });
+  const positions: [number, number, number, number][] = [
+    [0, 0, 0, 0.2],
+    [1.15, 0.65, -0.2, -0.55],
+    [-1.1, -0.65, 0.2, 0.6],
+    [0.3, 1.25, -0.4, 1.0],
+    [-0.45, -1.25, 0.3, -0.8],
+  ];
+  for (const [x, y, z, rotation] of positions) {
+    const cell = rod(1.1, 0.22, body);
+    cell.position.set(x, y, z);
+    cell.rotation.z = rotation;
+    g.add(cell);
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), texture);
+    bead.position.set(x, y, z + 0.21);
+    g.add(bead);
+  }
+  g.scale.setScalar(0.68);
+  return g;
+}
+
+function buildFlagellatedRods(c: string, c2: string): THREE.Group {
+  const g = new THREE.Group();
+  const body = mat(c, { roughness: 0.5 });
+  const flagella = mat(c2, { roughness: 0.6 });
+  const positions: [number, number, number, number][] = [
+    [0, 0, 0, 0.35],
+    [1.2, 0.65, -0.25, -0.5],
+    [-1.1, -0.7, 0.2, 0.7],
+  ];
+  for (const [x, y, z, rotation] of positions) {
+    const cell = rod(1.0, 0.3, body);
+    cell.position.set(x, y, z);
+    cell.rotation.z = rotation;
+    g.add(cell);
+    for (let f = 0; f < 4; f++) {
+      const points: THREE.Vector3[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24;
+        points.push(
+          new THREE.Vector3(
+            x +
+              Math.cos(rotation) * (0.25 + t * 1.15) +
+              Math.sin(t * 16 + f) * 0.12,
+            y +
+              Math.sin(rotation) * (0.25 + t * 1.15) +
+              Math.cos(t * 13 + f) * 0.12,
+            z + (f - 1.5) * 0.08 + Math.sin(t * 10) * 0.08
+          )
+        );
+      }
+      g.add(
+        new THREE.Mesh(
+          new THREE.TubeGeometry(
+            new THREE.CatmullRomCurve3(points),
+            36,
+            0.025,
+            6
+          ),
+          flagella
+        )
+      );
+    }
+  }
+  g.scale.setScalar(0.65);
+  return g;
+}
+
+function buildShortRods(c: string, c2: string): THREE.Group {
+  const g = new THREE.Group();
+  const body = mat(c, { roughness: 0.55 });
+  const tip = mat(c2, { roughness: 0.5 });
+  const positions: [number, number, number, number][] = [
+    [0, 0, 0, 0.2],
+    [1.1, 0.7, -0.25, -0.5],
+    [-1.1, -0.7, 0.2, 0.65],
+    [0.1, 1.3, -0.4, 1.1],
+    [-0.3, -1.25, 0.35, -0.9],
+  ];
+  for (const [x, y, z, rotation] of positions) {
+    const cell = rod(0.7, 0.25, body);
+    cell.position.set(x, y, z);
+    cell.rotation.z = rotation;
+    g.add(cell);
+    const spot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), tip);
+    spot.position.set(x, y, z + 0.24);
+    g.add(spot);
+  }
+  g.scale.setScalar(0.7);
   return g;
 }
 
@@ -228,7 +373,10 @@ function buildCorona(c: string, c2: string): THREE.Group {
       spikeMat
     );
     stalk.position.y = 1.0 + 0.2;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), spikeMat);
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.11, 12, 10),
+      spikeMat
+    );
     head.position.y = 1.0 + 0.45;
     spike.add(stalk, head);
     spike.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
@@ -281,7 +429,13 @@ function buildEbola(c: string, c2: string): THREE.Group {
     ridgePts.push(p.clone().add(off));
   }
   const ridge = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ridgePts), 240, 0.025, 6, false),
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(ridgePts),
+      240,
+      0.025,
+      6,
+      false
+    ),
     mat(c2, { roughness: 0.6 })
   );
   g.add(ridge);
@@ -328,7 +482,10 @@ function buildRabies(c: string, c2: string): THREE.Group {
   const g = new THREE.Group();
   // bullet shape: cylinder with one hemispherical (rounded) end and a flat base
   const body = mat(c, { roughness: 0.45 });
-  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.7, 32), body);
+  const cyl = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.6, 0.6, 1.7, 32),
+    body
+  );
   g.add(cyl);
   const dome = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
@@ -377,7 +534,10 @@ function buildHIV(c: string, c2: string): THREE.Group {
       knobMat
     );
     stalk.position.y = 1.0 + 0.11;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), knobMat);
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 12, 10),
+      knobMat
+    );
     head.position.y = 1.0 + 0.26;
     knob.add(stalk, head);
     knob.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
@@ -394,12 +554,33 @@ function buildHIV(c: string, c2: string): THREE.Group {
   return g;
 }
 
+function buildSphericalVirus(c: string, c2: string): THREE.Group {
+  const g = new THREE.Group();
+  const shell = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1, 4),
+    mat(c, { roughness: 0.45 })
+  );
+  g.add(shell);
+  addBumps(g, 72, 1.0, 0.07, mat(c2, { roughness: 0.5 }), 0.7);
+  const core = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.48, 1),
+    mat(c2, { transparent: true, opacity: 0.55, roughness: 0.4 })
+  );
+  g.add(core);
+  g.scale.setScalar(0.86);
+  return g;
+}
+
 // ---- prion -------------------------------------------------------------
 
 function buildPrion(c: string, c2: string): THREE.Group {
   const g = new THREE.Group();
   // tangled aggregate of twisted beta-sheet ribbons
-  const ribbon = mat(c, { roughness: 0.5, side: THREE.DoubleSide, metalness: 0.1 });
+  const ribbon = mat(c, {
+    roughness: 0.5,
+    side: THREE.DoubleSide,
+    metalness: 0.1,
+  });
   for (let s = 0; s < 5; s++) {
     const pts: THREE.Vector3[] = [];
     const ox = (Math.random() - 0.5) * 1.2;
@@ -423,6 +604,103 @@ function buildPrion(c: string, c2: string): THREE.Group {
     g.add(tube);
   }
   g.scale.setScalar(0.8);
+  return g;
+}
+
+// ---- protozoa & amoebae -----------------------------------------------
+
+function buildMalaria(c: string, c2: string): THREE.Group {
+  const g = new THREE.Group();
+  const blood = mat("#a82735", { roughness: 0.55 });
+  const parasite = mat(c, {
+    roughness: 0.4,
+    emissive: new THREE.Color(c).multiplyScalar(0.12),
+  });
+  const nucleus = mat(c2, { roughness: 0.45 });
+  const cells: [number, number, number, number][] = [
+    [0, 0, 0, 0],
+    [1.15, 0.65, -0.25, 0.35],
+    [-1.1, -0.7, 0.25, -0.45],
+  ];
+  for (let index = 0; index < cells.length; index++) {
+    const [x, y, z, rotation] = cells[index];
+    const cell = new THREE.Mesh(
+      new THREE.TorusGeometry(0.48, 0.3, 18, 44),
+      blood
+    );
+    cell.scale.set(1, 1, 0.28);
+    cell.position.set(x, y, z);
+    cell.rotation.z = rotation;
+    g.add(cell);
+    if (index < 2) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.16, 0.045, 10, 28),
+        parasite
+      );
+      ring.position.set(x + 0.08, y - 0.02, z + 0.1);
+      ring.rotation.z = rotation + 0.4;
+      g.add(ring);
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.055, 12, 10),
+        nucleus
+      );
+      dot.position.set(x + 0.22, y + 0.08, z + 0.11);
+      g.add(dot);
+    }
+  }
+  g.scale.setScalar(0.78);
+  return g;
+}
+
+function buildAmoeba(c: string, c2: string): THREE.Group {
+  const g = new THREE.Group();
+  const cytoplasm = mat(c, {
+    transparent: true,
+    opacity: 0.78,
+    roughness: 0.55,
+  });
+  const body = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.95, 3),
+    cytoplasm
+  );
+  body.scale.set(1.15, 0.82, 0.9);
+  g.add(body);
+  const nucleus = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 24, 18),
+    mat(c2, { roughness: 0.5 })
+  );
+  nucleus.position.set(-0.18, 0.1, 0.18);
+  g.add(nucleus);
+  const directions = [
+    new THREE.Vector3(1, 0.2, 0.1),
+    new THREE.Vector3(-1, -0.15, 0.2),
+    new THREE.Vector3(0.25, 1, -0.15),
+    new THREE.Vector3(-0.2, -1, 0.1),
+    new THREE.Vector3(0.45, 0.25, 1),
+    new THREE.Vector3(-0.3, 0.2, -1),
+  ];
+  for (const direction of directions) {
+    const length = 0.4 + Math.random() * 0.4;
+    const arm = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.16, length, 8, 14),
+      cytoplasm
+    );
+    const normal = direction.clone().normalize();
+    arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+    arm.position.copy(normal.multiplyScalar(0.85 + length * 0.35));
+    g.add(arm);
+  }
+  for (let i = 0; i < 12; i++) {
+    const vacuole = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05 + Math.random() * 0.07, 10, 8),
+      mat("#d9f1e7", { transparent: true, opacity: 0.5, roughness: 0.3 })
+    );
+    vacuole.position
+      .set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
+      .multiplyScalar(1.15);
+    g.add(vacuole);
+  }
+  g.scale.setScalar(0.9);
   return g;
 }
 
@@ -454,7 +732,10 @@ function buildDeathcap(c: string, c2: string): THREE.Group {
   volva.position.y = -0.72;
   g.add(volva);
   // floating spores
-  const sporeMat = mat(c, { roughness: 0.3, emissive: new THREE.Color(c).multiplyScalar(0.15) });
+  const sporeMat = mat(c, {
+    roughness: 0.3,
+    emissive: new THREE.Color(c).multiplyScalar(0.15),
+  });
   for (let i = 0; i < 18; i++) {
     const sp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), sporeMat);
     sp.scale.set(1, 1.25, 1);
@@ -486,7 +767,10 @@ function buildRagweed(c: string, c2: string): THREE.Group {
     const r = Math.sqrt(1 - y * y);
     const phi = i * 2.399963;
     const dir = new THREE.Vector3(Math.cos(phi) * r, y, Math.sin(phi) * r);
-    const spine = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.32, 8), spikeMat);
+    const spine = new THREE.Mesh(
+      new THREE.ConeGeometry(0.07, 0.32, 8),
+      spikeMat
+    );
     spine.position.copy(dir.clone().multiplyScalar(0.95 + 0.16));
     spine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
     g.add(spine);
@@ -553,7 +837,9 @@ function buildDNA(c: string, c2: string): THREE.Group {
     const t = i / n;
     const ang = t * turns * Math.PI * 2;
     const y = -height / 2 + t * height;
-    strandA.push(new THREE.Vector3(Math.cos(ang) * radius, y, Math.sin(ang) * radius));
+    strandA.push(
+      new THREE.Vector3(Math.cos(ang) * radius, y, Math.sin(ang) * radius)
+    );
     strandB.push(
       new THREE.Vector3(
         Math.cos(ang + Math.PI) * radius,
@@ -563,11 +849,23 @@ function buildDNA(c: string, c2: string): THREE.Group {
     );
   }
   const backboneA = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(strandA), n, 0.08, 10, false),
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(strandA),
+      n,
+      0.08,
+      10,
+      false
+    ),
     mat(c, { roughness: 0.35, metalness: 0.2 })
   );
   const backboneB = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(strandB), n, 0.08, 10, false),
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(strandB),
+      n,
+      0.08,
+      10,
+      false
+    ),
     mat(c2, { roughness: 0.35, metalness: 0.2 })
   );
   g.add(backboneA, backboneB);
@@ -662,14 +960,20 @@ function buildHuman(c: string, c2: string): THREE.Group {
   torso.scale.set(1, 1, 0.6);
   // arms
   for (const sgn of [-1, 1]) {
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.95, 8, 14), skin);
+    const arm = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.12, 0.95, 8, 14),
+      skin
+    );
     arm.position.set(sgn * 0.55, 0.62, 0);
     arm.rotation.z = sgn * 0.18;
     g.add(arm);
   }
   // legs
   for (const sgn of [-1, 1]) {
-    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 1.1, 8, 14), skin);
+    const leg = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.15, 1.1, 8, 14),
+      skin
+    );
     leg.position.set(sgn * 0.2, -0.75, 0);
     g.add(leg);
   }
@@ -686,12 +990,35 @@ const BUILDERS: Record<string, (c: string, c2: string) => THREE.Group> = {
   plague: buildPlague,
   cholera: buildCholera,
   botulinum: buildBotulinum,
+  tuberculosis: buildAcidFastRods,
+  pneumococcus: buildPneumococcus,
+  tetanus: buildBotulinum,
+  ecoli: buildFlagellatedRods,
+  salmonella: buildFlagellatedRods,
+  listeria: buildShortRods,
+  cdiff: buildBotulinum,
   sarscov2: buildCorona,
+  influenza: buildSphericalVirus,
+  "hepatitis-b": buildSphericalVirus,
+  "hepatitis-c": buildSphericalVirus,
+  dengue: buildSphericalVirus,
+  mers: buildCorona,
   ebola: buildEbola,
+  marburg: buildEbola,
+  nipah: buildSphericalVirus,
+  hantavirus: buildSphericalVirus,
+  lassa: buildSphericalVirus,
+  cchf: buildSphericalVirus,
+  mpox: buildSmallpox,
   smallpox: buildSmallpox,
   rabies: buildRabies,
   hiv: buildHIV,
   prion: buildPrion,
+  cjd: buildPrion,
+  kuru: buildPrion,
+  malaria: buildMalaria,
+  balamuthia: buildAmoeba,
+  naegleria: buildAmoeba,
   deathcap: buildDeathcap,
   ragweed: buildRagweed,
   grasspollen: buildGrassPollen,
