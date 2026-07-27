@@ -49,6 +49,7 @@ export interface Engine {
   story: string; // why it matters
   spec: string; // technical detail
   legacy: string; // where it ran / what it left behind
+  lore: string; // workshop stories and cultural memory
 }
 
 export interface EngineMediaImage {
@@ -111,10 +112,10 @@ export const ENGINES: Engine[] = [
     tagline: "Australia's first mass-produced car engine",
     story:
       "The engine that powered '48-215 (the FX) — the first 'Australia's Own Car'. Grey-painted and Buick-derived, it was a low-stress, easy-to-fix six that put a nation on wheels and defined the Holden character for a generation.",
-    spec:
-      "Cast-iron OHV six with a three-bearing crank, single Stromberg carburettor and a reputation for running forever. Bored out from 132 to 138 cu in for the FB in 1960.",
+    spec: "Cast-iron OHV six with a three-bearing crank, single Stromberg carburettor and a reputation for running forever. Bored out from 132 to 138 cu in for the FB in 1960.",
     legacy:
       "The starting point for Australian volume engine manufacturing at Fishermans Bend — and, tuned by the likes of Waggott and Repco, a giant-killer in early Australian motor racing.",
+    lore: "Old racers called the early Holden body a 'humpy', and its grey six became the backyard engineer's blank canvas: shaved heads, twin carburettors and home-made extractors turned the family sedan into a club-racing weapon.",
   },
   {
     id: "holden-red",
@@ -132,10 +133,10 @@ export const ENGINES: Engine[] = [
     tagline: "The six that half of Australia learned to drive on",
     story:
       "Ed Silins' clean-sheet 'Red' six replaced the Grey with the EH of 1963 and defined the Holden for a generation — from Kingswoods to Toranas to the first Commodores. Later 'Blue' and Bosch-injected 'Black' versions carried it to 1986.",
-    spec:
-      "Seven-bearing crank, cast-iron block and head, from a 138 baby-six up to the beloved 202. The twin-carb 186S and 202 X2 were Holden's first factory performance sixes.",
+    spec: "Seven-bearing crank, cast-iron block and head, from a 138 baby-six up to the beloved 202. The twin-carb 186S and 202 X2 were Holden's first factory performance sixes.",
     legacy:
       "Twenty-four years of service in cars, Bedford vans and forklifts, and a cornerstone of Australian street-machine culture before the smooth Nissan RB30 took over.",
+    lore: "Its paint became a family tree: Red, then Blue, then Black. Australians still identify a whole generation of Holden engineering by the colour on the block, with '186' and '202' spoken more like nicknames than capacities.",
   },
   {
     id: "chrysler-hemi6",
@@ -153,10 +154,10 @@ export const ENGINES: Engine[] = [
     tagline: "The Aussie hemi that scared the V8s",
     story:
       "Chrysler USA handed its abandoned 'D-engine' to a five-man team in Adelaide, who turned it into the Hemi-6 — a hemispherical-head straight-six for the Valiant. In triple-Weber 'Six Pack' E49 Charger form it made 302 bhp: for a time the quickest-accelerating Australian car built.",
-    spec:
-      "Thin-wall cast-iron block, hemi combustion chambers, 245 and 265 cu in performance versions with three twin-choke Weber carbs on the legendary E38/E49 Chargers.",
+    spec: "Thin-wall cast-iron block, hemi combustion chambers, 245 and 265 cu in performance versions with three twin-choke Weber carbs on the legendary E38/E49 Chargers.",
     legacy:
       "Proof Australia could engineer a world-class engine of its own — and a muscle-car icon that still commands six figures today.",
+    lore: "The Charger E49's 'Six Pack' badge meant three Weber carburettors, not six cylinders. Its standing-quarter reputation became folklore because the lighter Hemi-six could embarrass larger V8s without pretending to be one.",
   },
   {
     id: "ford-crossflow",
@@ -174,10 +175,10 @@ export const ENGINES: Engine[] = [
     tagline: "The Falcon workhorse, reinvented in Geelong",
     story:
       "Ford Australia reworked the American Falcon six into a locally developed crossflow — intake on one side, exhaust on the other — for better breathing. The alloy-head, EFI versions of the late 1980s made it smooth and strong enough to see out the carburettor era.",
-    spec:
-      "Cast-iron block with the Australian crossflow head (200 and 250 cu in), later an alloy head and Bosch EFI. Shared its bore centres with every Falcon six back to 1960 — and forward to the Barra.",
+    spec: "Cast-iron block with the Australian crossflow head (200 and 250 cu in), later an alloy head and Bosch EFI. Shared its bore centres with every Falcon six back to 1960 — and forward to the Barra.",
     legacy:
       "The direct ancestor of the Barra, and the engine that kept the Falcon competitive against the Holden six for two decades.",
+    lore: "Crossflows earned their mythology in taxis, utes and paddock cars rather than showrooms. A worn-looking Falcon could have already circled the continent in kilometres and still be expected to tow home another project.",
   },
   {
     id: "ford-barra",
@@ -195,10 +196,10 @@ export const ENGINES: Engine[] = [
     tagline: "The turbo six that became a tuning legend",
     story:
       "Named after the barramundi, the Barra gave the old Falcon six a modern twin-cam, 24-valve alloy head and — crucially — a turbocharged variant. The XR6 Turbo out-punched the V8s beside it, and the Barra's cast-iron block made it almost unbreakable: tuners now chase four-figure horsepower.",
-    spec:
-      "4.0-litre DOHC I6, variable cam timing, cast-iron block (same bore centres as the 1960 Falcon six). Factory turbo outputs to 310 kW in the FG F6; the aftermarket reliably doubles that.",
+    spec: "4.0-litre DOHC I6, variable cam timing, cast-iron block (same bore centres as the 1960 Falcon six). Factory turbo outputs to 310 kW in the FG F6; the aftermarket reliably doubles that.",
     legacy:
       "Ford Australia's engineering high-water mark — built in Geelong until the last Falcon in 2016, and now fitted to everything from Holdens to hot-rods.",
+    lore: "The Barra's cult grew after production ended: wrecking-yard taxi engines became swap material, unopened factory bottom ends made startling power, and 'Barra the world' became both a joke and a serious build plan.",
   },
 
   // ------------------------------- V8s -------------------------------
@@ -218,10 +219,10 @@ export const ENGINES: Engine[] = [
     tagline: "The homegrown V8 in every Aussie muscle car",
     story:
       "Holden's own OHV V8 — the 253 and the immortal 308 — powered Monaros, Toranas, Kingswoods and Commodores for three decades. Fuel-injected and stroked to a full 5.0 litres, it became the heartbeat of Group A touring-car racing and the Aussie V8 legend.",
-    spec:
-      "Cast-iron 90° V8, 4.2 and 5.0-litre capacities, single cam-in-block. The EFI 5000i and the HSV-fettled versions were the final, strongest evolutions.",
+    spec: "Cast-iron 90° V8, 4.2 and 5.0-litre capacities, single cam-in-block. The EFI 5000i and the HSV-fettled versions were the final, strongest evolutions.",
     legacy:
       "Retired in 2000 when the imported Chevrolet LS1 took over — but the '308' remains shorthand for Australian V8 muscle.",
+    lore: "The capacity badges changed from 253 and 308 cubic inches to 4.2 and 5.0 litres, but the old numbers never left the language. A lumpy 308 idle remains an instant audio signature at burnout pads and country car shows.",
   },
   {
     id: "ford-cleveland",
@@ -239,10 +240,10 @@ export const ENGINES: Engine[] = [
     tagline: "The Cleveland that only Australia kept building",
     story:
       "When Ford USA killed the 351 Cleveland after 1974, Ford Australia kept casting it at Geelong — even ordering 60,000 blocks to bridge the gap. The 351 Clevo powered the fearsome XY GTHO Phase III, and a uniquely-Australian short-stroke 302C ran alongside it.",
-    spec:
-      "335-series Cleveland V8, locally cast from 1975, 302 and 351 cu in. Over 250,000 built at Geelong; the last one went into a 4WD Bronco in 1985.",
+    spec: "335-series Cleveland V8, locally cast from 1975, 302 and 351 cu in. Over 250,000 built at Geelong; the last one went into a 4WD Bronco in 1985.",
     legacy:
       "So respected that De Tomaso and Bolwell turned to Geelong for Clevelands once US supply dried up.",
+    lore: "The GTHO Phase III made the 351 Cleveland inseparable from Bathurst folklore. Ford Australia's decision to keep casting blocks after America stopped also made Geelong an unlikely lifeline for exotic-car makers and racers overseas.",
   },
   {
     id: "leyland-p76-v8",
@@ -260,10 +261,10 @@ export const ENGINES: Engine[] = [
     tagline: "The all-alloy V8 in Australia's great might-have-been",
     story:
       "The P76 was the only car designed, built and sold by Leyland Australia — and its light, all-aluminium 4.4-litre V8 was genuinely good. Sydney engineers took the ex-GM/Rover 3.5 alloy V8, gave it a taller block and longer stroke, and made it punch well above its weight.",
-    spec:
-      "All-alloy OHV V8, bored and stroked to 4.4 litres with an Australian intake and twin-throat Stromberg. Famously roomy engine bay — the boot could swallow a 44-gallon drum.",
+    spec: "All-alloy OHV V8, bored and stroked to 4.4 litres with an Australian intake and twin-throat Stromberg. Famously roomy engine bay — the boot could swallow a 44-gallon drum.",
     legacy:
       "The car flopped and took Leyland's local manufacturing with it, but the alloy V8 remains a cult favourite and a proof-of-concept ahead of its time.",
+    lore: "The P76's famous 44-gallon-drum boot became the punchline that outlived the car, yet owners remember the engine's real party trick: V8 torque without a cast-iron V8's weight over the nose.",
   },
 
   // ------------------------------- racing -------------------------------
@@ -283,10 +284,10 @@ export const ENGINES: Engine[] = [
     tagline: "The Australian engine that won the F1 World Championship",
     story:
       "Australia's crown jewel. When F1 doubled to 3.0 litres for 1966, Jack Brabham and Repco's Phil Irving built a light, simple SOHC V8 on an abandoned GM Oldsmobile alloy block. Brabham won the 1966 Drivers' and Constructors' titles with it — still the only man to win F1 in a car bearing his own name.",
-    spec:
-      "3.0-litre 90° V8, aluminium block, chain-driven single overhead cams, two valves per cylinder, Lucas fuel injection, dry-sump. Just ~160 kg and ~310 bhp — reliability, not power, won it the title.",
+    spec: "3.0-litre 90° V8, aluminium block, chain-driven single overhead cams, two valves per cylinder, Lucas fuel injection, dry-sump. Just ~160 kg and ~310 bhp — reliability, not power, won it the title.",
     legacy:
       "The high-water mark of Australian engine-building, and one of the great David-and-Goliath stories in world motorsport.",
+    lore: "The RB620 was deliberately unfashionable: an off-the-shelf alloy block, modest revs and fewer camshafts than its rivals. Brabham and Repco bet that finishing races would beat dazzling dyno figures — and won both world titles.",
   },
   {
     id: "repco-rb740",
@@ -304,10 +305,10 @@ export const ENGINES: Engine[] = [
     tagline: "The quad-cam follow-up to a champion",
     story:
       "Repco chased more power for 1968 with the '740': four valves per cylinder and twin overhead cams per bank. It made big numbers but lost the reliability that had won 1966 — the year the Cosworth DFV arrived and rewrote the rules.",
-    spec:
-      "3.0-litre DOHC 32-valve V8 with a purpose-cast Repco block, Lucas injection and dry-sump lubrication. A genuine grand-prix engine designed and built in suburban Melbourne.",
+    spec: "3.0-litre DOHC 32-valve V8 with a purpose-cast Repco block, Lucas injection and dry-sump lubrication. A genuine grand-prix engine designed and built in suburban Melbourne.",
     legacy:
       "The end of Repco's F1 adventure, but a remarkable demonstration of a small Australian team building state-of-the-art racing engines.",
+    lore: "The RB740 tells the other half of the Repco story: after simplicity conquered Formula 1, the pressure to match the new Cosworth DFV pulled Melbourne's team toward a far more ambitious engine whose speed could not repay its fragility.",
   },
   {
     id: "waggott-tc4v",
@@ -325,10 +326,10 @@ export const ENGINES: Engine[] = [
     tagline: "Merv Waggott's championship twin-cams",
     story:
       "Merv Waggott started with a twin-cam head on the humble Holden Grey six, then built the TC-4V — a twin-cam, four-valve racing four on a Cortina block. In 2.0-litre form it won the 1971 Australian Drivers' Championship, beating imported Formula 5000 machinery.",
-    spec:
-      "Twin-overhead-cam, four-valves-per-cylinder head of Waggott's own design, three twin-choke Webers or fuel injection, 1600 and 2000 cc. From ~62 bhp stock to 275 bhp.",
+    spec: "Twin-overhead-cam, four-valves-per-cylinder head of Waggott's own design, three twin-choke Webers or fuel injection, 1600 and 2000 cc. From ~62 bhp stock to 275 bhp.",
     legacy:
       "A one-man-band engineering triumph — Waggott Cams still operates today under Merv's son.",
+    lore: "Waggott's workshop bridged hot-rodding and grand-prix engineering: a clever cylinder head could turn a familiar production block into something that sounded and performed like an exotic imported racing engine.",
   },
 
   // ------------------------------- aero -------------------------------
@@ -348,10 +349,10 @@ export const ENGINES: Engine[] = [
     tagline: "A clean-sheet Australian aircraft engine",
     story:
       "When their engine supplier folded, Jabiru simply designed and built their own. The result is a genuinely Australian aero engine — a compact, air-cooled flat-six (and flat-four 2200) that powers Jabiru's own light aircraft and thousands of homebuilts worldwide, made entirely in Bundaberg.",
-    spec:
-      "Direct-drive, air-cooled horizontally-opposed six, solid-lifter OHV, dual ignition, ~60 kg. The 2200 flat-four makes 85 hp; the 3300 flat-six makes 120 hp.",
+    spec: "Direct-drive, air-cooled horizontally-opposed six, solid-lifter OHV, dual ignition, ~60 kg. The 2200 flat-four makes 85 hp; the 3300 flat-six makes 120 hp.",
     legacy:
       "One of very few clean-sheet aero engines ever certified and mass-produced in Australia.",
+    lore: "Jabiru's answer to a failed supplier was unusually Australian: do not wait for another overseas catalogue — design the engine beside the aeroplane, machine it in Bundaberg and support builders directly from the factory.",
   },
   {
     id: "rotec-r3600",
@@ -369,10 +370,10 @@ export const ENGINES: Engine[] = [
     tagline: "A brand-new radial, built in Melbourne",
     story:
       "Rotec makes something almost no-one else does anymore: brand-new radial engines. The nine-cylinder R3600 (and seven-cylinder R2800) bring the look and sound of a 1920s rotary-era engine to modern reproductions of the Fokker Triplane, Sopwith Camel and Nieuport 17.",
-    spec:
-      "Single-row air-cooled radial, 7 cylinders (R2800, 110 hp) or 9 cylinders (R3600, 150 hp), with Rotec's own throttle-body injection. Craftsmanship of a bygone era, made new.",
+    spec: "Single-row air-cooled radial, 7 cylinders (R2800, 110 hp) or 9 cylinders (R3600, 150 hp), with Rotec's own throttle-body injection. Craftsmanship of a bygone era, made new.",
     legacy:
       "Australia's answer to the golden age of aviation — genuine radials for vintage repros and homebuilts around the world.",
+    lore: "A Rotec gives a newly built aircraft the slow propeller cadence, exposed rocker gear and circular silhouette people associate with interwar aviation — theatre backed by a modern engine that can still be ordered new.",
   },
   {
     id: "cac-avon",
@@ -390,10 +391,10 @@ export const ENGINES: Engine[] = [
     tagline: "Australia's home-built jet age",
     story:
       "When Australia built its own Sabre jet fighter and Canberra bomber, it built the engines too. CAC produced 218 Rolls-Royce Avon axial-flow turbojets under licence at Fishermans Bend — the Avon Sabre's uprated engine gave it more thrust than the American original.",
-    spec:
-      "Axial-flow turbojet, ~7,500 lbf at sea level (Mk 26 for the CAC Sabre; Mk 109 for the GAF Canberra). The first axial jet Rolls-Royce designed, built under licence in Melbourne.",
+    spec: "Axial-flow turbojet, ~7,500 lbf at sea level (Mk 26 for the CAC Sabre; Mk 109 for the GAF Canberra). The first axial jet Rolls-Royce designed, built under licence in Melbourne.",
     legacy:
       "Put Australia into the jet age with a domestically-built engine — a capability few nations of its size ever had.",
+    lore: "Fitting the Avon transformed the Sabre so thoroughly that CAC widened and redesigned much of the fuselage. It was not simply an American fighter assembled locally, but an Australian re-engineering built around a British engine made in Melbourne.",
   },
   {
     id: "cac-twin-wasp",
@@ -411,10 +412,10 @@ export const ENGINES: Engine[] = [
     tagline: "The radial that armed a wartime nation",
     story:
       "During WWII, CAC licence-built the Pratt & Whitney Twin Wasp so Australia could power its own Beaufort bombers without relying on imports. The nine-cylinder Wasp went into the Wirraway and Boomerang — home-built radials for home-built warplanes.",
-    spec:
-      "R-1830 Twin Wasp: 14-cylinder, twin-row, air-cooled radial, ~1,200 hp. Built in Australia for the DAP Beaufort; the smaller R-1340 Wasp powered CAC's own Wirraway trainer.",
+    spec: "R-1830 Twin Wasp: 14-cylinder, twin-row, air-cooled radial, ~1,200 hp. Built in Australia for the DAP Beaufort; the smaller R-1340 Wasp powered CAC's own Wirraway trainer.",
     legacy:
       "Aircraft-engine manufacturing at scale under wartime pressure — the industrial foundation CAC later built its jet engines on.",
+    lore: "The Twin Wasp programme was industrial insurance: drawings, tooling, foundries and workers had to become a domestic supply chain while shipping lanes were threatened. The achievement was as much factory-making as engine-making.",
   },
 
   // ------------------------------- stationary & farm -------------------------------
@@ -434,10 +435,10 @@ export const ENGINES: Engine[] = [
     tagline: "The engine that ran the Australian farm",
     story:
       "For nearly 70 years, Ronaldson Bros. & Tippett of Ballarat built the 'Austral' oil engine and its successors — rugged single-cylinder stationary engines that pumped water, ground chaff, sawed wood and generated power on farms right across Australia. One of the largest engine makers in the southern hemisphere.",
-    spec:
-      "Slow-revving single-cylinder, hopper (evaporative) cooling, huge exposed flywheels, hit-and-miss or throttle governing. Ran on kerosene or crude oil; later diesels too.",
+    spec: "Slow-revving single-cylinder, hopper (evaporative) cooling, huge exposed flywheels, hit-and-miss or throttle governing. Ran on kerosene or crude oil; later diesels too.",
     legacy:
       "Thousands survive and still chug at vintage rallies — the soundtrack of rural Australia before mains power reached the bush.",
+    lore: "Austral engines worked at walking pace with flywheels in full view, each power stroke separated by a patient mechanical breath. Collectors preserve not only the machines but the distinctive chuff that once marked a working farm.",
   },
   {
     id: "southern-cross",
@@ -455,10 +456,10 @@ export const ENGINES: Engine[] = [
     tagline: "Partner to the windmill on every Aussie station",
     story:
       "The Toowoomba Foundry is famous for the Southern Cross windmill — but when the wind didn't blow, its Southern Cross engines pumped the water instead. From a 1½-horsepower farm pump to big diesels, they were known worldwide for ruggedness and reliability.",
-    spec:
-      "Single-cylinder stationary engines across petrol, kerosene and diesel. Southern Cross's diesels pioneered oil-primed starting and internal oil filtration — innovations later copied at home and abroad.",
+    spec: "Single-cylinder stationary engines across petrol, kerosene and diesel. Southern Cross's diesels pioneered oil-primed starting and internal oil filtration — innovations later copied at home and abroad.",
     legacy:
       "Over a century of the Southern Cross name across engines, windmills and pumps — an enduring icon of the Darling Downs.",
+    lore: "On remote stations the windmill and engine were a team: free wind when it came, a dependable single-cylinder backup when it did not. Keeping water moving mattered more than elegance, which is why repairable Southern Cross machinery travelled so far.",
   },
 
   // ------------------------------- rotary & novel -------------------------------
@@ -478,10 +479,10 @@ export const ENGINES: Engine[] = [
     tagline: "Australia's audacious reinvention of the engine",
     story:
       "Perth engineer Ralph Sarich set out to reinvent the internal-combustion engine. His orbital engine used a prismatic piston that orbited — rather than reciprocated — promising more power from less bulk. It captivated the nation in the 1970s and drew BHP and government backing.",
-    spec:
-      "The original orbital ran a 3.5-litre four-stroke; the company later pivoted to the 'Orbital Combustion Process' — a clean, direct-injection two-stroke whose fuel-injection technology found real success in outboards and small engines.",
+    spec: "The original orbital ran a 3.5-litre four-stroke; the company later pivoted to the 'Orbital Combustion Process' — a clean, direct-injection two-stroke whose fuel-injection technology found real success in outboards and small engines.",
     legacy:
       "The engine itself never reached mass production, but Orbital's direct-injection IP was licensed worldwide — a genuinely Australian contribution to engine technology.",
+    lore: "Sarich became a household name before the orbital engine became a product. The original mechanism faded, but the company's air-assisted direct injection escaped the prototype and quietly appeared in practical marine and small-engine applications.",
   },
 
   // ------------------------------- modern V6 -------------------------------
@@ -501,10 +502,10 @@ export const ENGINES: Engine[] = [
     tagline: "Ten million engines, exported to the world",
     story:
       "Holden's last great engine story wasn't a V8 but a V6. The Fishermans Bend plant co-developed and built GM's High-Feature V6 — the 'Alloytec' — for Commodores and, remarkably, for export to Cadillac, Saab, Alfa Romeo and more across every continent but Antarctica.",
-    spec:
-      "All-alloy 60° V6, DOHC, 24 valves, variable cam timing, 2.8–3.6 litres. Over 200,000 engineering hours and 143 experimental engines went into localising it.",
+    spec: "All-alloy 60° V6, DOHC, 24 valves, variable cam timing, 2.8–3.6 litres. Over 200,000 engineering hours and 143 experimental engines went into localising it.",
     legacy:
       "More than 10 million engines built at Port Melbourne before the plant closed in 2016 — nearly half of them exported. The end of Australian volume engine manufacturing.",
+    lore: "Crates of Fishermans Bend V6s left Australia wearing no Holden badge at all, bound for global GM brands. The final engine in 2016 closed a manufacturing lineage that had begun with the Grey Motor sixty-eight years earlier.",
   },
 ];
 
