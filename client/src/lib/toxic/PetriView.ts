@@ -104,7 +104,7 @@ export class PetriView {
     drawField(ctx, w, h, spec);
 
     // prion brain tissue is a whole-field spongiform texture, not particles
-    if (spec.id === "prion") {
+    if (spec.kind === "prion") {
       drawSpongiform(ctx, w, h, this.t);
       drawVignette(ctx, w, h);
       return;
@@ -163,6 +163,8 @@ function particleCount(spec: Specimen): number {
       return 34;
     case "prion":
       return 1; // a single tissue field, drawn specially
+    case "protozoan":
+      return 12;
     case "fungus":
       return 30;
     case "pollen":
@@ -179,18 +181,29 @@ function drawField(
   spec: Specimen
 ) {
   let bg = "#f3ecf6"; // gram smear default (pale violet)
-  if (spec.kind === "virus" || spec.id === "prion") bg = "#0c0c0e"; // EM dark field
-  else if (spec.kind === "pollen") bg = "#0a1418"; // dark-field, bright grains
+  if (spec.kind === "virus" || spec.kind === "prion")
+    bg = "#0c0c0e"; // EM dark field
+  else if (spec.kind === "protozoan") bg = "#d8e8dc";
+  else if (spec.kind === "pollen")
+    bg = "#0a1418"; // dark-field, bright grains
   else if (spec.kind === "fungus") bg = "#101a12";
-  else if (spec.id === "cell") bg = "#f6e4ec"; // H&E histology pink
-  else if (spec.id === "dna") bg = "#0a0f18"; // gel / fluorescence
+  else if (spec.id === "cell")
+    bg = "#f6e4ec"; // H&E histology pink
+  else if (spec.id === "dna")
+    bg = "#0a0f18"; // gel / fluorescence
   else if (spec.id === "human") bg = "#0c1118";
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
   // subtle texture / out-of-focus blobs
   const rng = mulberry32(hashId(spec.id) ^ 0x9e3779b9);
-  const dark = spec.kind === "virus" || spec.id === "prion" || spec.kind === "pollen" || spec.kind === "fungus" || spec.id === "dna" || spec.id === "human";
+  const dark =
+    spec.kind === "virus" ||
+    spec.kind === "prion" ||
+    spec.kind === "pollen" ||
+    spec.kind === "fungus" ||
+    spec.id === "dna" ||
+    spec.id === "human";
   ctx.globalAlpha = dark ? 0.06 : 0.05;
   for (let i = 0; i < 40; i++) {
     const r = 20 + rng() * 90;
@@ -235,10 +248,24 @@ function drawOrganism(
       }
       return;
     }
+    case "pneumococcus": {
+      ctx.fillStyle = withAlpha(c2, 0.35);
+      ellipse(ctx, 0, 0, 0.06 * s, 0.04 * s);
+      ctx.fillStyle = c;
+      for (const dx of [-0.02, 0.02]) {
+        ctx.save();
+        ctx.translate(dx * s, 0);
+        ctx.rotate(dx < 0 ? -0.25 : 0.25);
+        ellipse(ctx, 0, 0, 0.018 * s, 0.028 * s);
+        ctx.restore();
+      }
+      return;
+    }
     case "anthrax": {
       // chains of blue rods (gram-positive)
       ctx.fillStyle = c2;
-      for (let i = 0; i < 4; i++) capsule(ctx, 0, (i - 1.5) * 0.05 * s, 0.05 * s, 0.018 * s);
+      for (let i = 0; i < 4; i++)
+        capsule(ctx, 0, (i - 1.5) * 0.05 * s, 0.05 * s, 0.018 * s);
       return;
     }
     case "plague": {
@@ -260,23 +287,65 @@ function drawOrganism(
       ctx.stroke();
       return;
     }
-    case "botulinum": {
-      // drumstick rods with terminal spore
+    case "botulinum":
+    case "tetanus":
+    case "cdiff": {
       ctx.fillStyle = withAlpha(c, 0.8);
       capsule(ctx, 0, 0.01 * s, 0.07 * s, 0.02 * s);
       ctx.fillStyle = c2;
       ellipse(ctx, 0, -0.05 * s, 0.026 * s, 0.026 * s);
       return;
     }
-    case "sarscov2": {
+    case "tuberculosis": {
+      ctx.fillStyle = withAlpha(c, 0.92);
+      capsule(ctx, 0, 0, 0.055 * s, 0.012 * s);
+      ctx.fillStyle = c2;
+      ellipse(ctx, 0, -0.015 * s, 0.007 * s, 0.007 * s);
+      return;
+    }
+    case "ecoli":
+    case "salmonella":
+    case "listeria": {
+      ctx.fillStyle = withAlpha(c, 0.9);
+      capsule(ctx, 0, 0, 0.05 * s, 0.018 * s);
+      if (spec.id !== "listeria") {
+        ctx.strokeStyle = withAlpha(c2, 0.7);
+        ctx.lineWidth = 0.004 * s;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(0.012 * s * (i - 1), 0.04 * s);
+          ctx.bezierCurveTo(
+            0.05 * s,
+            0.06 * s,
+            -0.05 * s,
+            0.08 * s,
+            0.04 * s,
+            0.1 * s
+          );
+          ctx.stroke();
+        }
+      }
+      return;
+    }
+    case "sarscov2":
+    case "mers": {
       virion(ctx, c, c2, 0.05 * s, 16, "club");
       return;
     }
-    case "hiv": {
+    case "hiv":
+    case "influenza":
+    case "hepatitis-b":
+    case "hepatitis-c":
+    case "dengue":
+    case "nipah":
+    case "hantavirus":
+    case "lassa":
+    case "cchf": {
       virion(ctx, c, c2, 0.05 * s, 12, "knob");
       return;
     }
-    case "smallpox": {
+    case "smallpox":
+    case "mpox": {
       // brick-shaped particles
       ctx.fillStyle = withAlpha(c, 0.85);
       roundRect(ctx, -0.05 * s, -0.035 * s, 0.1 * s, 0.07 * s, 0.015 * s);
@@ -292,7 +361,8 @@ function drawOrganism(
       bullet(ctx, 0.09 * s, 0.04 * s);
       return;
     }
-    case "ebola": {
+    case "ebola":
+    case "marburg": {
       // long filaments with a hook
       ctx.strokeStyle = withAlpha(c, 0.9);
       ctx.lineWidth = 0.014 * s;
@@ -304,8 +374,70 @@ function drawOrganism(
       ctx.stroke();
       return;
     }
+    case "malaria": {
+      ctx.fillStyle = withAlpha("#a82735", 0.85);
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.055 * s, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#d8e8dc";
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.025 * s, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 0.008 * s;
+      ctx.beginPath();
+      ctx.arc(0.006 * s, 0, 0.014 * s, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = c2;
+      ellipse(ctx, 0.016 * s, -0.006 * s, 0.005 * s, 0.005 * s);
+      return;
+    }
+    case "balamuthia":
+    case "naegleria": {
+      ctx.fillStyle = withAlpha(c, 0.72);
+      ctx.beginPath();
+      ctx.moveTo(-0.055 * s, -0.01 * s);
+      ctx.bezierCurveTo(
+        -0.08 * s,
+        -0.07 * s,
+        -0.015 * s,
+        -0.075 * s,
+        0.005 * s,
+        -0.045 * s
+      );
+      ctx.bezierCurveTo(
+        0.055 * s,
+        -0.08 * s,
+        0.08 * s,
+        -0.015 * s,
+        0.05 * s,
+        0.012 * s
+      );
+      ctx.bezierCurveTo(
+        0.085 * s,
+        0.055 * s,
+        0.015 * s,
+        0.075 * s,
+        -0.015 * s,
+        0.045 * s
+      );
+      ctx.bezierCurveTo(
+        -0.06 * s,
+        0.08 * s,
+        -0.085 * s,
+        0.025 * s,
+        -0.055 * s,
+        -0.01 * s
+      );
+      ctx.fill();
+      ctx.fillStyle = c2;
+      ellipse(ctx, -0.01 * s, 0, 0.018 * s, 0.016 * s);
+      return;
+    }
     case "prion":
-      return; // handled by spongiform field below
+    case "cjd":
+    case "kuru":
+      return; // handled by spongiform field above
     case "deathcap": {
       // amyloid spores (ovoid, faint blue from Melzer's reagent)
       ctx.fillStyle = withAlpha(c, 0.85);
@@ -546,11 +678,7 @@ function drawSpongiform(
 }
 
 // "You" under the lens: a body silhouette made of the same organic matter.
-function drawHumanField(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number
-) {
+function drawHumanField(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const cx = w / 2;
   const cy = h / 2;
   const s = Math.min(w, h) * 0.42;
