@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import HomeCubeWidget from '@/components/HomeCubeWidget';
 import HomeFractalWidget from '@/components/HomeFractalWidget';
 import HomeFractal3DWidget from '@/components/HomeFractal3DWidget';
+import HomePainterlyWidget from '@/components/HomePainterlyWidget';
 import HomeSkyWidget from '@/components/HomeSkyWidget';
 import HomeToxicWidget from '@/components/HomeToxicWidget';
 import HomeEngineWidget from '@/components/HomeEngineWidget';
@@ -687,6 +688,16 @@ export default function Home() {
               <p className="mt-3 text-sm text-gray-500">Spin the live preview, or open the full explorer for presets, fullscreen, colour drift and 4K/8K stills.</p>
             </div>
             <HomeFractal3DWidget />
+          </div>
+
+          {/* Painterly World */}
+          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+            <div className="flex flex-col justify-center">
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Painterly World</h3>
+              <p className="mt-3 text-gray-700">A living procedural landscape made entirely from code in one self-contained HTML file. Hills rise from layered noise, thousands of grass blades bend with the wind and your movement, and pollen drifts through a changing sky.</p>
+              <p className="mt-3 text-sm text-gray-500">Walk through the live meadow, grow a fresh world, or switch the renderer from natural light to painterly colour and a swirling Van Gogh-inspired night.</p>
+            </div>
+            <HomePainterlyWidget />
           </div>
 
           {/* Night Sky */}

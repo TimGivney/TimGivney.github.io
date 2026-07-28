@@ -1,0 +1,1395 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#12233c" />
+    <meta
+      name="description"
+      content="A self-contained procedural painterly world with wind-reactive grass and live Van Gogh styling."
+    />
+    <title>Painterly World — Tim Givney</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #f7f0d5;
+        --muted: #c7c5b8;
+        --glass: rgba(9, 18, 31, 0.68);
+        --line: rgba(255, 245, 203, 0.18);
+        --gold: #e4b94f;
+        --blue: #172b50;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #081321;
+      }
+      body {
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      body.embed .ui,
+      body.embed .signature {
+        display: none;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        color: inherit;
+      }
+      #world {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        cursor: grab;
+      }
+      #world:active {
+        cursor: grabbing;
+      }
+      .ui {
+        position: fixed;
+        z-index: 4;
+        transition:
+          opacity 240ms ease,
+          transform 240ms ease;
+      }
+      body.ui-hidden .ui {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .brand {
+        top: max(18px, env(safe-area-inset-top));
+        left: max(18px, env(safe-area-inset-left));
+        max-width: min(470px, calc(100vw - 36px));
+      }
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--gold);
+        font:
+          700 10px/1 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 34px;
+        height: 2px;
+        background: currentColor;
+      }
+      h1 {
+        margin: 9px 0 4px;
+        color: var(--ink);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(28px, 4.2vw, 58px);
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        text-shadow: 0 3px 22px rgba(4, 11, 23, 0.35);
+      }
+      .subtitle {
+        margin: 0;
+        max-width: 500px;
+        color: rgba(247, 240, 213, 0.78);
+        font-size: clamp(12px, 1.25vw, 15px);
+        line-height: 1.5;
+        text-shadow: 0 2px 14px rgba(4, 11, 23, 0.55);
+      }
+      .back {
+        display: inline-flex;
+        margin-top: 13px;
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .back:hover {
+        color: var(--gold);
+      }
+      .styles {
+        top: max(18px, env(safe-area-inset-top));
+        right: max(18px, env(safe-area-inset-right));
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--glass);
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(16px);
+      }
+      .style-button,
+      .icon-button,
+      .action-button {
+        border: 0;
+        cursor: pointer;
+        transition:
+          background 160ms ease,
+          color 160ms ease,
+          transform 160ms ease;
+      }
+      .style-button {
+        min-height: 34px;
+        padding: 0 13px;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .style-button:hover {
+        color: var(--ink);
+      }
+      .style-button.active {
+        background: var(--gold);
+        color: #17233a;
+        box-shadow: 0 5px 18px rgba(228, 185, 79, 0.28);
+      }
+      .controls {
+        left: max(18px, env(safe-area-inset-left));
+        bottom: max(18px, env(safe-area-inset-bottom));
+        width: min(420px, calc(100vw - 36px));
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--glass);
+        box-shadow: 0 18px 70px rgba(0, 0, 0, 0.32);
+        backdrop-filter: blur(18px);
+      }
+      .control-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 13px 18px;
+      }
+      .control {
+        min-width: 0;
+      }
+      .label-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 7px;
+        color: var(--muted);
+        font:
+          700 9px/1 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+      .label-row output {
+        color: var(--ink);
+        letter-spacing: 0;
+      }
+      input[type="range"] {
+        width: 100%;
+        height: 3px;
+        margin: 5px 0;
+        appearance: none;
+        border-radius: 5px;
+        outline: none;
+        background: rgba(255, 255, 255, 0.2);
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        width: 15px;
+        height: 15px;
+        appearance: none;
+        border: 2px solid #fff8df;
+        border-radius: 50%;
+        background: var(--gold);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+      }
+      .actions {
+        display: flex;
+        gap: 7px;
+        margin-top: 13px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+      .action-button {
+        flex: 1;
+        min-height: 34px;
+        padding: 0 10px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.09);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .action-button:hover {
+        background: rgba(255, 255, 255, 0.17);
+        transform: translateY(-1px);
+      }
+      .action-button.accent {
+        background: rgba(228, 185, 79, 0.92);
+        color: #18243a;
+      }
+      .tips {
+        right: max(18px, env(safe-area-inset-right));
+        bottom: max(18px, env(safe-area-inset-bottom));
+        color: rgba(247, 240, 213, 0.7);
+        font:
+          700 9px/1.65 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        letter-spacing: 0.09em;
+        text-align: right;
+        text-transform: uppercase;
+        text-shadow: 0 2px 12px #07101c;
+      }
+      .tools {
+        top: 78px;
+        right: max(18px, env(safe-area-inset-right));
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .icon-button {
+        width: 37px;
+        height: 37px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        background: var(--glass);
+        color: var(--ink);
+        font-size: 15px;
+        backdrop-filter: blur(14px);
+      }
+      .icon-button:hover {
+        background: rgba(228, 185, 79, 0.92);
+        color: #17233a;
+        transform: scale(1.04);
+      }
+      #notice {
+        position: fixed;
+        z-index: 7;
+        left: 50%;
+        top: 50%;
+        display: none;
+        width: min(520px, calc(100vw - 36px));
+        padding: 24px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 18px;
+        background: #111b2e;
+        color: #fff7dc;
+        text-align: center;
+        box-shadow: 0 20px 80px #000;
+      }
+      #notice h2 {
+        margin: 0 0 8px;
+        font-family: Georgia, serif;
+      }
+      #notice p {
+        margin: 0;
+        color: #c7c5b8;
+        line-height: 1.55;
+      }
+      .signature {
+        position: fixed;
+        z-index: 2;
+        right: 18px;
+        top: 50%;
+        color: rgba(255, 255, 255, 0.2);
+        font:
+          700 8px/1 ui-monospace,
+          monospace;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        transform: rotate(90deg) translateX(50%);
+        transform-origin: right center;
+        pointer-events: none;
+      }
+      @media (max-width: 760px) {
+        .brand {
+          max-width: calc(100vw - 92px);
+        }
+        .subtitle {
+          display: none;
+        }
+        .styles {
+          top: auto;
+          right: 12px;
+          bottom: calc(max(14px, env(safe-area-inset-bottom)) + 180px);
+          max-width: calc(100vw - 24px);
+        }
+        .style-button {
+          min-height: 32px;
+          padding: 0 9px;
+          font-size: 9px;
+        }
+        .tools {
+          top: max(14px, env(safe-area-inset-top));
+          right: 12px;
+        }
+        .controls {
+          left: 12px;
+          bottom: max(12px, env(safe-area-inset-bottom));
+          width: calc(100vw - 24px);
+          padding: 12px;
+        }
+        .tips,
+        .signature {
+          display: none;
+        }
+        .back {
+          margin-top: 8px;
+        }
+        h1 {
+          margin-top: 6px;
+        }
+      }
+      @media (max-height: 620px) and (min-width: 761px) {
+        .subtitle,
+        .tips {
+          display: none;
+        }
+        .controls {
+          width: 390px;
+          padding: 11px;
+        }
+        .actions {
+          margin-top: 9px;
+          padding-top: 9px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="world"
+      aria-label="Interactive procedural painterly landscape"
+    ></canvas>
+
+    <header class="brand ui">
+      <div class="eyebrow">Procedural study 01</div>
+      <h1>Painterly World</h1>
+      <p class="subtitle">
+        A landscape grown entirely from code. Drag across the meadow, stir the
+        grass, and move between natural light, painted colour and a swirling Van
+        Gogh night.
+      </p>
+      <a class="back" href="/">← Back to timgivney.com</a>
+    </header>
+
+    <nav class="styles ui" aria-label="Rendering style">
+      <button class="style-button active" data-style="0">Natural</button>
+      <button class="style-button" data-style="1">Painterly</button>
+      <button class="style-button" data-style="2">Van Gogh</button>
+    </nav>
+
+    <div class="tools ui">
+      <button
+        id="fullscreen"
+        class="icon-button"
+        title="Fullscreen (F)"
+        aria-label="Toggle fullscreen"
+      >
+        ⛶
+      </button>
+      <button
+        id="hideUi"
+        class="icon-button"
+        title="Hide interface (H)"
+        aria-label="Hide interface"
+      >
+        ◌
+      </button>
+    </div>
+
+    <section class="controls ui" aria-label="World controls">
+      <div class="control-grid">
+        <label class="control">
+          <span class="label-row"
+            ><span>Wind</span><output id="windValue">58%</output></span
+          >
+          <input id="wind" type="range" min="0" max="100" value="58" />
+        </label>
+        <label class="control">
+          <span class="label-row"
+            ><span>Daylight</span
+            ><output id="lightValue">Afternoon</output></span
+          >
+          <input id="light" type="range" min="0" max="100" value="62" />
+        </label>
+      </div>
+      <div class="actions">
+        <button id="wander" class="action-button accent">Pause wander</button>
+        <button id="reseed" class="action-button">New world</button>
+        <button id="snapshot" class="action-button">Save view</button>
+      </div>
+    </section>
+
+    <div class="tips ui">
+      Drag to orbit · wheel to travel<br />WASD / arrows to roam · drag the
+      field to make a gust
+    </div>
+    <div class="signature">One HTML · no assets · WebGL2</div>
+    <div id="notice">
+      <h2>This world needs WebGL 2</h2>
+      <p>
+        Try opening it in a current version of Chrome, Edge, Firefox or Safari
+        with hardware acceleration enabled.
+      </p>
+    </div>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const canvas = document.getElementById("world");
+        const notice = document.getElementById("notice");
+        const embedded = new URLSearchParams(location.search).has("embed");
+        document.body.classList.toggle("embed", embedded);
+        const gl = canvas.getContext("webgl2", {
+          antialias: true,
+          alpha: false,
+          depth: true,
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: true,
+        });
+
+        if (!gl) {
+          notice.style.display = "block";
+          return;
+        }
+
+        const COMMON_NOISE = `
+        float hash21(vec2 p) {
+          p = fract(p * vec2(123.34, 456.21));
+          p += dot(p, p + 45.32);
+          return fract(p.x * p.y);
+        }
+        float noise2(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+                     mix(hash21(i + vec2(0.0, 1.0)), hash21(i + 1.0), f.x), f.y);
+        }
+        float fbm(vec2 p) {
+          float value = 0.0;
+          float amplitude = 0.5;
+          mat2 turn = mat2(0.80, -0.60, 0.60, 0.80);
+          for (int i = 0; i < 5; i++) {
+            value += amplitude * noise2(p);
+            p = turn * p * 2.03 + 7.7;
+            amplitude *= 0.5;
+          }
+          return value;
+        }
+        float terrainHeight(vec2 p, float seed) {
+          vec2 offset = vec2(seed * 0.071, seed * 0.113);
+          float broad = fbm(p * 0.026 + offset);
+          float detail = fbm(p * 0.082 - offset * 0.7);
+          float ridge = 1.0 - abs(2.0 * fbm(p * 0.014 + offset * 1.7) - 1.0);
+          float river = exp(-pow((p.x + sin(p.y * 0.045 + seed) * 9.0) * 0.072, 2.0));
+          return pow(broad, 1.55) * 12.5 + detail * 2.1 + ridge * 2.8 - river * 6.1 - 4.0;
+        }
+      `;
+
+        const skyVS = `#version 300 es
+        precision highp float;
+        out vec2 vUv;
+        void main() {
+          vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+          vUv = p;
+          gl_Position = vec4(p * 2.0 - 1.0, 0.99999, 1.0);
+        }
+      `;
+
+        const skyFS = `#version 300 es
+        precision highp float;
+        in vec2 vUv;
+        out vec4 outColor;
+        uniform vec3 uForward;
+        uniform vec3 uRight;
+        uniform vec3 uUp;
+        uniform vec3 uSun;
+        uniform vec3 uCamera;
+        uniform float uAspect;
+        uniform float uFov;
+        uniform float uTime;
+        uniform float uStyle;
+        uniform float uSeed;
+        ${COMMON_NOISE}
+        void main() {
+          vec2 q = vUv * 2.0 - 1.0;
+          vec3 rd = normalize(uForward + q.x * uAspect * tan(uFov * 0.5) * uRight + q.y * tan(uFov * 0.5) * uUp);
+          float horizon = smoothstep(-0.14, 0.72, rd.y);
+          vec3 low = vec3(0.72, 0.79, 0.76);
+          vec3 high = vec3(0.12, 0.36, 0.64);
+          if (uStyle > 0.5 && uStyle < 1.5) {
+            low = vec3(0.83, 0.72, 0.55);
+            high = vec3(0.17, 0.35, 0.52);
+          } else if (uStyle > 1.5) {
+            low = vec3(0.10, 0.22, 0.43);
+            high = vec3(0.018, 0.055, 0.19);
+          }
+          vec3 color = mix(low, high, horizon);
+          float sun = max(dot(rd, uSun), 0.0);
+          float disk = smoothstep(0.997, 0.9994, sun);
+          float glow = pow(sun, 48.0);
+          vec3 sunColor = uStyle > 1.5 ? vec3(1.0, 0.69, 0.10) : vec3(1.0, 0.78, 0.42);
+          color += sunColor * (disk * 2.2 + glow * 0.45);
+
+          if (rd.y > 0.015) {
+            vec2 cloudP = uCamera.xz + rd.xz / max(rd.y, 0.04) * 32.0;
+            cloudP += vec2(uTime * 0.42, uTime * 0.17);
+            float cloudNoise = fbm(cloudP * 0.028 + uSeed * 0.01);
+            float cloud = smoothstep(0.59, 0.75, cloudNoise) * smoothstep(0.02, 0.22, rd.y);
+            vec3 cloudColor = uStyle > 1.5 ? vec3(0.20, 0.46, 0.78) : vec3(0.95, 0.92, 0.82);
+            color = mix(color, cloudColor, cloud * (uStyle > 1.5 ? 0.45 : 0.72));
+          }
+
+          if (uStyle > 1.5) {
+            float angle = atan(rd.z, rd.x);
+            float swirl = sin(angle * 10.0 + rd.y * 28.0 + fbm(rd.xz * 7.0 + uTime * 0.025) * 8.0);
+            float stroke = smoothstep(0.54, 0.98, swirl) * smoothstep(-0.05, 0.75, rd.y);
+            color += vec3(0.02, 0.14, 0.29) * stroke;
+            float starField = hash21(floor((rd.xz / max(rd.y + 0.32, 0.08)) * 85.0));
+            float stars = step(0.992, starField) * smoothstep(0.08, 0.52, rd.y);
+            color += vec3(1.0, 0.72, 0.16) * stars * (0.7 + 0.3 * sin(uTime * 2.0 + starField * 40.0));
+          } else if (uStyle > 0.5) {
+            float brush = noise2(gl_FragCoord.xy * vec2(0.08, 0.028));
+            color *= 0.93 + brush * 0.13;
+            color = floor(color * 18.0) / 18.0;
+          }
+          color = pow(color, vec3(0.92));
+          outColor = vec4(color, 1.0);
+        }
+      `;
+
+        const terrainVS = `#version 300 es
+        precision highp float;
+        layout(location=0) in vec2 aXZ;
+        uniform mat4 uView;
+        uniform mat4 uProj;
+        uniform float uSeed;
+        out vec3 vWorld;
+        out vec3 vNormal;
+        out float vHeight;
+        ${COMMON_NOISE}
+        void main() {
+          float h = terrainHeight(aXZ, uSeed);
+          float e = 0.32;
+          float hx = terrainHeight(aXZ + vec2(e, 0.0), uSeed) - terrainHeight(aXZ - vec2(e, 0.0), uSeed);
+          float hz = terrainHeight(aXZ + vec2(0.0, e), uSeed) - terrainHeight(aXZ - vec2(0.0, e), uSeed);
+          vec3 world = vec3(aXZ.x, h, aXZ.y);
+          vWorld = world;
+          vHeight = h;
+          vNormal = normalize(vec3(-hx, 2.0 * e, -hz));
+          gl_Position = uProj * uView * vec4(world, 1.0);
+        }
+      `;
+
+        const terrainFS = `#version 300 es
+        precision highp float;
+        in vec3 vWorld;
+        in vec3 vNormal;
+        in float vHeight;
+        out vec4 outColor;
+        uniform vec3 uCamera;
+        uniform vec3 uSun;
+        uniform float uStyle;
+        uniform float uSeed;
+        ${COMMON_NOISE}
+        void main() {
+          float slope = 1.0 - max(vNormal.y, 0.0);
+          float variation = noise2(vWorld.xz * 0.19 + uSeed);
+          vec3 low = vec3(0.22, 0.38, 0.20);
+          vec3 meadow = vec3(0.39, 0.55, 0.25);
+          vec3 dry = vec3(0.61, 0.57, 0.32);
+          vec3 rock = vec3(0.34, 0.35, 0.31);
+          vec3 color = mix(low, meadow, smoothstep(0.2, 3.5, vHeight));
+          color = mix(color, dry, smoothstep(5.0, 10.0, vHeight) * 0.62);
+          color = mix(color, rock, smoothstep(0.28, 0.68, slope));
+          color *= 0.86 + variation * 0.25;
+          if (uStyle > 0.5 && uStyle < 1.5) {
+            low = vec3(0.16, 0.31, 0.25);
+            meadow = vec3(0.48, 0.55, 0.28);
+            dry = vec3(0.74, 0.51, 0.25);
+            rock = vec3(0.34, 0.34, 0.42);
+            color = mix(low, meadow, smoothstep(-0.3, 4.0, vHeight));
+            color = mix(color, dry, smoothstep(5.0, 10.0, vHeight));
+            color = mix(color, rock, smoothstep(0.30, 0.72, slope));
+          } else if (uStyle > 1.5) {
+            low = vec3(0.035, 0.16, 0.23);
+            meadow = vec3(0.08, 0.37, 0.25);
+            dry = vec3(0.86, 0.58, 0.08);
+            rock = vec3(0.10, 0.13, 0.31);
+            color = mix(low, meadow, smoothstep(-0.4, 3.5, vHeight));
+            color = mix(color, dry, smoothstep(5.2, 10.5, vHeight) * 0.85);
+            color = mix(color, rock, smoothstep(0.24, 0.68, slope));
+          }
+          float diffuse = max(dot(vNormal, uSun), 0.0);
+          float light = 0.34 + diffuse * 0.78 + pow(max(dot(reflect(-uSun, vNormal), normalize(uCamera - vWorld)), 0.0), 24.0) * 0.12;
+          color *= light;
+          float distanceFog = smoothstep(54.0, 115.0, distance(uCamera, vWorld));
+          vec3 fog = uStyle > 1.5 ? vec3(0.055, 0.12, 0.29) : vec3(0.58, 0.68, 0.65);
+          color = mix(color, fog, distanceFog * 0.82);
+          if (uStyle > 0.5) {
+            float strokes = noise2(vWorld.xz * vec2(1.6, 0.36) + floor(gl_FragCoord.xy * 0.12));
+            color *= 0.86 + strokes * 0.25;
+            float levels = uStyle > 1.5 ? 12.0 : 18.0;
+            color = floor(color * levels) / levels;
+            float edge = smoothstep(0.18, 0.78, length(fwidth(vNormal)));
+            color = mix(color, uStyle > 1.5 ? vec3(0.018, 0.035, 0.12) : color * 0.58, edge * 0.45);
+          }
+          outColor = vec4(pow(max(color, 0.0), vec3(0.88)), 1.0);
+        }
+      `;
+
+        const waterVS = `#version 300 es
+        precision highp float;
+        layout(location=0) in vec2 aXZ;
+        uniform mat4 uView;
+        uniform mat4 uProj;
+        uniform float uTime;
+        out vec3 vWorld;
+        void main() {
+          float wave = sin(aXZ.x * 0.33 + uTime * 0.75) * 0.055 + sin(aXZ.y * 0.47 - uTime * 0.52) * 0.04;
+          vWorld = vec3(aXZ.x, wave + 0.08, aXZ.y);
+          gl_Position = uProj * uView * vec4(vWorld, 1.0);
+        }
+      `;
+
+        const waterFS = `#version 300 es
+        precision highp float;
+        in vec3 vWorld;
+        out vec4 outColor;
+        uniform vec3 uCamera;
+        uniform float uStyle;
+        uniform float uTime;
+        void main() {
+          float ripple = sin(vWorld.x * 1.2 + uTime) * sin(vWorld.z * 0.8 - uTime * 0.7);
+          vec3 color = uStyle > 1.5 ? vec3(0.025, 0.15, 0.40) : (uStyle > 0.5 ? vec3(0.18, 0.43, 0.55) : vec3(0.16, 0.45, 0.56));
+          color += ripple * (uStyle > 1.5 ? vec3(0.04, 0.19, 0.35) : vec3(0.03, 0.08, 0.08));
+          float fade = smoothstep(100.0, 35.0, distance(uCamera, vWorld));
+          outColor = vec4(color, 0.70 * fade + 0.12);
+        }
+      `;
+
+        const grassVS = `#version 300 es
+        precision highp float;
+        layout(location=0) in vec2 aBlade;
+        uniform mat4 uView;
+        uniform mat4 uProj;
+        uniform vec3 uCamera;
+        uniform vec3 uWind;
+        uniform vec3 uGust;
+        uniform float uTime;
+        uniform float uSeed;
+        uniform float uStyle;
+        out float vLevel;
+        out float vShade;
+        out float vFlower;
+        out float vFog;
+        ${COMMON_NOISE}
+        float hash11(float p) { return fract(sin(p * 127.1) * 43758.5453123); }
+        void main() {
+          float id = float(gl_InstanceID);
+          float r1 = hash11(id + uSeed * 13.7);
+          float r2 = hash11(id * 1.37 + uSeed * 29.1);
+          float r3 = hash11(id * 2.11 + 91.7 + uSeed);
+          vec2 base = (vec2(r1, r2) * 2.0 - 1.0) * 66.0;
+          float h = terrainHeight(base, uSeed);
+          float level = aBlade.y;
+          float bladeHeight = mix(0.42, 1.28, r3) * mix(0.72, 1.0, smoothstep(-0.2, 3.0, h));
+          float visible = step(0.25, h) * (1.0 - smoothstep(8.8, 11.4, h));
+          float angle = r3 * 6.2831853;
+          vec2 side = vec2(cos(angle), sin(angle));
+          float width = mix(0.025, 0.055, r2) * (1.0 - level * 0.78);
+          vec2 windDir = normalize(uWind.xz + vec2(0.0001));
+          float phase = dot(base, vec2(0.22, 0.31)) + r3 * 9.0;
+          float sway = sin(uTime * (1.1 + uWind.y * 1.8) + phase) * (0.14 + uWind.y * 0.34);
+          vec2 gustDelta = base - uGust.xy;
+          float gust = exp(-dot(gustDelta, gustDelta) * 0.035) * uGust.z;
+          vec2 bend = (windDir * sway + normalize(gustDelta + vec2(0.01)) * gust) * level * level * bladeHeight;
+          vec2 worldXZ = base + side * aBlade.x * width + bend;
+          vec3 world = vec3(worldXZ.x, h + level * bladeHeight * visible, worldXZ.y);
+          if (visible < 0.5) world.y = -20.0;
+          vLevel = level;
+          vShade = 0.74 + r1 * 0.36;
+          vFlower = step(0.965, r3) * step(0.76, level);
+          vFog = smoothstep(36.0, 94.0, distance(uCamera, world));
+          gl_Position = uProj * uView * vec4(world, 1.0);
+        }
+      `;
+
+        const grassFS = `#version 300 es
+        precision highp float;
+        in float vLevel;
+        in float vShade;
+        in float vFlower;
+        in float vFog;
+        out vec4 outColor;
+        uniform float uStyle;
+        void main() {
+          vec3 base = vec3(0.10, 0.28, 0.09);
+          vec3 tip = vec3(0.56, 0.66, 0.23);
+          if (uStyle > 0.5 && uStyle < 1.5) {
+            base = vec3(0.08, 0.23, 0.16);
+            tip = vec3(0.67, 0.59, 0.22);
+          } else if (uStyle > 1.5) {
+            base = vec3(0.02, 0.13, 0.20);
+            tip = vec3(0.91, 0.59, 0.06);
+          }
+          vec3 color = mix(base, tip, vLevel) * vShade;
+          vec3 flower = uStyle > 1.5 ? vec3(1.0, 0.73, 0.10) : vec3(0.88, 0.70, 0.42);
+          color = mix(color, flower, vFlower);
+          vec3 fog = uStyle > 1.5 ? vec3(0.055, 0.12, 0.29) : vec3(0.56, 0.66, 0.61);
+          color = mix(color, fog, vFog * 0.78);
+          outColor = vec4(color, 1.0);
+        }
+      `;
+
+        const pollenVS = `#version 300 es
+        precision highp float;
+        uniform mat4 uView;
+        uniform mat4 uProj;
+        uniform vec3 uCamera;
+        uniform vec3 uWind;
+        uniform float uTime;
+        uniform float uSeed;
+        out float vAlpha;
+        float hash11(float p) { return fract(sin(p * 91.17) * 43758.5453); }
+        void main() {
+          float id = float(gl_VertexID);
+          float a = hash11(id + uSeed * 7.0);
+          float b = hash11(id * 1.71 + 31.0 + uSeed);
+          float c = hash11(id * 2.41 + 73.0);
+          vec3 p = vec3((a * 2.0 - 1.0) * 42.0, 1.2 + b * 11.0, (c * 2.0 - 1.0) * 42.0);
+          p.xz += uWind.xz * uTime * (0.12 + b * 0.18);
+          p.xz = mod(p.xz + 42.0, 84.0) - 42.0;
+          p.y += sin(uTime * (0.3 + b) + id) * 0.8;
+          gl_Position = uProj * uView * vec4(p, 1.0);
+          gl_PointSize = mix(1.0, 3.2, b) * (1.0 - smoothstep(10.0, 80.0, distance(uCamera, p)));
+          vAlpha = 0.18 + b * 0.38;
+        }
+      `;
+
+        const pollenFS = `#version 300 es
+        precision highp float;
+        in float vAlpha;
+        out vec4 outColor;
+        uniform float uStyle;
+        void main() {
+          vec2 p = gl_PointCoord - 0.5;
+          float alpha = smoothstep(0.5, 0.05, length(p)) * vAlpha;
+          vec3 color = uStyle > 1.5 ? vec3(1.0, 0.69, 0.12) : vec3(0.93, 0.82, 0.48);
+          outColor = vec4(color, alpha);
+        }
+      `;
+
+        function compile(type, source) {
+          const shader = gl.createShader(type);
+          gl.shaderSource(shader, source);
+          gl.compileShader(shader);
+          if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            throw new Error(
+              gl.getShaderInfoLog(shader) || "Shader compilation failed"
+            );
+          }
+          return shader;
+        }
+
+        function program(vertexSource, fragmentSource) {
+          const value = gl.createProgram();
+          gl.attachShader(value, compile(gl.VERTEX_SHADER, vertexSource));
+          gl.attachShader(value, compile(gl.FRAGMENT_SHADER, fragmentSource));
+          gl.linkProgram(value);
+          if (!gl.getProgramParameter(value, gl.LINK_STATUS)) {
+            throw new Error(
+              gl.getProgramInfoLog(value) || "Shader linking failed"
+            );
+          }
+          return value;
+        }
+
+        function locations(value, names) {
+          const result = {};
+          names.forEach(name => {
+            result[name] = gl.getUniformLocation(value, name);
+          });
+          return result;
+        }
+
+        let skyProgram;
+        let terrainProgram;
+        let waterProgram;
+        let grassProgram;
+        let pollenProgram;
+        try {
+          skyProgram = program(skyVS, skyFS);
+          terrainProgram = program(terrainVS, terrainFS);
+          waterProgram = program(waterVS, waterFS);
+          grassProgram = program(grassVS, grassFS);
+          pollenProgram = program(pollenVS, pollenFS);
+        } catch (error) {
+          notice.style.display = "block";
+          notice.querySelector("h2").textContent =
+            "The world could not be painted";
+          notice.querySelector("p").textContent = error.message;
+          return;
+        }
+
+        const skyU = locations(skyProgram, [
+          "uForward",
+          "uRight",
+          "uUp",
+          "uSun",
+          "uCamera",
+          "uAspect",
+          "uFov",
+          "uTime",
+          "uStyle",
+          "uSeed",
+        ]);
+        const terrainU = locations(terrainProgram, [
+          "uView",
+          "uProj",
+          "uCamera",
+          "uSun",
+          "uStyle",
+          "uSeed",
+        ]);
+        const waterU = locations(waterProgram, [
+          "uView",
+          "uProj",
+          "uCamera",
+          "uStyle",
+          "uTime",
+        ]);
+        const grassU = locations(grassProgram, [
+          "uView",
+          "uProj",
+          "uCamera",
+          "uWind",
+          "uGust",
+          "uTime",
+          "uSeed",
+          "uStyle",
+        ]);
+        const pollenU = locations(pollenProgram, [
+          "uView",
+          "uProj",
+          "uCamera",
+          "uWind",
+          "uTime",
+          "uSeed",
+          "uStyle",
+        ]);
+
+        const worldVao = gl.createVertexArray();
+        gl.bindVertexArray(worldVao);
+        const terrainSize = 69;
+        const terrainSteps = 160;
+        const terrainVertices = new Float32Array(
+          (terrainSteps + 1) * (terrainSteps + 1) * 2
+        );
+        let cursor = 0;
+        for (let z = 0; z <= terrainSteps; z++) {
+          for (let x = 0; x <= terrainSteps; x++) {
+            terrainVertices[cursor++] =
+              ((x / terrainSteps) * 2 - 1) * terrainSize;
+            terrainVertices[cursor++] =
+              ((z / terrainSteps) * 2 - 1) * terrainSize;
+          }
+        }
+        const terrainIndices = new Uint32Array(terrainSteps * terrainSteps * 6);
+        cursor = 0;
+        for (let z = 0; z < terrainSteps; z++) {
+          for (let x = 0; x < terrainSteps; x++) {
+            const a = z * (terrainSteps + 1) + x;
+            const b = a + 1;
+            const c = a + terrainSteps + 1;
+            const d = c + 1;
+            terrainIndices[cursor++] = a;
+            terrainIndices[cursor++] = c;
+            terrainIndices[cursor++] = b;
+            terrainIndices[cursor++] = b;
+            terrainIndices[cursor++] = c;
+            terrainIndices[cursor++] = d;
+          }
+        }
+        const terrainBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, terrainBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, terrainVertices, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        const terrainIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, terrainIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, terrainIndices, gl.STATIC_DRAW);
+
+        const grassVao = gl.createVertexArray();
+        gl.bindVertexArray(grassVao);
+        const blade = new Float32Array([
+          -1, 0, 1, 0, -0.82, 0.34, 0.82, 0.34, -0.48, 0.68, 0.48, 0.68, 0, 1,
+          0, 1,
+        ]);
+        const bladeBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bladeBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, blade, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+        const emptyVao = gl.createVertexArray();
+        const waterVao = gl.createVertexArray();
+        gl.bindVertexArray(waterVao);
+        const waterVertices = new Float32Array([
+          -69, -69, 69, -69, -69, 69, -69, 69, 69, -69, 69, 69,
+        ]);
+        const waterBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, waterBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, waterVertices, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+        const state = {
+          style: 0,
+          seed: 47.2,
+          wind: 0.58,
+          daylight: 0.62,
+          yaw: -0.73,
+          pitch: 0.25,
+          distance: 28,
+          target: [0, 3.3, 0],
+          wander: true,
+          gust: [0, 0, 0],
+          dragging: false,
+          pointerX: 0,
+          pointerY: 0,
+          moved: false,
+          keys: new Set(),
+        };
+
+        const view = new Float32Array(16);
+        const projection = new Float32Array(16);
+        let camera = [0, 0, 0];
+        let forward = [0, 0, 0];
+        let right = [1, 0, 0];
+        let up = [0, 1, 0];
+        const fov = Math.PI / 3.15;
+
+        function normalize(v) {
+          const length = Math.hypot(v[0], v[1], v[2]) || 1;
+          return [v[0] / length, v[1] / length, v[2] / length];
+        }
+
+        function cross(a, b) {
+          return [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+          ];
+        }
+
+        function perspective(out, fieldOfView, aspect, near, far) {
+          const f = 1 / Math.tan(fieldOfView / 2);
+          out.fill(0);
+          out[0] = f / aspect;
+          out[5] = f;
+          out[10] = (far + near) / (near - far);
+          out[11] = -1;
+          out[14] = (2 * far * near) / (near - far);
+        }
+
+        function lookAt(out, eye, target, worldUp) {
+          const z = normalize([
+            eye[0] - target[0],
+            eye[1] - target[1],
+            eye[2] - target[2],
+          ]);
+          const x = normalize(cross(worldUp, z));
+          const y = cross(z, x);
+          out[0] = x[0];
+          out[1] = y[0];
+          out[2] = z[0];
+          out[3] = 0;
+          out[4] = x[1];
+          out[5] = y[1];
+          out[6] = z[1];
+          out[7] = 0;
+          out[8] = x[2];
+          out[9] = y[2];
+          out[10] = z[2];
+          out[11] = 0;
+          out[12] = -(x[0] * eye[0] + x[1] * eye[1] + x[2] * eye[2]);
+          out[13] = -(y[0] * eye[0] + y[1] * eye[1] + y[2] * eye[2]);
+          out[14] = -(z[0] * eye[0] + z[1] * eye[1] + z[2] * eye[2]);
+          out[15] = 1;
+        }
+
+        function updateCamera() {
+          const horizontal = Math.cos(state.pitch) * state.distance;
+          camera = [
+            state.target[0] + Math.sin(state.yaw) * horizontal,
+            state.target[1] + Math.sin(state.pitch) * state.distance,
+            state.target[2] + Math.cos(state.yaw) * horizontal,
+          ];
+          forward = normalize([
+            state.target[0] - camera[0],
+            state.target[1] - camera[1],
+            state.target[2] - camera[2],
+          ]);
+          right = normalize(cross(forward, [0, 1, 0]));
+          up = normalize(cross(right, forward));
+          lookAt(view, camera, state.target, [0, 1, 0]);
+        }
+
+        function sunDirection() {
+          const arc = 0.1 + state.daylight * Math.PI * 0.82;
+          return normalize([Math.cos(arc) * 0.78, Math.sin(arc), -0.42]);
+        }
+
+        function resize() {
+          const pixelRatio = Math.min(
+            window.devicePixelRatio || 1,
+            embedded ? 1.15 : innerWidth < 700 ? 1.25 : 1.75
+          );
+          const width = Math.max(1, Math.floor(innerWidth * pixelRatio));
+          const height = Math.max(1, Math.floor(innerHeight * pixelRatio));
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+            gl.viewport(0, 0, width, height);
+          }
+          perspective(projection, fov, width / height, 0.1, 180);
+        }
+
+        function setMatrices(uniforms, currentProgram) {
+          gl.useProgram(currentProgram);
+          gl.uniformMatrix4fv(uniforms.uView, false, view);
+          gl.uniformMatrix4fv(uniforms.uProj, false, projection);
+        }
+
+        function updateMovement(dt) {
+          const speed = dt * (state.keys.has("Shift") ? 11 : 5.4);
+          const flatForward = normalize([forward[0], 0, forward[2]]);
+          let x = 0;
+          let z = 0;
+          if (state.keys.has("w") || state.keys.has("ArrowUp")) {
+            x += flatForward[0];
+            z += flatForward[2];
+          }
+          if (state.keys.has("s") || state.keys.has("ArrowDown")) {
+            x -= flatForward[0];
+            z -= flatForward[2];
+          }
+          if (state.keys.has("a") || state.keys.has("ArrowLeft")) {
+            x -= right[0];
+            z -= right[2];
+          }
+          if (state.keys.has("d") || state.keys.has("ArrowRight")) {
+            x += right[0];
+            z += right[2];
+          }
+          if (x || z) {
+            state.target[0] = Math.max(
+              -34,
+              Math.min(34, state.target[0] + x * speed)
+            );
+            state.target[2] = Math.max(
+              -34,
+              Math.min(34, state.target[2] + z * speed)
+            );
+            state.wander = false;
+            document.getElementById("wander").textContent = "Resume wander";
+            document.getElementById("wander").classList.remove("accent");
+          }
+        }
+
+        let previousTime = performance.now();
+        function render(now) {
+          const time = now * 0.001;
+          const dt = Math.min(0.05, (now - previousTime) * 0.001);
+          previousTime = now;
+          resize();
+          updateMovement(dt);
+          if (state.wander && !state.dragging) state.yaw += dt * 0.035;
+          state.gust[2] *= Math.pow(0.05, dt);
+          updateCamera();
+          const sun = sunDirection();
+          const aspect = canvas.width / canvas.height;
+
+          gl.disable(gl.DEPTH_TEST);
+          gl.disable(gl.BLEND);
+          gl.bindVertexArray(emptyVao);
+          gl.useProgram(skyProgram);
+          gl.uniform3fv(skyU.uForward, forward);
+          gl.uniform3fv(skyU.uRight, right);
+          gl.uniform3fv(skyU.uUp, up);
+          gl.uniform3fv(skyU.uSun, sun);
+          gl.uniform3fv(skyU.uCamera, camera);
+          gl.uniform1f(skyU.uAspect, aspect);
+          gl.uniform1f(skyU.uFov, fov);
+          gl.uniform1f(skyU.uTime, time);
+          gl.uniform1f(skyU.uStyle, state.style);
+          gl.uniform1f(skyU.uSeed, state.seed);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+          gl.enable(gl.DEPTH_TEST);
+          gl.depthFunc(gl.LEQUAL);
+          gl.clear(gl.DEPTH_BUFFER_BIT);
+          gl.bindVertexArray(worldVao);
+          setMatrices(terrainU, terrainProgram);
+          gl.uniform3fv(terrainU.uCamera, camera);
+          gl.uniform3fv(terrainU.uSun, sun);
+          gl.uniform1f(terrainU.uStyle, state.style);
+          gl.uniform1f(terrainU.uSeed, state.seed);
+          gl.drawElements(
+            gl.TRIANGLES,
+            terrainIndices.length,
+            gl.UNSIGNED_INT,
+            0
+          );
+
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+          gl.depthMask(false);
+          gl.bindVertexArray(waterVao);
+          setMatrices(waterU, waterProgram);
+          gl.uniform3fv(waterU.uCamera, camera);
+          gl.uniform1f(waterU.uStyle, state.style);
+          gl.uniform1f(waterU.uTime, time);
+          gl.drawArrays(gl.TRIANGLES, 0, 6);
+          gl.depthMask(true);
+          gl.disable(gl.BLEND);
+
+          const windAngle = 0.65 + Math.sin(time * 0.045) * 0.22;
+          const wind = [Math.cos(windAngle), state.wind, Math.sin(windAngle)];
+          gl.bindVertexArray(grassVao);
+          setMatrices(grassU, grassProgram);
+          gl.uniform3fv(grassU.uCamera, camera);
+          gl.uniform3fv(grassU.uWind, wind);
+          gl.uniform3fv(grassU.uGust, state.gust);
+          gl.uniform1f(grassU.uTime, time);
+          gl.uniform1f(grassU.uSeed, state.seed);
+          gl.uniform1f(grassU.uStyle, state.style);
+          const grassCount = embedded
+            ? 16000
+            : innerWidth < 700
+              ? 18000
+              : 36000;
+          gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 8, grassCount);
+
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+          gl.depthMask(false);
+          gl.bindVertexArray(emptyVao);
+          setMatrices(pollenU, pollenProgram);
+          gl.uniform3fv(pollenU.uCamera, camera);
+          gl.uniform3fv(pollenU.uWind, wind);
+          gl.uniform1f(pollenU.uTime, time);
+          gl.uniform1f(pollenU.uSeed, state.seed);
+          gl.uniform1f(pollenU.uStyle, state.style);
+          gl.drawArrays(
+            gl.POINTS,
+            0,
+            embedded ? 500 : innerWidth < 700 ? 650 : 1300
+          );
+          gl.depthMask(true);
+          gl.disable(gl.BLEND);
+
+          requestAnimationFrame(render);
+        }
+
+        function setStyle(style) {
+          state.style = style;
+          document.querySelectorAll(".style-button").forEach(button => {
+            button.classList.toggle(
+              "active",
+              Number(button.dataset.style) === style
+            );
+          });
+          if (style === 2 && state.daylight > 0.46) {
+            state.daylight = 0.18;
+            document.getElementById("light").value = "18";
+            updateLightLabel();
+          } else if (style !== 2 && state.daylight < 0.3) {
+            state.daylight = 0.62;
+            document.getElementById("light").value = "62";
+            updateLightLabel();
+          }
+        }
+
+        function updateLightLabel() {
+          const value = state.daylight;
+          const label =
+            value < 0.2
+              ? "Blue hour"
+              : value < 0.42
+                ? "Morning"
+                : value < 0.72
+                  ? "Afternoon"
+                  : "Golden hour";
+          document.getElementById("lightValue").textContent = label;
+        }
+
+        canvas.addEventListener("pointerdown", event => {
+          state.dragging = true;
+          state.moved = false;
+          state.pointerX = event.clientX;
+          state.pointerY = event.clientY;
+          canvas.setPointerCapture(event.pointerId);
+        });
+        canvas.addEventListener("pointermove", event => {
+          if (!state.dragging) return;
+          const dx = event.clientX - state.pointerX;
+          const dy = event.clientY - state.pointerY;
+          if (Math.abs(dx) + Math.abs(dy) > 1) state.moved = true;
+          state.yaw -= dx * 0.0045;
+          state.pitch = Math.max(
+            -0.05,
+            Math.min(0.72, state.pitch + dy * 0.0036)
+          );
+          state.pointerX = event.clientX;
+          state.pointerY = event.clientY;
+          state.gust[0] =
+            state.target[0] +
+            right[0] *
+              ((event.clientX / innerWidth) * 2 - 1) *
+              state.distance *
+              0.62;
+          state.gust[1] =
+            state.target[2] +
+            right[2] *
+              ((event.clientX / innerWidth) * 2 - 1) *
+              state.distance *
+              0.62;
+          state.gust[2] = Math.min(
+            2.8,
+            state.gust[2] + Math.hypot(dx, dy) * 0.035
+          );
+        });
+        canvas.addEventListener("pointerup", () => {
+          state.dragging = false;
+        });
+        canvas.addEventListener("pointercancel", () => {
+          state.dragging = false;
+        });
+        canvas.addEventListener(
+          "wheel",
+          event => {
+            event.preventDefault();
+            state.distance = Math.max(
+              8,
+              Math.min(58, state.distance * Math.exp(event.deltaY * 0.0011))
+            );
+          },
+          { passive: false }
+        );
+
+        window.addEventListener("keydown", event => {
+          if (
+            ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(
+              event.key
+            )
+          )
+            event.preventDefault();
+          state.keys.add(
+            event.key.length === 1 ? event.key.toLowerCase() : event.key
+          );
+          if (event.key.toLowerCase() === "h")
+            document.body.classList.toggle("ui-hidden");
+          if (event.key.toLowerCase() === "f")
+            document.getElementById("fullscreen").click();
+          if (event.key === "1") setStyle(0);
+          if (event.key === "2") setStyle(1);
+          if (event.key === "3") setStyle(2);
+        });
+        window.addEventListener("keyup", event =>
+          state.keys.delete(
+            event.key.length === 1 ? event.key.toLowerCase() : event.key
+          )
+        );
+        window.addEventListener("blur", () => state.keys.clear());
+        window.addEventListener("resize", resize);
+
+        document.querySelectorAll(".style-button").forEach(button => {
+          button.addEventListener("click", () =>
+            setStyle(Number(button.dataset.style))
+          );
+        });
+        document.getElementById("wind").addEventListener("input", event => {
+          state.wind = Number(event.target.value) / 100;
+          document.getElementById("windValue").textContent =
+            `${event.target.value}%`;
+        });
+        document.getElementById("light").addEventListener("input", event => {
+          state.daylight = Number(event.target.value) / 100;
+          updateLightLabel();
+        });
+        document.getElementById("wander").addEventListener("click", event => {
+          state.wander = !state.wander;
+          event.currentTarget.textContent = state.wander
+            ? "Pause wander"
+            : "Resume wander";
+          event.currentTarget.classList.toggle("accent", state.wander);
+        });
+        document.getElementById("reseed").addEventListener("click", () => {
+          state.seed = Math.random() * 900 + 10;
+          state.target = [0, 3.3, 0];
+          state.distance = 28;
+          state.gust[2] = 2.4;
+        });
+        document.getElementById("snapshot").addEventListener("click", () => {
+          const link = document.createElement("a");
+          link.download = `painterly-world-${Date.now()}.png`;
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        });
+        document
+          .getElementById("hideUi")
+          .addEventListener("click", () =>
+            document.body.classList.toggle("ui-hidden")
+          );
+        document
+          .getElementById("fullscreen")
+          .addEventListener("click", async () => {
+            if (document.fullscreenElement) await document.exitFullscreen();
+            else await document.documentElement.requestFullscreen();
+          });
+        window.addEventListener("message", event => {
+          if (event.origin !== location.origin || !event.data) return;
+          if (event.data.type === "painterly-style")
+            setStyle(Number(event.data.style));
+          if (event.data.type === "painterly-reseed")
+            document.getElementById("reseed").click();
+        });
+
+        updateLightLabel();
+        resize();
+        requestAnimationFrame(render);
+      })();
+    </script>
+  </body>
+</html>
