@@ -448,8 +448,8 @@
     </section>
 
     <div class="tips ui">
-      Drag to orbit · wheel to travel<br />WASD / arrows to roam · drag the
-      field to make a gust
+      Drag to orbit · wheel to travel<br />WASD / arrows to walk forever · drag
+      the field to make a gust
     </div>
     <div class="signature">One HTML · no assets · WebGL2</div>
     <div id="notice">
@@ -593,16 +593,18 @@
         uniform mat4 uView;
         uniform mat4 uProj;
         uniform float uSeed;
+        uniform vec2 uCenter;
         out vec3 vWorld;
         out vec3 vNormal;
         out float vHeight;
         ${COMMON_NOISE}
         void main() {
-          float h = terrainHeight(aXZ, uSeed);
+          vec2 xz = aXZ + uCenter;
+          float h = terrainHeight(xz, uSeed);
           float e = 0.32;
-          float hx = terrainHeight(aXZ + vec2(e, 0.0), uSeed) - terrainHeight(aXZ - vec2(e, 0.0), uSeed);
-          float hz = terrainHeight(aXZ + vec2(0.0, e), uSeed) - terrainHeight(aXZ - vec2(0.0, e), uSeed);
-          vec3 world = vec3(aXZ.x, h, aXZ.y);
+          float hx = terrainHeight(xz + vec2(e, 0.0), uSeed) - terrainHeight(xz - vec2(e, 0.0), uSeed);
+          float hz = terrainHeight(xz + vec2(0.0, e), uSeed) - terrainHeight(xz - vec2(0.0, e), uSeed);
+          vec3 world = vec3(xz.x, h, xz.y);
           vWorld = world;
           vHeight = h;
           vNormal = normalize(vec3(-hx, 2.0 * e, -hz));
@@ -652,9 +654,9 @@
           float diffuse = max(dot(vNormal, uSun), 0.0);
           float light = 0.34 + diffuse * 0.78 + pow(max(dot(reflect(-uSun, vNormal), normalize(uCamera - vWorld)), 0.0), 24.0) * 0.12;
           color *= light;
-          float distanceFog = smoothstep(54.0, 115.0, distance(uCamera, vWorld));
+          float distanceFog = smoothstep(78.0, 128.0, distance(uCamera, vWorld));
           vec3 fog = uStyle > 1.5 ? vec3(0.055, 0.12, 0.29) : vec3(0.58, 0.68, 0.65);
-          color = mix(color, fog, distanceFog * 0.82);
+          color = mix(color, fog, distanceFog * 0.98);
           if (uStyle > 0.5) {
             float strokes = noise2(vWorld.xz * vec2(1.6, 0.36) + floor(gl_FragCoord.xy * 0.12));
             color *= 0.86 + strokes * 0.25;
@@ -673,10 +675,12 @@
         uniform mat4 uView;
         uniform mat4 uProj;
         uniform float uTime;
+        uniform vec2 uCenter;
         out vec3 vWorld;
         void main() {
-          float wave = sin(aXZ.x * 0.33 + uTime * 0.75) * 0.055 + sin(aXZ.y * 0.47 - uTime * 0.52) * 0.04;
-          vWorld = vec3(aXZ.x, wave + 0.08, aXZ.y);
+          vec2 xz = aXZ + uCenter;
+          float wave = sin(xz.x * 0.33 + uTime * 0.75) * 0.055 + sin(xz.y * 0.47 - uTime * 0.52) * 0.04;
+          vWorld = vec3(xz.x, wave + 0.08, xz.y);
           gl_Position = uProj * uView * vec4(vWorld, 1.0);
         }
       `;
@@ -703,43 +707,92 @@
         uniform mat4 uView;
         uniform mat4 uProj;
         uniform vec3 uCamera;
+        uniform vec3 uSun;
         uniform vec3 uWind;
         uniform vec3 uGust;
         uniform float uTime;
         uniform float uSeed;
         uniform float uStyle;
+        uniform vec2 uCenter;
+        uniform float uSpacing;
+        uniform float uSide;
+        uniform float uPerClump;
         out float vLevel;
         out float vShade;
         out float vFlower;
         out float vFog;
+        out float vLight;
+        out float vHue;
         ${COMMON_NOISE}
-        float hash11(float p) { return fract(sin(p * 127.1) * 43758.5453123); }
         void main() {
           float id = float(gl_InstanceID);
-          float r1 = hash11(id + uSeed * 13.7);
-          float r2 = hash11(id * 1.37 + uSeed * 29.1);
-          float r3 = hash11(id * 2.11 + 91.7 + uSeed);
-          vec2 base = (vec2(r1, r2) * 2.0 - 1.0) * 66.0;
-          float h = terrainHeight(base, uSeed);
+          float clumpId = floor(id / uPerClump);
+          float bIdx = mod(id, uPerClump);
+          float cx = mod(clumpId, uSide);
+          float cz = floor(clumpId / uSide);
+          vec2 cell = vec2(cx, cz) - floor(uSide * 0.5);
+          // Deterministic clump position in world space (so the meadow is infinite).
+          vec2 clumpBase = uCenter + cell * uSpacing;
+          vec2 clumpJit = (vec2(hash21(clumpBase * 0.37 + 3.1),
+                                hash21(clumpBase * 0.71 + 8.7)) - 0.5) * uSpacing * 0.9;
+          vec2 clumpPos = clumpBase + clumpJit;
+          float cr = hash21(clumpPos + 1.7);
+          vec2 bladeJit = (vec2(hash21(clumpPos * 1.31 + bIdx * 1.7),
+                                hash21(clumpPos * 2.13 + bIdx * 4.3)) - 0.5) * uSpacing * 0.85;
+          vec2 root = clumpPos + bladeJit;
+
+          float h = terrainHeight(root, uSeed);
+          float br = hash21(root * 3.7 + 0.5);
+          float br2 = hash21(root * 5.3 + 9.1);
+          float species = hash21(clumpPos * 0.9 + 2.4);
           float level = aBlade.y;
-          float bladeHeight = mix(0.42, 1.28, r3) * mix(0.72, 1.0, smoothstep(-0.2, 3.0, h));
-          float visible = step(0.25, h) * (1.0 - smoothstep(8.8, 11.4, h));
-          float angle = r3 * 6.2831853;
+
+          // Blades near clump centre are tallest; edges shorter, giving a tuft look.
+          float bladeHeight = mix(0.55, 1.75, br) * mix(0.7, 1.05, cr)
+            * mix(0.7, 1.0, smoothstep(-0.4, 3.0, h));
+          float visible = step(0.2, h) * (1.0 - smoothstep(8.4, 11.2, h));
+
+          // Fade the outer ring so recycled tiles dissolve into the distance haze.
+          float ringDist = distance(uCamera.xz, root);
+          float ring = uSpacing * uSide * 0.5;
+          float distFade = 1.0 - smoothstep(ring * 0.72, ring * 0.96, ringDist);
+          bladeHeight *= distFade;
+
+          float angle = br2 * 6.2831853;
           vec2 side = vec2(cos(angle), sin(angle));
-          float width = mix(0.025, 0.055, r2) * (1.0 - level * 0.78);
+          vec2 faceDir = vec2(-side.y, side.x);
+
+          // Grass is widest low down and tapers to a point.
+          float width = mix(0.022, 0.05, br) * (1.0 - smoothstep(0.15, 1.0, level));
+
           vec2 windDir = normalize(uWind.xz + vec2(0.0001));
-          float phase = dot(base, vec2(0.22, 0.31)) + r3 * 9.0;
-          float sway = sin(uTime * (1.1 + uWind.y * 1.8) + phase) * (0.14 + uWind.y * 0.34);
-          vec2 gustDelta = base - uGust.xy;
-          float gust = exp(-dot(gustDelta, gustDelta) * 0.035) * uGust.z;
-          vec2 bend = (windDir * sway + normalize(gustDelta + vec2(0.01)) * gust) * level * level * bladeHeight;
-          vec2 worldXZ = base + side * aBlade.x * width + bend;
-          vec3 world = vec3(worldXZ.x, h + level * bladeHeight * visible, worldXZ.y);
-          if (visible < 0.5) world.y = -20.0;
+          float phase = dot(root, vec2(0.35, 0.27)) + br2 * 9.0;
+          float stiff = level * level;
+          float sway = sin(uTime * (1.0 + uWind.y * 1.7) + phase) * (0.1 + uWind.y * 0.42);
+          sway += sin(uTime * 2.7 + phase * 1.7) * uWind.y * 0.06;
+          vec2 gustDelta = root - uGust.xy;
+          float gust = exp(-dot(gustDelta, gustDelta) * 0.03) * uGust.z;
+          // Natural resting lean plus wind + gust, all curving the blade forward.
+          vec2 lean = faceDir * (br - 0.5) * 0.32;
+          vec2 bend = (windDir * sway + normalize(gustDelta + vec2(0.01)) * gust + lean) * stiff;
+          vec2 worldXZ = root + side * aBlade.x * width + bend * bladeHeight;
+          float droop = dot(bend, bend) * 0.35;
+          vec3 world = vec3(worldXZ.x, h + level * bladeHeight - droop * bladeHeight, worldXZ.y);
+          if (visible < 0.5) world.y = -30.0;
+
+          // Approximate blade normal (bends toward the wind, faces outward) for lighting.
+          vec3 tangent = normalize(vec3(bend.x, 1.2, bend.y));
+          vec3 nrm = normalize(cross(vec3(side.x, 0.0, side.y), tangent));
+          if (nrm.y < 0.0) nrm = -nrm;
+          float ndl = max(dot(nrm, uSun), 0.0);
+          float ao = mix(0.42, 1.0, level);
+          vLight = (0.32 + ndl * 0.82) * ao;
+
           vLevel = level;
-          vShade = 0.74 + r1 * 0.36;
-          vFlower = step(0.965, r3) * step(0.76, level);
-          vFog = smoothstep(36.0, 94.0, distance(uCamera, world));
+          vShade = 0.78 + br * 0.3;
+          vHue = species;
+          vFlower = step(0.94, cr) * step(0.82, level) * step(0.5, bIdx);
+          vFog = smoothstep(ring * 0.55, ring * 0.98, ringDist);
           gl_Position = uProj * uView * vec4(world, 1.0);
         }
       `;
@@ -750,23 +803,36 @@
         in float vShade;
         in float vFlower;
         in float vFog;
+        in float vLight;
+        in float vHue;
         out vec4 outColor;
         uniform float uStyle;
         void main() {
-          vec3 base = vec3(0.10, 0.28, 0.09);
-          vec3 tip = vec3(0.56, 0.66, 0.23);
+          vec3 base = vec3(0.07, 0.24, 0.07);
+          vec3 mid = vec3(0.24, 0.42, 0.13);
+          vec3 tip = vec3(0.58, 0.68, 0.26);
           if (uStyle > 0.5 && uStyle < 1.5) {
-            base = vec3(0.08, 0.23, 0.16);
-            tip = vec3(0.67, 0.59, 0.22);
+            base = vec3(0.06, 0.2, 0.14);
+            mid = vec3(0.26, 0.4, 0.16);
+            tip = vec3(0.72, 0.62, 0.24);
           } else if (uStyle > 1.5) {
-            base = vec3(0.02, 0.13, 0.20);
-            tip = vec3(0.91, 0.59, 0.06);
+            base = vec3(0.02, 0.11, 0.19);
+            mid = vec3(0.06, 0.28, 0.24);
+            tip = vec3(0.94, 0.62, 0.07);
           }
-          vec3 color = mix(base, tip, vLevel) * vShade;
-          vec3 flower = uStyle > 1.5 ? vec3(1.0, 0.73, 0.10) : vec3(0.88, 0.70, 0.42);
+          // Two-stop gradient plus per-blade hue drift toward dry/yellow tones.
+          vec3 color = mix(base, mid, smoothstep(0.0, 0.5, vLevel));
+          color = mix(color, tip, smoothstep(0.5, 1.0, vLevel));
+          color = mix(color, color * vec3(1.22, 1.12, 0.7), (vHue - 0.5) * 0.5);
+          color *= vShade * vLight;
+          vec3 flower = uStyle > 1.5 ? vec3(1.0, 0.74, 0.12) : vec3(0.92, 0.74, 0.44);
           color = mix(color, flower, vFlower);
           vec3 fog = uStyle > 1.5 ? vec3(0.055, 0.12, 0.29) : vec3(0.56, 0.66, 0.61);
-          color = mix(color, fog, vFog * 0.78);
+          color = mix(color, fog, vFog * 0.9);
+          if (uStyle > 0.5) {
+            float levels = uStyle > 1.5 ? 12.0 : 18.0;
+            color = floor(color * levels) / levels;
+          }
           outColor = vec4(color, 1.0);
         }
       `;
@@ -788,7 +854,8 @@
           float c = hash11(id * 2.41 + 73.0);
           vec3 p = vec3((a * 2.0 - 1.0) * 42.0, 1.2 + b * 11.0, (c * 2.0 - 1.0) * 42.0);
           p.xz += uWind.xz * uTime * (0.12 + b * 0.18);
-          p.xz = mod(p.xz + 42.0, 84.0) - 42.0;
+          // Wrap the pollen field around the camera so it never runs out ahead of you.
+          p.xz = mod(p.xz - uCamera.xz + 42.0, 84.0) - 42.0 + uCamera.xz;
           p.y += sin(uTime * (0.3 + b) + id) * 0.8;
           gl_Position = uProj * uView * vec4(p, 1.0);
           gl_PointSize = mix(1.0, 3.2, b) * (1.0 - smoothstep(10.0, 80.0, distance(uCamera, p)));
@@ -880,6 +947,7 @@
           "uSun",
           "uStyle",
           "uSeed",
+          "uCenter",
         ]);
         const waterU = locations(waterProgram, [
           "uView",
@@ -887,16 +955,22 @@
           "uCamera",
           "uStyle",
           "uTime",
+          "uCenter",
         ]);
         const grassU = locations(grassProgram, [
           "uView",
           "uProj",
           "uCamera",
+          "uSun",
           "uWind",
           "uGust",
           "uTime",
           "uSeed",
           "uStyle",
+          "uCenter",
+          "uSpacing",
+          "uSide",
+          "uPerClump",
         ]);
         const pollenU = locations(pollenProgram, [
           "uView",
@@ -910,8 +984,8 @@
 
         const worldVao = gl.createVertexArray();
         gl.bindVertexArray(worldVao);
-        const terrainSize = 69;
-        const terrainSteps = 160;
+        const terrainSize = 132;
+        const terrainSteps = 200;
         const terrainVertices = new Float32Array(
           (terrainSteps + 1) * (terrainSteps + 1) * 2
         );
@@ -951,10 +1025,16 @@
 
         const grassVao = gl.createVertexArray();
         gl.bindVertexArray(grassVao);
-        const blade = new Float32Array([
-          -1, 0, 1, 0, -0.82, 0.34, 0.82, 0.34, -0.48, 0.68, 0.48, 0.68, 0, 1,
-          0, 1,
-        ]);
+        // A tapered strip: 7 rows of paired vertices curving from root to tip.
+        const bladeSegments = 6;
+        const bladeData = [];
+        for (let i = 0; i <= bladeSegments; i++) {
+          const t = i / bladeSegments;
+          const taper = 1 - t;
+          bladeData.push(-taper, t, taper, t);
+        }
+        const blade = new Float32Array(bladeData);
+        const bladeVertexCount = (bladeSegments + 1) * 2;
         const bladeBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, bladeBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, blade, gl.STATIC_DRAW);
@@ -965,7 +1045,7 @@
         const waterVao = gl.createVertexArray();
         gl.bindVertexArray(waterVao);
         const waterVertices = new Float32Array([
-          -69, -69, 69, -69, -69, 69, -69, 69, 69, -69, 69, 69,
+          -150, -150, 150, -150, -150, 150, -150, 150, 150, -150, 150, 150,
         ]);
         const waterBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, waterBuffer);
@@ -998,6 +1078,64 @@
         let right = [1, 0, 0];
         let up = [0, 1, 0];
         const fov = Math.PI / 3.15;
+
+        // CPU port of the GLSL terrainHeight so the walker stays on the ground.
+        const fract = x => x - Math.floor(x);
+        function cpuHash21(x, y) {
+          let px = fract(x * 123.34);
+          let py = fract(y * 456.21);
+          const d = px * (px + 45.32) + py * (py + 45.32);
+          px += d;
+          py += d;
+          return fract(px * py);
+        }
+        function cpuNoise2(x, y) {
+          const ix = Math.floor(x);
+          const iy = Math.floor(y);
+          let fx = x - ix;
+          let fy = y - iy;
+          fx = fx * fx * (3 - 2 * fx);
+          fy = fy * fy * (3 - 2 * fy);
+          const a = cpuHash21(ix, iy);
+          const b = cpuHash21(ix + 1, iy);
+          const c = cpuHash21(ix, iy + 1);
+          const d = cpuHash21(ix + 1, iy + 1);
+          return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+        }
+        function cpuFbm(x, y) {
+          let value = 0;
+          let amplitude = 0.5;
+          for (let i = 0; i < 5; i++) {
+            value += amplitude * cpuNoise2(x, y);
+            const nx = 0.8 * x + 0.6 * y;
+            const ny = -0.6 * x + 0.8 * y;
+            x = nx * 2.03 + 7.7;
+            y = ny * 2.03 + 7.7;
+            amplitude *= 0.5;
+          }
+          return value;
+        }
+        function cpuTerrainHeight(px, pz, seed) {
+          const ox = seed * 0.071;
+          const oz = seed * 0.113;
+          const broad = cpuFbm(px * 0.026 + ox, pz * 0.026 + oz);
+          const detail = cpuFbm(px * 0.082 - ox * 0.7, pz * 0.082 - oz * 0.7);
+          const ridge =
+            1 -
+            Math.abs(
+              2 * cpuFbm(px * 0.014 + ox * 1.7, pz * 0.014 + oz * 1.7) - 1
+            );
+          const river = Math.exp(
+            -Math.pow((px + Math.sin(pz * 0.045 + seed) * 9.0) * 0.072, 2)
+          );
+          return (
+            Math.pow(broad, 1.55) * 12.5 +
+            detail * 2.1 +
+            ridge * 2.8 -
+            river * 6.1 -
+            4.0
+          );
+        }
 
         function normalize(v) {
           const length = Math.hypot(v[0], v[1], v[2]) || 1;
@@ -1049,12 +1187,23 @@
         }
 
         function updateCamera() {
+          // Keep the focus point gliding along the terrain surface.
+          const ground = cpuTerrainHeight(
+            state.target[0],
+            state.target[2],
+            state.seed
+          );
+          state.target[1] += (ground + 2.6 - state.target[1]) * 0.12;
           const horizontal = Math.cos(state.pitch) * state.distance;
           camera = [
             state.target[0] + Math.sin(state.yaw) * horizontal,
             state.target[1] + Math.sin(state.pitch) * state.distance,
             state.target[2] + Math.cos(state.yaw) * horizontal,
           ];
+          // Never let the eye dip beneath the ground it is flying over.
+          const camGround =
+            cpuTerrainHeight(camera[0], camera[2], state.seed) + 1.4;
+          if (camera[1] < camGround) camera[1] = camGround;
           forward = normalize([
             state.target[0] - camera[0],
             state.target[1] - camera[1],
@@ -1082,7 +1231,7 @@
             canvas.height = height;
             gl.viewport(0, 0, width, height);
           }
-          perspective(projection, fov, width / height, 0.1, 180);
+          perspective(projection, fov, width / height, 0.1, 320);
         }
 
         function setMatrices(uniforms, currentProgram) {
@@ -1113,14 +1262,9 @@
             z += right[2];
           }
           if (x || z) {
-            state.target[0] = Math.max(
-              -34,
-              Math.min(34, state.target[0] + x * speed)
-            );
-            state.target[2] = Math.max(
-              -34,
-              Math.min(34, state.target[2] + z * speed)
-            );
+            // No bounds: the procedural world extends forever in every direction.
+            state.target[0] += x * speed;
+            state.target[2] += z * speed;
             state.wander = false;
             document.getElementById("wander").textContent = "Resume wander";
             document.getElementById("wander").classList.remove("accent");
@@ -1134,7 +1278,13 @@
           previousTime = now;
           resize();
           updateMovement(dt);
-          if (state.wander && !state.dragging) state.yaw += dt * 0.035;
+          if (state.wander && !state.dragging) {
+            // Auto-wander strolls forward through the endless meadow.
+            state.yaw += Math.sin(time * 0.05) * dt * 0.16;
+            const drift = normalize([forward[0], 0, forward[2]]);
+            state.target[0] += drift[0] * dt * 2.4;
+            state.target[2] += drift[2] * dt * 2.4;
+          }
           state.gust[2] *= Math.pow(0.05, dt);
           updateCamera();
           const sun = sunDirection();
@@ -1165,6 +1315,7 @@
           gl.uniform3fv(terrainU.uSun, sun);
           gl.uniform1f(terrainU.uStyle, state.style);
           gl.uniform1f(terrainU.uSeed, state.seed);
+          gl.uniform2f(terrainU.uCenter, camera[0], camera[2]);
           gl.drawElements(
             gl.TRIANGLES,
             terrainIndices.length,
@@ -1180,26 +1331,40 @@
           gl.uniform3fv(waterU.uCamera, camera);
           gl.uniform1f(waterU.uStyle, state.style);
           gl.uniform1f(waterU.uTime, time);
+          gl.uniform2f(waterU.uCenter, camera[0], camera[2]);
           gl.drawArrays(gl.TRIANGLES, 0, 6);
           gl.depthMask(true);
           gl.disable(gl.BLEND);
 
           const windAngle = 0.65 + Math.sin(time * 0.045) * 0.22;
           const wind = [Math.cos(windAngle), state.wind, Math.sin(windAngle)];
+          const perClump = 7;
+          const spacing = embedded ? 1.45 : innerWidth < 700 ? 1.35 : 1.25;
+          const clumpBudget = embedded ? 2400 : innerWidth < 700 ? 2900 : 6200;
+          const side = Math.floor(Math.sqrt(clumpBudget));
+          const grassCount = side * side * perClump;
+          // Snap the field centre to the clump grid so blades stay put as you walk.
+          const centerX = Math.round(camera[0] / spacing) * spacing;
+          const centerZ = Math.round(camera[2] / spacing) * spacing;
           gl.bindVertexArray(grassVao);
           setMatrices(grassU, grassProgram);
           gl.uniform3fv(grassU.uCamera, camera);
+          gl.uniform3fv(grassU.uSun, sun);
           gl.uniform3fv(grassU.uWind, wind);
           gl.uniform3fv(grassU.uGust, state.gust);
           gl.uniform1f(grassU.uTime, time);
           gl.uniform1f(grassU.uSeed, state.seed);
           gl.uniform1f(grassU.uStyle, state.style);
-          const grassCount = embedded
-            ? 16000
-            : innerWidth < 700
-              ? 18000
-              : 36000;
-          gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 8, grassCount);
+          gl.uniform2f(grassU.uCenter, centerX, centerZ);
+          gl.uniform1f(grassU.uSpacing, spacing);
+          gl.uniform1f(grassU.uSide, side);
+          gl.uniform1f(grassU.uPerClump, perClump);
+          gl.drawArraysInstanced(
+            gl.TRIANGLE_STRIP,
+            0,
+            bladeVertexCount,
+            grassCount
+          );
 
           gl.enable(gl.BLEND);
           gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
