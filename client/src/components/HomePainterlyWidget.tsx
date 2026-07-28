@@ -117,8 +117,8 @@ export default function HomePainterlyWidget() {
       </div>
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-400">
-        <Brush size={13} /> Drag to orbit and stir the grass. Switch painting
-        styles live in the preview.
+        <Brush size={13} /> Walk an endless procedural meadow — drag to orbit,
+        stir the grass, and switch painting styles live.
       </p>
     </div>
   );
