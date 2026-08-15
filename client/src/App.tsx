@@ -14,6 +14,7 @@ const Sky = lazy(() => import("./pages/Sky"));
 const Toxic = lazy(() => import("./pages/Toxic"));
 const AusEngine = lazy(() => import("./pages/AusEngine"));
 const Foundation = lazy(() => import("./pages/Foundation"));
+const FallsCreek = lazy(() => import("./pages/FallsCreek"));
 
 function Router() {
   return (
@@ -94,6 +95,17 @@ function Router() {
           }
         >
           <Foundation />
+        </Suspense>
+      </Route>
+      <Route path={"/falls-creek"}>
+        <Suspense
+          fallback={
+            <div className="flex h-[100dvh] w-full items-center justify-center bg-[#0a111a] font-mono text-sm text-slate-400">
+              Loading Falls Creek snow map…
+            </div>
+          }
+        >
+          <FallsCreek />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
