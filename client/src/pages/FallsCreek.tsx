@@ -124,11 +124,11 @@ const MAP_STYLE: StyleSpecification = {
       type: "hillshade",
       source: "terrain",
       paint: {
-        "hillshade-shadow-color": "rgba(4, 15, 35, 0.72)",
-        "hillshade-highlight-color": "rgba(210, 235, 255, 0.14)",
-        "hillshade-accent-color": "rgba(45, 77, 112, 0.38)",
+        "hillshade-shadow-color": "rgba(2, 10, 28, 0.82)",
+        "hillshade-highlight-color": "rgba(224, 243, 255, 0.22)",
+        "hillshade-accent-color": "rgba(37, 73, 112, 0.48)",
         "hillshade-illumination-direction": 310,
-        "hillshade-exaggeration": 0.78,
+        "hillshade-exaggeration": 0.95,
       },
     },
     {
@@ -148,7 +148,7 @@ const MAP_STYLE: StyleSpecification = {
       },
     },
   ],
-  terrain: { source: "terrain", exaggeration: 1.28 },
+  terrain: { source: "terrain", exaggeration: 1.8 },
 };
 
 function forecastUrl(elevation: number) {
@@ -256,6 +256,7 @@ export default function FallsCreek() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [uiHidden, setUiHidden] = useState(false);
+  const [is3D, setIs3D] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [forecastError, setForecastError] = useState<string | null>(null);
@@ -335,9 +336,9 @@ export default function FallsCreek() {
       container: mapNodeRef.current,
       style: MAP_STYLE,
       center: [FALLS_CREEK.lon, FALLS_CREEK.lat],
-      zoom: 13.15,
-      pitch: 66,
-      bearing: -12,
+      zoom: 13,
+      pitch: 52,
+      bearing: 0,
       maxPitch: 85,
       minZoom: 9,
       maxZoom: 16.5,
@@ -356,10 +357,90 @@ export default function FallsCreek() {
 
     map.on("load", async () => {
       try {
-        const response = await fetch("/falls-creek/resort-lines.geojson");
-        if (!response.ok) throw new Error("Resort line data unavailable");
-        const data = await response.json();
+        const [lineResponse, structureResponse] = await Promise.all([
+          fetch("/falls-creek/resort-lines.geojson"),
+          fetch("/falls-creek/structures.geojson"),
+        ]);
+        if (!lineResponse.ok) throw new Error("Resort line data unavailable");
+        const data = await lineResponse.json();
         map.addSource("resort-lines", { type: "geojson", data });
+
+        if (structureResponse.ok) {
+          const structures = await structureResponse.json();
+          map.addSource("resort-structures", {
+            type: "geojson",
+            data: structures,
+          });
+          map.addLayer({
+            id: "buildings-3d",
+            type: "fill-extrusion",
+            source: "resort-structures",
+            minzoom: 11.7,
+            filter: ["==", ["get", "kind"], "building"],
+            paint: {
+              "fill-extrusion-color": [
+                "interpolate",
+                ["linear"],
+                ["get", "height"],
+                3,
+                "#71818b",
+                18,
+                "#dce6eb",
+                35,
+                "#f2f7f9",
+              ],
+              "fill-extrusion-height": ["get", "height"],
+              "fill-extrusion-base": 0,
+              "fill-extrusion-opacity": 0.86,
+              "fill-extrusion-vertical-gradient": true,
+            },
+          });
+          map.addLayer({
+            id: "lift-towers-3d",
+            type: "fill-extrusion",
+            source: "resort-structures",
+            minzoom: 11.4,
+            filter: ["==", ["get", "kind"], "pylon"],
+            paint: {
+              "fill-extrusion-color": "#ef4b43",
+              "fill-extrusion-height": ["get", "height"],
+              "fill-extrusion-base": 0,
+              "fill-extrusion-opacity": 0.94,
+              "fill-extrusion-vertical-gradient": true,
+            },
+          });
+          map.addLayer({
+            id: "elevation-markers-3d",
+            type: "fill-extrusion",
+            source: "resort-structures",
+            filter: ["==", ["get", "kind"], "marker"],
+            paint: {
+              "fill-extrusion-color": "#70ddff",
+              "fill-extrusion-height": ["get", "height"],
+              "fill-extrusion-base": 0,
+              "fill-extrusion-opacity": 0.9,
+            },
+          });
+          map.addLayer({
+            id: "elevation-marker-labels",
+            type: "symbol",
+            source: "resort-structures",
+            filter: ["==", ["get", "kind"], "marker"],
+            layout: {
+              "text-field": ["get", "name"],
+              "text-size": 11,
+              "text-font": ["Open Sans Regular"],
+              "text-offset": [0, 1.2],
+              "text-anchor": "top",
+            },
+            paint: {
+              "text-color": "#dff8ff",
+              "text-halo-color": "rgba(4,11,20,0.95)",
+              "text-halo-width": 1.8,
+            },
+          });
+        }
+
         map.addLayer({
           id: "runs-shadow",
           type: "line",
@@ -481,6 +562,13 @@ export default function FallsCreek() {
         // The terrain and forecast remain useful if optional OSM linework fails.
       }
       setMapReady(true);
+      map.easeTo({
+        pitch: 76,
+        bearing: -28,
+        zoom: 13.35,
+        duration: 1800,
+        essential: true,
+      });
     });
 
     return () => {
@@ -549,6 +637,31 @@ export default function FallsCreek() {
     window.setTimeout(() => mapRef.current?.resize(), 100);
   }, []);
 
+  const toggle3D = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = !is3D;
+    setIs3D(next);
+    map.setTerrain(next ? { source: "terrain", exaggeration: 1.8 } : null);
+    for (const layer of [
+      "buildings-3d",
+      "lift-towers-3d",
+      "elevation-markers-3d",
+      "elevation-marker-labels",
+    ]) {
+      if (map.getLayer(layer)) {
+        map.setLayoutProperty(layer, "visibility", next ? "visible" : "none");
+      }
+    }
+    map.easeTo({
+      pitch: next ? 76 : 0,
+      bearing: next ? -28 : 0,
+      zoom: next ? 13.35 : 13,
+      duration: 1200,
+      essential: true,
+    });
+  }, [is3D]);
+
   const graphPoints = useMemo(() => {
     if (!forecast.length) return "";
     const min = 700;
@@ -598,7 +711,7 @@ export default function FallsCreek() {
               </Link>
               <div className="border-l border-white/10 px-3 py-1">
                 <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-cyan-300">
-                  Victorian Alps
+                  Victorian Alps · interactive 3D terrain
                 </p>
                 <h1 className="text-base font-semibold leading-tight md:text-lg">
                   Falls Creek
@@ -656,7 +769,22 @@ export default function FallsCreek() {
                   {label}
                 </button>
               ))}
+              <button
+                onClick={toggle3D}
+                aria-pressed={is3D}
+                className={`flex items-center gap-1.5 rounded-lg border-l border-white/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.12em] transition md:px-3 ${
+                  is3D
+                    ? "bg-cyan-300/20 text-cyan-100"
+                    : "text-slate-300 hover:bg-white/10"
+                }`}
+                title="Toggle between 3D terrain and a flat map"
+              >
+                <Layers3 size={12} /> 3D
+              </button>
             </div>
+            <p className="mt-2 hidden rounded-lg bg-[#07101b]/72 px-3 py-1.5 font-mono text-[8px] uppercase tracking-[0.14em] text-slate-400 backdrop-blur md:block">
+              1.8× terrain relief · 146 buildings · 85 lift towers
+            </p>
           </div>
 
           {forecastError && !selected && (
@@ -816,9 +944,9 @@ export default function FallsCreek() {
           </section>
 
           <div className="absolute bottom-[102px] right-3 z-10 max-w-[calc(100%-1.5rem)] rounded-lg bg-[#07101b]/78 px-2.5 py-1.5 text-right font-mono text-[7px] leading-relaxed text-slate-400 backdrop-blur md:bottom-[108px] md:right-5 md:text-[9px]">
-            Elevation-modelled forecast · satellite not live · Weather:
-            Open-Meteo · imagery: Esri · DEM: Mapterhorn · trails: ©
-            OpenStreetMap contributors
+            Current forecast over 3D DEM terrain · archived satellite mosaic ·
+            Weather: Open-Meteo · imagery: Esri · DEM: Mapterhorn ·
+            structures/trails: © OpenStreetMap contributors
           </div>
         </>
       )}
