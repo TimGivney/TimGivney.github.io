@@ -202,22 +202,37 @@ function alpha(value: number) {
   return Math.max(0, Math.min(0.88, value));
 }
 
-function snowRamp(hour: ForecastHour, mode: SnowMode, accumulated: number) {
+function snowRamp(
+  hour: ForecastHour,
+  mode: SnowMode,
+  accumulated: number,
+  illustrativeCover: boolean
+) {
   if (mode === "coverage") {
-    const baseAlpha = alpha(hour.baseDepth / 45);
-    const summitAlpha = alpha(hour.summitDepth / 60);
+    const baseAlpha =
+      hour.baseDepth > 0.1
+        ? alpha(0.18 + hour.baseDepth / 42)
+        : illustrativeCover
+          ? 0.5
+          : 0;
+    const summitAlpha =
+      hour.summitDepth > 0.1
+        ? alpha(0.28 + hour.summitDepth / 46)
+        : illustrativeCover
+          ? 0.82
+          : 0;
     return [
       "interpolate",
       ["linear"],
       ["elevation"],
       1200,
       "rgba(215,235,250,0)",
-      FALLS_CREEK.baseElevation - 80,
-      `rgba(205,229,247,${baseAlpha * 0.2})`,
+      FALLS_CREEK.baseElevation - 100,
+      `rgba(190,219,239,${baseAlpha * 0.16})`,
       FALLS_CREEK.baseElevation,
-      `rgba(220,240,253,${baseAlpha * 0.68})`,
+      `rgba(218,239,252,${baseAlpha * 0.74})`,
       FALLS_CREEK.summitElevation,
-      `rgba(247,252,255,${summitAlpha})`,
+      `rgba(248,253,255,${summitAlpha})`,
       2200,
       `rgba(255,255,255,${summitAlpha})`,
     ];
@@ -256,6 +271,7 @@ export default function FallsCreek() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [uiHidden, setUiHidden] = useState(false);
+  const [snowSceneEnabled, setSnowSceneEnabled] = useState(true);
   const [is3D, setIs3D] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -273,6 +289,20 @@ export default function FallsCreek() {
     () => forecast.reduce((sum, hour) => sum + hour.snowfall, 0),
     [forecast]
   );
+  const snowIntensity = useMemo(() => {
+    if (!selected) return 0;
+    const weatherBoost =
+      selected.weatherCode >= 71 && selected.weatherCode <= 86 ? 0.16 : 0;
+    const forecastIntensity = Math.min(
+      1,
+      selected.snowfall / 1.4 + weatherBoost
+    );
+    return forecastIntensity > 0
+      ? forecastIntensity
+      : mode === "coverage" && snowSceneEnabled
+        ? 0.13
+        : 0;
+  }, [mode, selected, snowSceneEnabled]);
 
   useEffect(() => {
     document.title = "Falls Creek Snow Map — Tim Givney";
@@ -584,9 +614,9 @@ export default function FallsCreek() {
     map.setPaintProperty(
       "snow-forecast",
       "color-relief-color",
-      snowRamp(selected, mode, accumulated)
+      snowRamp(selected, mode, accumulated, snowSceneEnabled)
     );
-  }, [selected, mode, accumulated, mapReady]);
+  }, [selected, mode, accumulated, mapReady, snowSceneEnabled]);
 
   useEffect(() => {
     if (!playing || forecast.length === 0) return;
@@ -688,6 +718,13 @@ export default function FallsCreek() {
         />
       </div>
 
+      <SnowfallEffect
+        enabled={snowSceneEnabled}
+        intensity={snowIntensity}
+        windSpeed={selected?.windSpeed ?? 0}
+        windDirection={selected?.windDirection ?? 0}
+      />
+
       {!mapReady && (
         <div className="absolute inset-0 z-30 grid place-items-center bg-[#0a111a]">
           <div className="text-center font-mono text-xs uppercase tracking-[0.22em] text-slate-400">
@@ -783,9 +820,22 @@ export default function FallsCreek() {
               >
                 <Layers3 size={12} /> 3D
               </button>
+              <button
+                onClick={() => setSnowSceneEnabled(value => !value)}
+                aria-pressed={snowSceneEnabled}
+                aria-label="Toggle illustrative snow scene"
+                className={`grid w-9 place-items-center rounded-lg transition ${
+                  snowSceneEnabled
+                    ? "bg-sky-200/20 text-sky-100"
+                    : "text-slate-400 hover:bg-white/10"
+                }`}
+                title="Toggle illustrative ground cover and ambient snow"
+              >
+                <Snowflake size={13} />
+              </button>
             </div>
             <p className="mt-2 hidden rounded-lg bg-[#07101b]/72 px-3 py-1.5 font-mono text-[8px] uppercase tracking-[0.14em] text-slate-400 backdrop-blur md:block">
-              1.8× terrain relief · 146 buildings · 85 lift towers
+              Snow scene: illustrative · forecast values unchanged
             </p>
           </div>
 
@@ -946,9 +996,9 @@ export default function FallsCreek() {
           </section>
 
           <div className="absolute bottom-[102px] right-3 z-10 max-w-[calc(100%-1.5rem)] rounded-lg bg-[#07101b]/78 px-2.5 py-1.5 text-right font-mono text-[7px] leading-relaxed text-slate-400 backdrop-blur md:bottom-[108px] md:right-5 md:text-[9px]">
-            Current forecast over 3D DEM terrain · archived satellite mosaic ·
-            Weather: Open-Meteo · imagery: Esri · DEM: Mapterhorn ·
-            structures/trails: © OpenStreetMap contributors
+            Illustrative snow scene · forecast values unchanged · archived
+            satellite mosaic · Weather: Open-Meteo · imagery: Esri · DEM:
+            Mapterhorn · structures/trails: © OpenStreetMap contributors
           </div>
         </>
       )}
@@ -963,6 +1013,127 @@ export default function FallsCreek() {
         </button>
       )}
     </div>
+  );
+}
+
+interface SnowParticle {
+  x: number;
+  y: number;
+  radius: number;
+  fallSpeed: number;
+  drift: number;
+  opacity: number;
+  phase: number;
+}
+
+function SnowfallEffect({
+  enabled,
+  intensity,
+  windSpeed,
+  windDirection,
+}: {
+  enabled: boolean;
+  intensity: number;
+  windSpeed: number;
+  windDirection: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+
+    let width = 0;
+    let height = 0;
+    let frame = 0;
+    let previous = performance.now();
+    const particles: SnowParticle[] = [];
+    const count =
+      enabled && intensity > 0.01 ? Math.round(60 + intensity * 300) : 0;
+    const windRadians = (windDirection * Math.PI) / 180;
+    const horizontalWind =
+      Math.sin(windRadians) * Math.min(85, windSpeed * 2.2);
+
+    const createParticle = (randomY: boolean): SnowParticle => ({
+      x: Math.random() * Math.max(1, width),
+      y: randomY ? Math.random() * Math.max(1, height) : -12,
+      radius: 0.7 + Math.random() * (1.5 + intensity * 1.8),
+      fallSpeed: 34 + Math.random() * 62 + intensity * 85,
+      drift: (Math.random() - 0.5) * 20,
+      opacity: 0.28 + Math.random() * 0.52,
+      phase: Math.random() * Math.PI * 2,
+    });
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      width = Math.max(1, rect.width);
+      height = Math.max(1, rect.height);
+      const ratio = Math.min(window.devicePixelRatio, 2);
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      if (particles.length === 0) {
+        for (let index = 0; index < count; index++) {
+          particles.push(createParticle(true));
+        }
+      }
+    };
+
+    const draw = (now: number) => {
+      const elapsed = Math.min(0.04, (now - previous) / 1000);
+      previous = now;
+      context.clearRect(0, 0, width, height);
+      context.lineCap = "round";
+      context.globalCompositeOperation = "screen";
+
+      for (const particle of particles) {
+        const flutter = Math.sin(now * 0.0016 + particle.phase) * 16;
+        const horizontal = horizontalWind + particle.drift + flutter;
+        particle.x += horizontal * elapsed;
+        particle.y += particle.fallSpeed * elapsed;
+
+        if (
+          particle.y > height + 14 ||
+          particle.x < -35 ||
+          particle.x > width + 35
+        ) {
+          Object.assign(particle, createParticle(false));
+          if (horizontalWind < 0) particle.x = width + 20;
+          if (horizontalWind > 0) particle.x = -20;
+        }
+
+        context.strokeStyle = `rgba(240,249,255,${particle.opacity})`;
+        context.lineWidth = particle.radius;
+        context.beginPath();
+        context.moveTo(particle.x, particle.y);
+        context.lineTo(
+          particle.x - horizontal * 0.035,
+          particle.y - particle.fallSpeed * 0.045
+        );
+        context.stroke();
+      }
+
+      frame = requestAnimationFrame(draw);
+    };
+
+    resize();
+    if (count > 0) frame = requestAnimationFrame(draw);
+    window.addEventListener("resize", resize);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", resize);
+      context.clearRect(0, 0, width, height);
+    };
+  }, [enabled, intensity, windDirection, windSpeed]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute inset-0 z-[8] h-full w-full"
+      aria-hidden="true"
+    />
   );
 }
 
