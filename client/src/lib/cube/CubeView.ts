@@ -5,6 +5,7 @@ import {
   cloneCube,
   createCube,
   isSolved,
+  setStickerColor,
   type Axis,
   type CubeState,
   type Move,
@@ -34,6 +35,7 @@ interface Cubie {
 export interface CubeViewOptions {
   onMove?: (move: Move) => void; // fired when a user drag completes a turn
   onSolvedChange?: (solved: boolean) => void;
+  onStickerPaint?: (state: CubeState) => void;
   distanceScale?: number; // <1 zooms the camera in so the cube fills more of the view
 }
 
@@ -71,6 +73,7 @@ export class CubeView {
     committed: boolean;
   } = null;
   private lastSolved = true;
+  private paintColor: number | null = null;
 
   constructor(container: HTMLElement, n: number, opts: CubeViewOptions = {}) {
     this.container = container;
@@ -275,6 +278,15 @@ export class CubeView {
     return 3;
   }
 
+  private normalFromFaceId(faceId: number): [number, number, number] {
+    if (faceId === 4) return [1, 0, 0];
+    if (faceId === 5) return [-1, 0, 0];
+    if (faceId === 0) return [0, 1, 0];
+    if (faceId === 1) return [0, -1, 0];
+    if (faceId === 2) return [0, 0, 1];
+    return [0, 0, -1];
+  }
+
   private coordOnAxis(c: Cubie, axis: Axis): number {
     return axis === 0 ? c.cx : axis === 1 ? c.cy : c.cz;
   }
@@ -310,6 +322,13 @@ export class CubeView {
     this.state = cloneCube(state);
     this.n = state.n;
     this.syncFromState();
+  }
+
+  setPaintColor(color: number | null) {
+    this.paintColor = color;
+    this.renderer.domElement.style.cursor = color === null ? "" : "crosshair";
+    this.controls.enabled = true;
+    this.dragging = null;
   }
 
   private finishAnim() {
@@ -389,6 +408,23 @@ export class CubeView {
       }
     }
     if (!owner) return;
+
+    if (this.paintColor !== null) {
+      const [nx, ny, nz] = this.normalFromFaceId(faceId);
+      if (
+        setStickerColor(
+          this.state,
+          { x: owner.cx, y: owner.cy, z: owner.cz, nx, ny, nz },
+          this.paintColor
+        )
+      ) {
+        this.syncFromState();
+        this.opts.onStickerPaint?.(cloneCube(this.state));
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
 
     const normalAxis: Axis =
       faceId === 4 || faceId === 5 ? 0 : faceId === 0 || faceId === 1 ? 1 : 2;

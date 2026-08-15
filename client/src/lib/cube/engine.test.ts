@@ -3,10 +3,12 @@ import {
   applyMoves,
   applySolutionMove,
   cloneCube,
+  countStickerColors,
   createCube,
   expandSolution,
   isSolved,
   randomScramble,
+  setStickerColor,
   simplify,
   solveFromHistory,
   type Axis,
@@ -89,6 +91,25 @@ for (let trial = 0; trial < 100; trial++) {
   const moves = randomScramble(n, 60);
   const sol = simplify(moves);
   assert(sol.length <= moves.length, `trial=${trial} simplify not longer`);
+}
+
+// 8. A sticker can be recoloured by its exact cubie and face address.
+{
+  const cube = createCube(3);
+  const sticker = cube.stickers[0];
+  const original = sticker.color;
+  const replacement = (original + 1) % 6;
+  assert(
+    setStickerColor(cube, sticker, replacement),
+    "paint finds the addressed sticker"
+  );
+  const counts = countStickerColors(cube);
+  assert(counts[original] === 8, "paint decrements the original colour count");
+  assert(counts[replacement] === 10, "paint increments the new colour count");
+  assert(
+    !setStickerColor(cube, sticker, 6),
+    "paint rejects colours outside the cube palette"
+  );
 }
 
 if (failures === 0) console.log("ALL ENGINE TESTS PASSED");

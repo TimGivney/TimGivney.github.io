@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowLeft,
+  Palette,
   Pause,
   Play,
   RotateCcw,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { CubeView } from "@/lib/cube/CubeView";
 import {
+  countStickerColors,
   createCube,
   expandSolution,
   invertMove,
@@ -23,6 +25,14 @@ import {
 } from "@/lib/cube/engine";
 
 const SIZES = [2, 3, 4, 5] as const;
+const CUBE_COLORS = [
+  { id: 0, label: "White", hex: "#f7f7f7" },
+  { id: 1, label: "Yellow", hex: "#fdd835" },
+  { id: 2, label: "Green", hex: "#00a64f" },
+  { id: 3, label: "Blue", hex: "#1466b8" },
+  { id: 4, label: "Red", hex: "#c4222f" },
+  { id: 5, label: "Orange", hex: "#f07d1a" },
+] as const;
 
 type FaceKey = "U" | "D" | "L" | "R" | "F" | "B";
 const FACE_MOVES: Record<FaceKey, { axis: Axis; high: boolean; cw: 1 | -1 }> = {
@@ -49,6 +59,12 @@ export default function Cube() {
   const [moveCount, setMoveCount] = useState(0);
   const [speed, setSpeed] = useState(2); // 0..4
   const [status, setStatus] = useState("Solved");
+  const [painting, setPainting] = useState(false);
+  const [paintColor, setPaintColor] = useState(0);
+  const [customColours, setCustomColours] = useState(false);
+  const [colorCounts, setColorCounts] = useState<number[]>(() =>
+    Array(6).fill(25)
+  );
   const [solutionLabels, setSolutionLabels] = useState<string[]>([]);
   const [solutionIndex, setSolutionIndex] = useState(-1);
 
@@ -76,12 +92,24 @@ export default function Cube() {
         setSolved(s);
         setStatus(s ? "Solved" : "Scrambled");
       },
+      onStickerPaint: state => {
+        historyRef.current = [];
+        setMoveCount(0);
+        setCustomColours(true);
+        setColorCounts(countStickerColors(state));
+        setSolutionLabels([]);
+        setSolutionIndex(-1);
+        setStatus("Custom colours");
+      },
     });
     viewRef.current = view;
     historyRef.current = [];
     setMoveCount(0);
     setSolved(true);
     setStatus("Solved");
+    setPainting(false);
+    setCustomColours(false);
+    setColorCounts(Array(6).fill(n * n));
     setSolutionLabels([]);
     setSolutionIndex(-1);
     return () => {
@@ -90,10 +118,14 @@ export default function Cube() {
     };
   }, [n]);
 
+  useEffect(() => {
+    viewRef.current?.setPaintColor(painting ? paintColor : null);
+  }, [painting, paintColor]);
+
   const pushMove = useCallback(
     async (move: Move) => {
       const view = viewRef.current;
-      if (!view || busy) return;
+      if (!view || busy || painting) return;
       setBusy(true);
       await view.animateMove(move, turnDuration());
       historyRef.current.push(move);
@@ -102,7 +134,7 @@ export default function Cube() {
       setSolutionIndex(-1);
       setBusy(false);
     },
-    [busy, turnDuration]
+    [busy, painting, turnDuration]
   );
 
   const faceMove = useCallback(
@@ -117,7 +149,7 @@ export default function Cube() {
 
   const undo = useCallback(async () => {
     const view = viewRef.current;
-    if (!view || busy || solving) return;
+    if (!view || busy || solving || painting) return;
     const last = historyRef.current.pop();
     if (!last) return;
     setBusy(true);
@@ -126,7 +158,7 @@ export default function Cube() {
     setSolutionLabels([]);
     setSolutionIndex(-1);
     setBusy(false);
-  }, [busy, solving, turnDuration]);
+  }, [busy, painting, solving, turnDuration]);
 
   const reset = useCallback(() => {
     const view = viewRef.current;
@@ -140,13 +172,16 @@ export default function Cube() {
     historyRef.current = [];
     setMoveCount(0);
     setStatus("Solved");
+    setPainting(false);
+    setCustomColours(false);
+    setColorCounts(Array(6).fill(n * n));
     setSolutionLabels([]);
     setSolutionIndex(-1);
   }, [n]);
 
   const scramble = useCallback(async () => {
     const view = viewRef.current;
-    if (!view || busy || solving) return;
+    if (!view || busy || solving || painting || customColours) return;
     setBusy(true);
     setStatus("Scrambling…");
     setSolutionLabels([]);
@@ -159,11 +194,11 @@ export default function Cube() {
     }
     setStatus("Scrambled");
     setBusy(false);
-  }, [busy, solving, n, turnDuration]);
+  }, [busy, customColours, n, painting, solving]);
 
   const solve = useCallback(async () => {
     const view = viewRef.current;
-    if (!view || busy || solving) return;
+    if (!view || busy || solving || customColours) return;
     if (historyRef.current.length === 0) {
       setStatus("Already solved");
       return;
@@ -206,7 +241,7 @@ export default function Cube() {
     } else {
       setStatus("Stopped");
     }
-  }, [busy, solving, n, turnDuration]);
+  }, [busy, customColours, solving, n, turnDuration]);
 
   const togglePause = useCallback(() => {
     if (!solving) return;
@@ -220,10 +255,27 @@ export default function Cube() {
     setPaused(false);
   }, []);
 
+  const togglePainting = useCallback(() => {
+    if (busy || solving) return;
+    setPainting(current => {
+      const next = !current;
+      setStatus(
+        next
+          ? "Colour editor"
+          : customColours
+            ? "Custom colours"
+            : solved
+              ? "Solved"
+              : "Scrambled"
+      );
+      return next;
+    });
+  }, [busy, customColours, solved, solving]);
+
   // Keyboard shortcuts for outer faces.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (solving || busy) return;
+      if (solving || busy || painting) return;
       const map: Record<string, FaceKey> = {
         u: "U",
         d: "D",
@@ -240,7 +292,7 @@ export default function Cube() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [solving, busy, pushMove, faceMove]);
+  }, [solving, busy, painting, pushMove, faceMove]);
 
   const faceButtons: FaceKey[] = ["U", "D", "L", "R", "F", "B"];
 
@@ -309,12 +361,12 @@ export default function Cube() {
       <div className="absolute left-1/2 top-16 z-10 -translate-x-1/2">
         <span
           className={`rounded-full border px-3 py-1 font-mono text-[11px] backdrop-blur ${
-            solved
+            solved && !customColours && !painting
               ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
               : "border-[#C9A84C]/30 bg-[#C9A84C]/10 text-[#e7cf85]"
           }`}
         >
-          {status} · {moveCount} moves
+          {status} · {customColours ? "custom pattern" : `${moveCount} moves`}
         </span>
       </div>
 
@@ -343,38 +395,82 @@ export default function Cube() {
       {/* Bottom controls */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-3">
-          {/* Face turn buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            {faceButtons.map(f => (
-              <div
-                key={f}
-                className="flex overflow-hidden rounded-md border border-white/10"
-              >
+          {painting ? (
+            <div className="flex items-center justify-center gap-1.5 rounded-xl border border-[#C9A84C]/25 bg-black/35 p-2 backdrop-blur">
+              <span className="mr-1 hidden font-mono text-[10px] uppercase tracking-wider text-zinc-400 sm:block">
+                Pick colour
+              </span>
+              {CUBE_COLORS.map(color => (
                 <button
-                  onClick={() => pushMove(faceMove(f, false))}
-                  disabled={busy || solving}
-                  className="bg-white/5 px-2.5 py-1.5 font-mono text-xs text-zinc-100 transition hover:bg-white/15 disabled:opacity-40"
-                  title={`${f} (key: ${f.toLowerCase()})`}
+                  key={color.id}
+                  onClick={() => setPaintColor(color.id)}
+                  aria-label={`${color.label}, ${colorCounts[color.id]} stickers`}
+                  aria-pressed={paintColor === color.id}
+                  title={`${color.label} · ${colorCounts[color.id]} / ${n * n}`}
+                  className={`relative h-9 w-9 rounded-lg border-2 transition hover:scale-105 ${
+                    paintColor === color.id
+                      ? "scale-105 border-[#C9A84C] shadow-lg shadow-[#C9A84C]/25"
+                      : "border-white/20"
+                  }`}
+                  style={{ backgroundColor: color.hex }}
                 >
-                  {f}
+                  <span
+                    className={`absolute -bottom-1 -right-1 min-w-4 rounded-full px-1 font-mono text-[8px] leading-4 ${
+                      color.id < 2
+                        ? "bg-zinc-900 text-white"
+                        : "bg-white text-zinc-900"
+                    }`}
+                  >
+                    {colorCounts[color.id]}
+                  </span>
                 </button>
-                <button
-                  onClick={() => pushMove(faceMove(f, true))}
-                  disabled={busy || solving}
-                  className="border-l border-white/10 bg-white/5 px-2 py-1.5 font-mono text-xs text-zinc-400 transition hover:bg-white/15 disabled:opacity-40"
-                  title={`${f}' (key: shift+${f.toLowerCase()})`}
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {faceButtons.map(f => (
+                <div
+                  key={f}
+                  className="flex overflow-hidden rounded-md border border-white/10"
                 >
-                  {f}′
-                </button>
-              </div>
-            ))}
-          </div>
+                  <button
+                    onClick={() => pushMove(faceMove(f, false))}
+                    disabled={busy || solving}
+                    className="bg-white/5 px-2.5 py-1.5 font-mono text-xs text-zinc-100 transition hover:bg-white/15 disabled:opacity-40"
+                    title={`${f} (key: ${f.toLowerCase()})`}
+                  >
+                    {f}
+                  </button>
+                  <button
+                    onClick={() => pushMove(faceMove(f, true))}
+                    disabled={busy || solving}
+                    className="border-l border-white/10 bg-white/5 px-2 py-1.5 font-mono text-xs text-zinc-400 transition hover:bg-white/15 disabled:opacity-40"
+                    title={`${f}' (key: shift+${f.toLowerCase()})`}
+                  >
+                    {f}′
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Primary actions */}
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button
-              onClick={scramble}
+              onClick={togglePainting}
               disabled={busy || solving}
+              aria-pressed={painting}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-3.5 py-2 text-sm font-medium transition disabled:opacity-40 ${
+                painting
+                  ? "border-[#C9A84C]/50 bg-[#C9A84C] text-[#1a1a2e]"
+                  : "border-white/10 bg-white/5 text-zinc-100 hover:bg-white/15"
+              }`}
+            >
+              <Palette className="h-4 w-4" /> {painting ? "Done" : "Colours"}
+            </button>
+            <button
+              onClick={scramble}
+              disabled={busy || solving || painting || customColours}
               className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-sm font-medium text-zinc-100 transition hover:bg-white/15 disabled:opacity-40"
             >
               <Shuffle className="h-4 w-4" /> Scramble
@@ -383,7 +479,9 @@ export default function Cube() {
             {!solving ? (
               <button
                 onClick={solve}
-                disabled={busy || solving || solved}
+                disabled={
+                  busy || solving || solved || painting || customColours
+                }
                 className="inline-flex items-center gap-1.5 rounded-md bg-[#C9A84C] px-4 py-2 text-sm font-semibold text-[#1a1a2e] shadow-lg shadow-[#C9A84C]/20 transition hover:bg-[#d8ba63] disabled:opacity-40"
               >
                 <Sparkles className="h-4 w-4" /> Solve
@@ -412,7 +510,7 @@ export default function Cube() {
 
             <button
               onClick={undo}
-              disabled={busy || solving || moveCount === 0}
+              disabled={busy || solving || painting || moveCount === 0}
               className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-zinc-100 transition hover:bg-white/15 disabled:opacity-40"
             >
               <Undo2 className="h-4 w-4" /> Undo
@@ -441,8 +539,11 @@ export default function Cube() {
           </div>
 
           <p className="text-center text-[11px] text-zinc-500">
-            Drag the background to orbit · drag a face to turn it · scroll to
-            zoom · keys U D L R F B (hold Shift to reverse)
+            {painting
+              ? `Choose a colour, then click any square · each colour should total ${n * n}`
+              : customColours
+                ? "Custom patterns can be turned but not auto-solved · Reset restores solver mode"
+                : "Drag the background to orbit · drag a face to turn it · scroll to zoom · keys U D L R F B"}
           </p>
 
           <p className="text-center text-[11px] text-zinc-600">

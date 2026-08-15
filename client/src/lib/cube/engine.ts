@@ -70,6 +70,37 @@ export function cloneCube(c: CubeState): CubeState {
   return { n: c.n, stickers: c.stickers.map(s => ({ ...s })) };
 }
 
+export type StickerAddress = Pick<
+  Sticker,
+  "x" | "y" | "z" | "nx" | "ny" | "nz"
+>;
+
+export function setStickerColor(
+  cube: CubeState,
+  address: StickerAddress,
+  color: number
+): boolean {
+  if (!Number.isInteger(color) || color < 0 || color > 5) return false;
+  const sticker = cube.stickers.find(
+    candidate =>
+      candidate.x === address.x &&
+      candidate.y === address.y &&
+      candidate.z === address.z &&
+      candidate.nx === address.nx &&
+      candidate.ny === address.ny &&
+      candidate.nz === address.nz
+  );
+  if (!sticker) return false;
+  sticker.color = color;
+  return true;
+}
+
+export function countStickerColors(cube: CubeState): number[] {
+  const counts = [0, 0, 0, 0, 0, 0];
+  for (const sticker of cube.stickers) counts[sticker.color]++;
+  return counts;
+}
+
 /** Apply a single right-handed quarter turn (dir +1) to a sticker in-place. */
 function quarterPlus(s: Sticker, axis: Axis, max: number): void {
   if (axis === 0) {
