@@ -680,11 +680,13 @@ export default function FallsCreek() {
       ref={pageRef}
       className="relative h-[100dvh] w-full overflow-hidden bg-[#0a111a] text-white"
     >
-      <div
-        ref={mapNodeRef}
-        className="absolute inset-0"
-        aria-label="Falls Creek 3D snow map"
-      />
+      <div className="absolute inset-0">
+        <div
+          ref={mapNodeRef}
+          className="h-full w-full"
+          aria-label="Falls Creek 3D snow map"
+        />
+      </div>
 
       {!mapReady && (
         <div className="absolute inset-0 z-30 grid place-items-center bg-[#0a111a]">
