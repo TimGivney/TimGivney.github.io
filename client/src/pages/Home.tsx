@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import HomeCubeWidget from '@/components/HomeCubeWidget';
 import HomeFractalWidget from '@/components/HomeFractalWidget';
 import HomeFractal3DWidget from '@/components/HomeFractal3DWidget';
-import HomePainterlyWidget from '@/components/HomePainterlyWidget';
+import HomeFallsCreekWidget from '@/components/HomeFallsCreekWidget';
 import HomeSkyWidget from '@/components/HomeSkyWidget';
 import HomeToxicWidget from '@/components/HomeToxicWidget';
 import HomeEngineWidget from '@/components/HomeEngineWidget';
@@ -690,14 +690,14 @@ export default function Home() {
             <HomeFractal3DWidget />
           </div>
 
-          {/* Painterly World */}
+          {/* Falls Creek Snow Map */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Painterly World</h3>
-              <p className="mt-3 text-gray-700">A living procedural landscape made entirely from code in one self-contained HTML file. Hills rise from layered noise, thousands of grass blades bend with the wind and your movement, and pollen drifts through a changing sky.</p>
-              <p className="mt-3 text-sm text-gray-500">Walk through the live meadow, grow a fresh world, or switch the renderer from natural light to painterly colour and a swirling Van Gogh-inspired night.</p>
+              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Falls Creek Snow Map</h3>
+              <p className="mt-3 text-gray-700">A live 3D alpine forecast for Falls Creek. The real mountain terrain, ski runs and lift network sit beneath an elevation-aware snow layer driven by the next 168 hours of summit and village weather.</p>
+              <p className="mt-3 text-sm text-gray-500">Scrub hour by hour, animate the forecast, compare existing modelled coverage with fresh and accumulated snow, and inspect freezing level, snow line, rain and summit wind.</p>
             </div>
-            <HomePainterlyWidget />
+            <HomeFallsCreekWidget />
           </div>
 
           {/* Night Sky */}
