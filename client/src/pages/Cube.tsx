@@ -275,7 +275,8 @@ export default function Cube() {
   // Keyboard shortcuts for outer faces.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (solving || busy || painting) return;
+      if (solving || busy || painting || e.ctrlKey || e.metaKey || e.altKey)
+        return;
       const map: Record<string, FaceKey> = {
         u: "U",
         d: "D",
@@ -286,7 +287,12 @@ export default function Cube() {
       };
       const face = map[e.key.toLowerCase()];
       if (!face) return;
-      if (e.target instanceof HTMLInputElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      )
+        return;
       e.preventDefault();
       void pushMove(faceMove(face, e.shiftKey));
     };
@@ -318,7 +324,10 @@ export default function Cube() {
       />
 
       {/* 3D canvas */}
-      <div ref={mountRef} className="absolute inset-0" />
+      <div
+        ref={mountRef}
+        className="absolute inset-x-0 bottom-48 top-12 sm:inset-0"
+      />
 
       {/* Top bar */}
       <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
