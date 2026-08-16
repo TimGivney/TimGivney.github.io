@@ -15,6 +15,7 @@ const Toxic = lazy(() => import("./pages/Toxic"));
 const AusEngine = lazy(() => import("./pages/AusEngine"));
 const Foundation = lazy(() => import("./pages/Foundation"));
 const FallsCreek = lazy(() => import("./pages/FallsCreek"));
+const Redback = lazy(() => import("./pages/Redback"));
 
 function Router() {
   return (
@@ -106,6 +107,17 @@ function Router() {
           }
         >
           <FallsCreek />
+        </Suspense>
+      </Route>
+      <Route path={"/redback"}>
+        <Suspense
+          fallback={
+            <div className="flex h-[100dvh] w-full items-center justify-center bg-[#030404] font-mono text-sm text-zinc-500">
+              Spinning the web…
+            </div>
+          }
+        >
+          <Redback />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
