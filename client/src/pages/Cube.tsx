@@ -61,7 +61,6 @@ export default function Cube() {
   const [status, setStatus] = useState("Solved");
   const [painting, setPainting] = useState(false);
   const [paintColor, setPaintColor] = useState(0);
-  const [customColours, setCustomColours] = useState(false);
   const [colorCounts, setColorCounts] = useState<number[]>(() =>
     Array(6).fill(25)
   );
@@ -81,7 +80,8 @@ export default function Cube() {
   // Build / rebuild the view when n changes.
   useEffect(() => {
     if (!mountRef.current) return;
-    const view = new CubeView(mountRef.current, n, {
+    let view: CubeView;
+    view = new CubeView(mountRef.current, n, {
       onMove: m => {
         historyRef.current.push(m);
         setMoveCount(historyRef.current.length);
@@ -92,14 +92,24 @@ export default function Cube() {
         setSolved(s);
         setStatus(s ? "Solved" : "Scrambled");
       },
-      onStickerPaint: state => {
-        historyRef.current = [];
-        setMoveCount(0);
-        setCustomColours(true);
-        setColorCounts(countStickerColors(state));
+      onStickerPlace: async (moves, color) => {
+        const label = CUBE_COLORS[color].label;
+        if (moves.length === 0) {
+          setStatus(`${label} already here`);
+          return;
+        }
+        setBusy(true);
+        setStatus(`Placing ${label}…`);
+        for (const move of moves) {
+          await view.animateMove(move, Math.min(turnDuration(), 180));
+          historyRef.current.push(move);
+        }
+        setMoveCount(historyRef.current.length);
+        setColorCounts(countStickerColors(view.state));
         setSolutionLabels([]);
         setSolutionIndex(-1);
-        setStatus("Custom colours");
+        setStatus(`${label} placed · ready to solve`);
+        setBusy(false);
       },
     });
     viewRef.current = view;
@@ -108,7 +118,6 @@ export default function Cube() {
     setSolved(true);
     setStatus("Solved");
     setPainting(false);
-    setCustomColours(false);
     setColorCounts(Array(6).fill(n * n));
     setSolutionLabels([]);
     setSolutionIndex(-1);
@@ -116,7 +125,7 @@ export default function Cube() {
       view.dispose();
       viewRef.current = null;
     };
-  }, [n]);
+  }, [n, turnDuration]);
 
   useEffect(() => {
     viewRef.current?.setPaintColor(painting ? paintColor : null);
@@ -173,7 +182,6 @@ export default function Cube() {
     setMoveCount(0);
     setStatus("Solved");
     setPainting(false);
-    setCustomColours(false);
     setColorCounts(Array(6).fill(n * n));
     setSolutionLabels([]);
     setSolutionIndex(-1);
@@ -181,7 +189,7 @@ export default function Cube() {
 
   const scramble = useCallback(async () => {
     const view = viewRef.current;
-    if (!view || busy || solving || painting || customColours) return;
+    if (!view || busy || solving || painting) return;
     setBusy(true);
     setStatus("Scrambling…");
     setSolutionLabels([]);
@@ -194,11 +202,11 @@ export default function Cube() {
     }
     setStatus("Scrambled");
     setBusy(false);
-  }, [busy, customColours, n, painting, solving]);
+  }, [busy, n, painting, solving]);
 
   const solve = useCallback(async () => {
     const view = viewRef.current;
-    if (!view || busy || solving || customColours) return;
+    if (!view || busy || solving) return;
     if (historyRef.current.length === 0) {
       setStatus("Already solved");
       return;
@@ -241,7 +249,7 @@ export default function Cube() {
     } else {
       setStatus("Stopped");
     }
-  }, [busy, customColours, solving, n, turnDuration]);
+  }, [busy, solving, n, turnDuration]);
 
   const togglePause = useCallback(() => {
     if (!solving) return;
@@ -259,18 +267,10 @@ export default function Cube() {
     if (busy || solving) return;
     setPainting(current => {
       const next = !current;
-      setStatus(
-        next
-          ? "Colour editor"
-          : customColours
-            ? "Custom colours"
-            : solved
-              ? "Solved"
-              : "Scrambled"
-      );
+      setStatus(next ? "Colour placement" : solved ? "Solved" : "Scrambled");
       return next;
     });
-  }, [busy, customColours, solved, solving]);
+  }, [busy, solved, solving]);
 
   // Keyboard shortcuts for outer faces.
   useEffect(() => {
@@ -370,12 +370,12 @@ export default function Cube() {
       <div className="absolute left-1/2 top-16 z-10 -translate-x-1/2">
         <span
           className={`rounded-full border px-3 py-1 font-mono text-[11px] backdrop-blur ${
-            solved && !customColours && !painting
+            solved && !painting
               ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
               : "border-[#C9A84C]/30 bg-[#C9A84C]/10 text-[#e7cf85]"
           }`}
         >
-          {status} · {customColours ? "custom pattern" : `${moveCount} moves`}
+          {status} · {moveCount} moves
         </span>
       </div>
 
@@ -479,7 +479,7 @@ export default function Cube() {
             </button>
             <button
               onClick={scramble}
-              disabled={busy || solving || painting || customColours}
+              disabled={busy || solving || painting}
               className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-sm font-medium text-zinc-100 transition hover:bg-white/15 disabled:opacity-40"
             >
               <Shuffle className="h-4 w-4" /> Scramble
@@ -488,9 +488,7 @@ export default function Cube() {
             {!solving ? (
               <button
                 onClick={solve}
-                disabled={
-                  busy || solving || solved || painting || customColours
-                }
+                disabled={busy || solving || solved || painting}
                 className="inline-flex items-center gap-1.5 rounded-md bg-[#C9A84C] px-4 py-2 text-sm font-semibold text-[#1a1a2e] shadow-lg shadow-[#C9A84C]/20 transition hover:bg-[#d8ba63] disabled:opacity-40"
               >
                 <Sparkles className="h-4 w-4" /> Solve
@@ -549,10 +547,8 @@ export default function Cube() {
 
           <p className="text-center text-[11px] text-zinc-500">
             {painting
-              ? `Choose a colour, then click any square · each colour should total ${n * n}`
-              : customColours
-                ? "Custom patterns can be turned but not auto-solved · Reset restores solver mode"
-                : "Drag the background to orbit · drag a face to turn it · scroll to zoom · keys U D L R F B"}
+              ? "Choose a colour, then click any square · legal turns place that colour so Solve still works"
+              : "Drag the background to orbit · drag a face to turn it · scroll to zoom · keys U D L R F B"}
           </p>
 
           <p className="text-center text-[11px] text-zinc-600">
