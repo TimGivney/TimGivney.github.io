@@ -28,6 +28,8 @@ interface Damage {
   id: number;
   x: number;
   y: number;
+  radius: number;
+  createdAt: number;
   strands: number[];
   repaired: boolean;
 }
@@ -55,6 +57,7 @@ interface Spider {
   damageId: number | null;
   dropOriginX: number;
   dropOriginY: number;
+  curve: number;
 }
 
 interface RedbackWebOptions {
@@ -111,6 +114,7 @@ export class RedbackWeb {
   private particles: Particle[] = [];
   private nextDamageId = 1;
   private repairs = 0;
+  private patrolIndex = 0;
   private pointer = { x: 0, y: 0, active: false };
   private spider: Spider = {
     x: 0,
@@ -126,6 +130,7 @@ export class RedbackWeb {
     damageId: null,
     dropOriginX: 0,
     dropOriginY: 0,
+    curve: 0,
   };
 
   constructor(canvas: HTMLCanvasElement, options: RedbackWebOptions = {}) {
@@ -144,7 +149,7 @@ export class RedbackWeb {
   }
 
   tear(x: number, y: number) {
-    const radius = clamp(Math.min(this.width, this.height) * 0.085, 46, 92);
+    const radius = this.width < 600 ? 92 : 132;
     const candidates = this.strands
       .map((strand, index) => ({
         index,
@@ -160,15 +165,16 @@ export class RedbackWeb {
     let broken = candidates
       .filter(candidate => candidate.distance < radius)
       .map(candidate => candidate.index);
-    if (broken.length < 4)
-      broken = candidates.slice(0, 7).map(item => item.index);
-    broken = broken.slice(0, 22);
+    if (broken.length < 8)
+      broken = candidates.slice(0, 12).map(item => item.index);
     for (const index of broken) this.strands[index].health = 0;
 
     const damage: Damage = {
       id: this.nextDamageId++,
       x,
       y,
+      radius,
+      createdAt: performance.now(),
       strands: broken,
       repaired: false,
     };
@@ -195,6 +201,7 @@ export class RedbackWeb {
     this.damages = [];
     this.particles = [];
     this.nextDamageId = 1;
+    this.patrolIndex = 0;
     this.buildWeb();
     this.placeSpider();
     this.emitStatus();
@@ -220,6 +227,7 @@ export class RedbackWeb {
     this.particles = [];
     this.repairs = 0;
     this.nextDamageId = 1;
+    this.patrolIndex = 0;
     this.buildWeb();
     this.placeSpider();
     this.emitStatus();
@@ -277,9 +285,9 @@ export class RedbackWeb {
   }
 
   private placeSpider() {
-    const point = this.points[Math.min(4, this.points.length - 1)] ?? {
-      x: this.width * 0.5,
-      y: this.height * 0.25,
+    const point = {
+      x: this.width * (this.width < 600 ? 0.52 : 0.56),
+      y: this.height * 0.38,
     };
     this.spider = {
       x: point.x,
@@ -295,6 +303,7 @@ export class RedbackWeb {
       damageId: null,
       dropOriginX: point.x,
       dropOriginY: point.y,
+      curve: 0,
     };
   }
 
@@ -319,7 +328,9 @@ export class RedbackWeb {
     this.spider.phaseStarted = now;
     this.spider.phaseDuration = this.reduceMotion
       ? 120
-      : clamp(distance / 1.05, 260, 850);
+      : clamp(distance / 0.8, 360, 1050);
+    this.spider.curve =
+      (seeded(next.id * 47) > 0.5 ? 1 : -1) * clamp(distance * 0.18, 24, 90);
     this.spider.damageId = next.id;
     this.emitStatus();
   }
@@ -331,6 +342,7 @@ export class RedbackWeb {
     this.spider.dropOriginX = this.spider.x;
     this.spider.dropOriginY = this.spider.y;
     this.spider.damageId = null;
+    this.spider.curve = 0;
     this.emitStatus();
   }
 
@@ -339,10 +351,20 @@ export class RedbackWeb {
     if (this.spider.mode === "rushing") {
       const progress = clamp(elapsed / this.spider.phaseDuration, 0, 1);
       const eased = easeInOut(progress);
-      this.spider.x =
-        this.spider.fromX + (this.spider.targetX - this.spider.fromX) * eased;
-      this.spider.y =
-        this.spider.fromY + (this.spider.targetY - this.spider.fromY) * eased;
+      const dx = this.spider.targetX - this.spider.fromX;
+      const dy = this.spider.targetY - this.spider.fromY;
+      const distance = Math.max(Math.hypot(dx, dy), 1);
+      const normalX = -dy / distance;
+      const normalY = dx / distance;
+      const arc = Math.sin(eased * Math.PI) * this.spider.curve;
+      this.spider.x = this.spider.fromX + dx * eased + normalX * arc;
+      this.spider.y = this.spider.fromY + dy * eased + normalY * arc;
+      const arcTangent =
+        Math.cos(eased * Math.PI) * Math.PI * this.spider.curve;
+      this.spider.heading = Math.atan2(
+        dy + normalY * arcTangent,
+        dx + normalX * arcTangent
+      );
       if (progress >= 1) {
         this.spider.mode = "repairing";
         this.spider.phaseStarted = now;
@@ -388,17 +410,53 @@ export class RedbackWeb {
     }
 
     if (this.spider.mode === "watching" || this.spider.mode === "annoyed") {
-      const idle = this.reduceMotion ? 0 : Math.sin(now * 0.0014) * 4;
-      const anchor = this.points[Math.min(4, this.points.length - 1)];
-      if (anchor) {
-        this.spider.x += (anchor.x + idle - this.spider.x) * 0.025;
-        this.spider.y += (anchor.y - this.spider.y) * 0.025;
+      const patrolPoints = [
+        [0.56, 0.36],
+        [0.68, 0.48],
+        [0.56, 0.65],
+        [0.38, 0.58],
+        [0.42, 0.36],
+      ];
+      if (
+        this.spider.phaseDuration === 0 ||
+        elapsed >= this.spider.phaseDuration
+      ) {
+        const target = patrolPoints[this.patrolIndex % patrolPoints.length];
+        this.patrolIndex++;
+        this.spider.fromX = this.spider.x;
+        this.spider.fromY = this.spider.y;
+        this.spider.targetX = this.width * target[0];
+        this.spider.targetY = this.height * target[1];
+        this.spider.phaseStarted = now;
+        this.spider.phaseDuration = this.reduceMotion
+          ? 500
+          : 3200 + seeded(this.patrolIndex * 29) * 1800;
+        this.spider.curve =
+          (this.patrolIndex % 2 ? 1 : -1) *
+          clamp(Math.min(this.width, this.height) * 0.08, 28, 70);
+        this.spider.heading = Math.atan2(
+          this.spider.targetY - this.spider.fromY,
+          this.spider.targetX - this.spider.fromX
+        );
+        return;
       }
+      const progress = easeInOut(
+        clamp(elapsed / this.spider.phaseDuration, 0, 1)
+      );
+      const dx = this.spider.targetX - this.spider.fromX;
+      const dy = this.spider.targetY - this.spider.fromY;
+      const distance = Math.max(Math.hypot(dx, dy), 1);
+      const normalX = -dy / distance;
+      const normalY = dx / distance;
+      const arc = Math.sin(progress * Math.PI) * this.spider.curve;
+      this.spider.x = this.spider.fromX + dx * progress + normalX * arc;
+      this.spider.y = this.spider.fromY + dy * progress + normalY * arc;
+      this.spider.heading = Math.atan2(dy, dx);
     }
   }
 
   private spawnTearParticles(x: number, y: number, strength: number) {
-    const count = clamp(strength, 8, 18);
+    const count = clamp(strength * 1.5, 16, 34);
     for (let index = 0; index < count; index++) {
       const angle = seeded(this.nextDamageId * 53 + index * 11) * TAU;
       const speed = 18 + seeded(index * 71 + this.nextDamageId) * 55;
@@ -510,6 +568,69 @@ export class RedbackWeb {
     context.restore();
   }
 
+  private drawHoles(now: number) {
+    const context = this.context;
+    for (const damage of this.damages) {
+      const health =
+        damage.strands.reduce(
+          (sum, index) => sum + (this.strands[index]?.health ?? 1),
+          0
+        ) / Math.max(damage.strands.length, 1);
+      const openness = clamp(1 - health, 0, 1);
+      if (openness < 0.015) continue;
+      const radius = damage.radius * (0.32 + openness * 0.68);
+      const gradient = context.createRadialGradient(
+        damage.x,
+        damage.y,
+        radius * 0.15,
+        damage.x,
+        damage.y,
+        radius
+      );
+      gradient.addColorStop(0, `rgba(0,0,0,${0.97 * openness})`);
+      gradient.addColorStop(0.68, `rgba(1,2,2,${0.93 * openness})`);
+      gradient.addColorStop(1, "rgba(1,2,2,0)");
+
+      context.save();
+      context.fillStyle = gradient;
+      context.beginPath();
+      for (let point = 0; point < 28; point++) {
+        const angle = (point / 28) * TAU;
+        const jagged = 0.82 + seeded(damage.id * 97 + point * 13) * 0.28;
+        const x = damage.x + Math.cos(angle) * radius * jagged;
+        const y = damage.y + Math.sin(angle) * radius * jagged;
+        if (point === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+      context.fill();
+
+      context.strokeStyle = `rgba(225,236,231,${0.42 * openness})`;
+      context.lineWidth = 1.2;
+      context.setLineDash([2, 8]);
+      context.beginPath();
+      context.arc(damage.x, damage.y, radius * 0.88, 0, TAU);
+      context.stroke();
+
+      const blast = clamp((now - damage.createdAt) / 520, 0, 1);
+      if (blast < 1) {
+        context.setLineDash([]);
+        context.strokeStyle = `rgba(240,247,243,${(1 - blast) * 0.72})`;
+        context.lineWidth = 1.5;
+        context.beginPath();
+        context.arc(
+          damage.x,
+          damage.y,
+          damage.radius * (0.35 + blast * 1.05),
+          0,
+          TAU
+        );
+        context.stroke();
+      }
+      context.restore();
+    }
+  }
+
   private drawRepairThread(now: number) {
     if (this.spider.mode !== "repairing") return;
     const damage = this.damages.find(
@@ -540,13 +661,13 @@ export class RedbackWeb {
   private drawSpider(now: number) {
     if (this.spider.mode === "gave-up") return;
     const context = this.context;
-    const scale = clamp(Math.min(this.width, this.height) / 760, 0.72, 1.15);
+    const scale = clamp(Math.min(this.width, this.height) / 420, 1.35, 2.25);
     const rush = this.spider.mode === "rushing";
     const repair = this.spider.mode === "repairing";
-    const legPhase = rush ? now * 0.025 : now * 0.006;
+    const legPhase = rush ? now * 0.024 : now * 0.005;
     const bodyBob = this.reduceMotion
       ? 0
-      : Math.sin(legPhase) * (rush ? 2 : 0.8);
+      : Math.sin(legPhase * 0.72) * (rush ? 2.4 : 1.2);
 
     if (this.spider.mode === "giving-up") {
       context.save();
@@ -561,7 +682,11 @@ export class RedbackWeb {
 
     context.save();
     context.translate(this.spider.x, this.spider.y + bodyBob);
-    context.rotate(this.spider.heading - Math.PI / 2);
+    context.rotate(
+      this.spider.heading -
+        Math.PI / 2 +
+        (this.reduceMotion ? 0 : Math.sin(now * 0.0017) * 0.035)
+    );
     context.scale(scale, scale);
     context.shadowColor = "rgba(0,0,0,0.9)";
     context.shadowBlur = 10;
@@ -572,11 +697,14 @@ export class RedbackWeb {
     for (const side of [-1, 1]) {
       for (let leg = 0; leg < 4; leg++) {
         const startY = -9 + leg * 7;
-        const gait = Math.sin(legPhase + leg * 1.6) * (rush ? 5 : 2);
-        const jointX = side * (17 + leg * 1.5);
+        const gait =
+          Math.sin(legPhase + leg * 1.55 + (side === 1 ? Math.PI : 0)) *
+          (rush ? 6 : 2.8);
+        const reach = 1 + Math.sin(legPhase * 0.63 + leg) * 0.08;
+        const jointX = side * (17 + leg * 1.5) * reach;
         const jointY = startY + gait;
-        const footX = side * (31 + (leg % 2) * 5);
-        const footY = startY + (leg - 1.5) * 6 - gait * 0.45;
+        const footX = side * (31 + (leg % 2) * 5) * reach;
+        const footY = startY + (leg - 1.5) * 6 - gait * 0.58;
         context.beginPath();
         context.moveTo(side * 5, startY);
         context.lineTo(jointX, jointY);
@@ -650,6 +778,7 @@ export class RedbackWeb {
     this.updateSpider(now);
     this.updateParticles(delta);
     this.drawBackground(now);
+    this.drawHoles(now);
     this.drawWeb(now);
     this.drawRepairThread(now);
     this.drawSpider(now);
