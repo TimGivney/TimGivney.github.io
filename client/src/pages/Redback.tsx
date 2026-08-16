@@ -140,16 +140,14 @@ export default function Redback() {
         </header>
 
         {!interacted && (
-          <div className="absolute inset-0 flex items-center justify-center px-6">
+          <div className="absolute inset-x-0 bottom-24 flex justify-center px-6 sm:bottom-16">
             <div className="max-w-sm text-center">
               <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-red-400">
-                Disturb the structure
+                One click. One wound.
               </p>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-300 sm:text-base">
-                Click or tap the silk to tear a hole. The redback will find the
-                damage and try to repair it.
+              <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                Punch a hole through the silk and watch the redback respond.
               </p>
-              <div className="mx-auto mt-5 h-8 w-px animate-pulse bg-gradient-to-b from-red-500 to-transparent" />
             </div>
           </div>
         )}
