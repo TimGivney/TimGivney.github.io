@@ -4,12 +4,13 @@ import {
   applyMove,
   cloneCube,
   createCube,
-  findStickerPlacementMoves,
   isSolved,
+  setStickerColor,
   type Axis,
   type CubeState,
   type Move,
   type Sticker,
+  type StickerAddress,
 } from "./engine";
 
 const FACE_COLOR: Record<number, number> = {
@@ -35,7 +36,11 @@ interface Cubie {
 export interface CubeViewOptions {
   onMove?: (move: Move) => void; // fired when a user drag completes a turn
   onSolvedChange?: (solved: boolean) => void;
-  onStickerPlace?: (moves: Move[], color: number) => Promise<void> | void;
+  onStickerPaint?: (
+    state: CubeState,
+    address: StickerAddress,
+    color: number
+  ) => void;
   distanceScale?: number; // <1 zooms the camera in so the cube fills more of the view
 }
 
@@ -74,7 +79,6 @@ export class CubeView {
   } = null;
   private lastSolved = true;
   private paintColor: number | null = null;
-  private paintPlacementPending = false;
 
   constructor(container: HTMLElement, n: number, opts: CubeViewOptions = {}) {
     this.container = container;
@@ -258,7 +262,7 @@ export class CubeView {
         const tile = cubie.tiles[id];
         tile.visible = true;
         (tile.material as THREE.MeshStandardMaterial).color.setHex(
-          FACE_COLOR[s.color]
+          FACE_COLOR[s.color] ?? 0x353a42
         );
       }
     }
@@ -387,7 +391,7 @@ export class CubeView {
   }
 
   private onPointerDown(e: PointerEvent) {
-    if (this.anim || this.paintPlacementPending || e.button !== 0) return;
+    if (this.anim || e.button !== 0) return;
     const ndc = this.pointerToNDC(e);
     this.raycaster.setFromCamera(ndc, this.camera);
     const meshes: THREE.Mesh[] = [];
@@ -411,19 +415,28 @@ export class CubeView {
     if (!owner) return;
 
     if (this.paintColor !== null) {
+      const middle = (this.n - 1) / 2;
+      const fixedCenter =
+        this.n % 2 === 1 &&
+        [owner.cx, owner.cy, owner.cz].filter(value => value === middle)
+          .length === 2;
+      if (fixedCenter) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       const [nx, ny, nz] = this.normalFromFaceId(faceId);
-      const moves = findStickerPlacementMoves(
-        this.state,
-        { x: owner.cx, y: owner.cy, z: owner.cz, nx, ny, nz },
-        this.paintColor
-      );
-      if (moves) {
-        this.paintPlacementPending = true;
-        Promise.resolve(
-          this.opts.onStickerPlace?.(moves, this.paintColor)
-        ).finally(() => {
-          this.paintPlacementPending = false;
-        });
+      const address = {
+        x: owner.cx,
+        y: owner.cy,
+        z: owner.cz,
+        nx,
+        ny,
+        nz,
+      };
+      if (setStickerColor(this.state, address, this.paintColor)) {
+        this.syncFromState();
+        this.opts.onStickerPaint?.(this.state, address, this.paintColor);
       }
       e.preventDefault();
       e.stopImmediatePropagation();
