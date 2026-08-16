@@ -75,30 +75,25 @@ export type StickerAddress = Pick<
   "x" | "y" | "z" | "nx" | "ny" | "nz"
 >;
 
-export function setStickerColor(
-  cube: CubeState,
-  address: StickerAddress,
-  color: number
-): boolean {
-  if (!Number.isInteger(color) || color < 0 || color > 5) return false;
-  const sticker = cube.stickers.find(
-    candidate =>
-      candidate.x === address.x &&
-      candidate.y === address.y &&
-      candidate.z === address.z &&
-      candidate.nx === address.nx &&
-      candidate.ny === address.ny &&
-      candidate.nz === address.nz
-  );
-  if (!sticker) return false;
-  sticker.color = color;
-  return true;
-}
-
 export function countStickerColors(cube: CubeState): number[] {
   const counts = [0, 0, 0, 0, 0, 0];
   for (const sticker of cube.stickers) counts[sticker.color]++;
   return counts;
+}
+
+function sameStickerAddress(a: StickerAddress, b: StickerAddress): boolean {
+  return (
+    a.x === b.x &&
+    a.y === b.y &&
+    a.z === b.z &&
+    a.nx === b.nx &&
+    a.ny === b.ny &&
+    a.nz === b.nz
+  );
+}
+
+function stickerAddressKey(sticker: StickerAddress): string {
+  return `${sticker.x},${sticker.y},${sticker.z},${sticker.nx},${sticker.ny},${sticker.nz}`;
 }
 
 /** Apply a single right-handed quarter turn (dir +1) to a sticker in-place. */
@@ -155,6 +150,50 @@ export function applyMove(c: CubeState, m: Move): CubeState {
 export function applyMoves(c: CubeState, moves: Move[]): CubeState {
   for (const m of moves) applyMove(c, m);
   return c;
+}
+
+export function findStickerPlacementMoves(
+  cube: CubeState,
+  target: StickerAddress,
+  color: number
+): Move[] | null {
+  if (!Number.isInteger(color) || color < 0 || color > 5) return null;
+  if (!cube.stickers.some(sticker => sameStickerAddress(sticker, target)))
+    return null;
+
+  const queue: Array<{ sticker: Sticker; moves: Move[] }> = [];
+  const visited = new Set<string>();
+
+  for (const sticker of cube.stickers) {
+    if (sticker.color !== color) continue;
+    const candidate = { ...sticker };
+    const key = stickerAddressKey(candidate);
+    if (visited.has(key)) continue;
+    visited.add(key);
+    queue.push({ sticker: candidate, moves: [] });
+  }
+
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    if (sameStickerAddress(current.sticker, target)) return current.moves;
+
+    for (let axis = 0 as Axis; axis < 3; axis = (axis + 1) as Axis) {
+      const layer = coordOnAxis(current.sticker, axis);
+      for (const dir of [1, -1] as const) {
+        const move: Move = { axis, layer, dir };
+        const next = { ...current.sticker };
+        const reps = dir === 1 ? 1 : 3;
+        for (let turn = 0; turn < reps; turn++)
+          quarterPlus(next, axis, cube.n - 1);
+        const key = stickerAddressKey(next);
+        if (visited.has(key)) continue;
+        visited.add(key);
+        queue.push({ sticker: next, moves: [...current.moves, move] });
+      }
+    }
+  }
+
+  return null;
 }
 
 /** Apply a compacted solution move in-place. */
