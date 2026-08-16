@@ -4,8 +4,8 @@ import {
   applyMove,
   cloneCube,
   createCube,
+  findStickerPlacementMoves,
   isSolved,
-  setStickerColor,
   type Axis,
   type CubeState,
   type Move,
@@ -35,7 +35,7 @@ interface Cubie {
 export interface CubeViewOptions {
   onMove?: (move: Move) => void; // fired when a user drag completes a turn
   onSolvedChange?: (solved: boolean) => void;
-  onStickerPaint?: (state: CubeState) => void;
+  onStickerPlace?: (moves: Move[], color: number) => Promise<void> | void;
   distanceScale?: number; // <1 zooms the camera in so the cube fills more of the view
 }
 
@@ -74,6 +74,7 @@ export class CubeView {
   } = null;
   private lastSolved = true;
   private paintColor: number | null = null;
+  private paintPlacementPending = false;
 
   constructor(container: HTMLElement, n: number, opts: CubeViewOptions = {}) {
     this.container = container;
@@ -386,7 +387,7 @@ export class CubeView {
   }
 
   private onPointerDown(e: PointerEvent) {
-    if (this.anim || e.button !== 0) return;
+    if (this.anim || this.paintPlacementPending || e.button !== 0) return;
     const ndc = this.pointerToNDC(e);
     this.raycaster.setFromCamera(ndc, this.camera);
     const meshes: THREE.Mesh[] = [];
@@ -411,15 +412,18 @@ export class CubeView {
 
     if (this.paintColor !== null) {
       const [nx, ny, nz] = this.normalFromFaceId(faceId);
-      if (
-        setStickerColor(
-          this.state,
-          { x: owner.cx, y: owner.cy, z: owner.cz, nx, ny, nz },
-          this.paintColor
-        )
-      ) {
-        this.syncFromState();
-        this.opts.onStickerPaint?.(cloneCube(this.state));
+      const moves = findStickerPlacementMoves(
+        this.state,
+        { x: owner.cx, y: owner.cy, z: owner.cz, nx, ny, nz },
+        this.paintColor
+      );
+      if (moves) {
+        this.paintPlacementPending = true;
+        Promise.resolve(
+          this.opts.onStickerPlace?.(moves, this.paintColor)
+        ).finally(() => {
+          this.paintPlacementPending = false;
+        });
       }
       e.preventDefault();
       e.stopImmediatePropagation();

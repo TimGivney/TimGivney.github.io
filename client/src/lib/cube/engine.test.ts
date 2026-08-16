@@ -6,9 +6,9 @@ import {
   countStickerColors,
   createCube,
   expandSolution,
+  findStickerPlacementMoves,
   isSolved,
   randomScramble,
-  setStickerColor,
   simplify,
   solveFromHistory,
   type Axis,
@@ -93,22 +93,95 @@ for (let trial = 0; trial < 100; trial++) {
   assert(sol.length <= moves.length, `trial=${trial} simplify not longer`);
 }
 
-// 8. A sticker can be recoloured by its exact cubie and face address.
+// 8. Colour placement uses legal moves and remains solvable for every size.
+for (const n of [2, 3, 4, 5]) {
+  const solved = createCube(n);
+  for (const target of solved.stickers) {
+    for (let color = 0; color < 6; color++) {
+      const moves = findStickerPlacementMoves(solved, target, color);
+      assert(moves !== null, `n=${n} colour=${color} placement path exists`);
+      if (!moves) continue;
+      const placed = cloneCube(solved);
+      applyMoves(placed, moves);
+      const sticker = placed.stickers.find(
+        candidate =>
+          candidate.x === target.x &&
+          candidate.y === target.y &&
+          candidate.z === target.z &&
+          candidate.nx === target.nx &&
+          candidate.ny === target.ny &&
+          candidate.nz === target.nz
+      );
+      assert(
+        sticker?.color === color,
+        `n=${n} colour=${color} reaches target square`
+      );
+      assert(
+        countStickerColors(placed).every(count => count === n * n),
+        `n=${n} colour=${color} preserves sticker counts`
+      );
+      const restored = cloneCube(placed);
+      for (const move of solveFromHistory(moves))
+        applySolutionMove(restored, move);
+      assert(isSolved(restored), `n=${n} colour=${color} placement solves`);
+    }
+  }
+}
+
+// 9. Colour placement also works after an existing scramble.
+for (const n of [2, 3, 4, 5]) {
+  for (let trial = 0; trial < 100; trial++) {
+    const history = randomScramble(n, n * 8);
+    const cube = applyMoves(createCube(n), history);
+    const target = {
+      ...cube.stickers[Math.floor(Math.random() * cube.stickers.length)],
+    };
+    const color = Math.floor(Math.random() * 6);
+    const placement = findStickerPlacementMoves(cube, target, color);
+    assert(
+      placement !== null,
+      `n=${n} trial=${trial} scrambled placement path`
+    );
+    if (!placement) continue;
+    applyMoves(cube, placement);
+    const sticker = cube.stickers.find(
+      candidate =>
+        candidate.x === target.x &&
+        candidate.y === target.y &&
+        candidate.z === target.z &&
+        candidate.nx === target.nx &&
+        candidate.ny === target.ny &&
+        candidate.nz === target.nz
+    );
+    assert(
+      sticker?.color === color,
+      `n=${n} trial=${trial} scrambled placement reaches target`
+    );
+    for (const move of solveFromHistory([...history, ...placement]))
+      applySolutionMove(cube, move);
+    assert(isSolved(cube), `n=${n} trial=${trial} scrambled placement solves`);
+  }
+}
+
+// 10. Colour placement rejects invalid requests.
 {
   const cube = createCube(3);
-  const sticker = cube.stickers[0];
-  const original = sticker.color;
-  const replacement = (original + 1) % 6;
+  const target = { ...cube.stickers[0] };
   assert(
-    setStickerColor(cube, sticker, replacement),
-    "paint finds the addressed sticker"
+    findStickerPlacementMoves(cube, target, -1) === null,
+    "placement rejects negative colours"
   );
-  const counts = countStickerColors(cube);
-  assert(counts[original] === 8, "paint decrements the original colour count");
-  assert(counts[replacement] === 10, "paint increments the new colour count");
   assert(
-    !setStickerColor(cube, sticker, 6),
-    "paint rejects colours outside the cube palette"
+    findStickerPlacementMoves(cube, target, 6) === null,
+    "placement rejects colours outside the palette"
+  );
+  assert(
+    findStickerPlacementMoves(
+      cube,
+      { x: -1, y: 0, z: 0, nx: -1, ny: 0, nz: 0 },
+      0
+    ) === null,
+    "placement rejects missing sticker addresses"
   );
 }
 
