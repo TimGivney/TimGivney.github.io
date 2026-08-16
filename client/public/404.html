@@ -8,7 +8,7 @@
       // client-side routes, bounce to the app (which restores the URL); otherwise
       // show the branded 404 below.
       (function () {
-        var spaRoutes = ["/cube", "/fractal", "/fractal3d", "/sky", "/toxic", "/ausengine", "/foundation", "/falls-creek"];
+        var spaRoutes = ["/cube", "/fractal", "/fractal3d", "/sky", "/toxic", "/ausengine", "/foundation", "/falls-creek", "/redback"];
         var path = location.pathname.replace(/\/$/, "");
         if (spaRoutes.indexOf(path) !== -1) {
           sessionStorage.setItem("spaRedirect", path + location.search + location.hash);
