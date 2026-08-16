@@ -70,6 +70,12 @@ export function cloneCube(c: CubeState): CubeState {
   return { n: c.n, stickers: c.stickers.map(s => ({ ...s })) };
 }
 
+export function createBlankCube(n: number): CubeState {
+  const cube = createCube(n);
+  for (const sticker of cube.stickers) sticker.color = -1;
+  return cube;
+}
+
 export type StickerAddress = Pick<
   Sticker,
   "x" | "y" | "z" | "nx" | "ny" | "nz"
@@ -77,7 +83,10 @@ export type StickerAddress = Pick<
 
 export function countStickerColors(cube: CubeState): number[] {
   const counts = [0, 0, 0, 0, 0, 0];
-  for (const sticker of cube.stickers) counts[sticker.color]++;
+  for (const sticker of cube.stickers) {
+    if (sticker.color >= 0 && sticker.color < counts.length)
+      counts[sticker.color]++;
+  }
   return counts;
 }
 
@@ -90,6 +99,20 @@ function sameStickerAddress(a: StickerAddress, b: StickerAddress): boolean {
     a.ny === b.ny &&
     a.nz === b.nz
   );
+}
+
+export function setStickerColor(
+  cube: CubeState,
+  target: StickerAddress,
+  color: number
+): boolean {
+  if (!Number.isInteger(color) || color < 0 || color > 5) return false;
+  const sticker = cube.stickers.find(candidate =>
+    sameStickerAddress(candidate, target)
+  );
+  if (!sticker) return false;
+  sticker.color = color;
+  return true;
 }
 
 function stickerAddressKey(sticker: StickerAddress): string {
@@ -213,6 +236,7 @@ export function isSolved(c: CubeState): boolean {
   // Group stickers by their current outward normal; each group must be one colour.
   const groups = new Map<string, number>();
   for (const s of c.stickers) {
+    if (s.color < 0 || s.color > 5) return false;
     const key = `${s.nx},${s.ny},${s.nz}`;
     const existing = groups.get(key);
     if (existing === undefined) groups.set(key, s.color);
