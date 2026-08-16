@@ -151,11 +151,19 @@ function fieldJulia(
   return escaped ? Math.abs(de) : -Math.abs(de);
 }
 
+// Number of field iterations used when meshing. Finer grids can resolve finer
+// fractal detail, so we lift the iteration count with resolution — more
+// iterations reveal more of the true surface rather than just smoothing it.
+export function meshIterations(p: MeshParams): number {
+  const n = Math.max(16, Math.round(p.resolution));
+  const resBonus = Math.max(0, Math.round(Math.log2(n / 64) * 2)); // 96→1,160→3,256→4,320→5
+  return Math.max(11, Math.round(p.iterations) + 4 + resBonus);
+}
+
 function makeFieldFn(
   p: MeshParams
 ): (x: number, y: number, z: number) => number {
-  // A few extra iterations sharpen the surface without changing the shape.
-  const iters = Math.max(6, Math.round(p.iterations) + 3);
+  const iters = meshIterations(p);
   if (p.type === "mandelbulb")
     return (x, y, z) => fieldBulb(x, y, z, p.power, iters);
   if (p.type === "mandelbox")
@@ -269,7 +277,44 @@ export function generateMesh(
     return s;
   };
 
-  const positions: number[] = [];
+  // Growable Float32Array for triangle vertices (9 floats per triangle). Using
+  // a typed buffer instead of a plain number[] keeps memory in check so the
+  // high-resolution tiers stay feasible. A hard triangle budget guards against
+  // pathologically dense meshes exhausting browser memory.
+  const MAX_TRIANGLES = 14_000_000;
+  let cap = 1 << 16;
+  let data = new Float32Array(cap);
+  let len = 0;
+  const emit = (
+    p0: [number, number, number],
+    p1: [number, number, number],
+    p2: [number, number, number]
+  ) => {
+    if (len / 9 >= MAX_TRIANGLES) {
+      throw new Error(
+        "Mesh too detailed to export — pick a lower detail tier."
+      );
+    }
+    if (len + 9 > cap) {
+      // Grow by 1.5× (rounded up to a multiple of 9) to limit the peak memory
+      // spike during reallocation on very large meshes.
+      cap = Math.max(cap + 9, Math.ceil((cap * 1.5) / 9) * 9);
+      const nd = new Float32Array(cap);
+      nd.set(data);
+      data = nd;
+    }
+    data[len] = p0[0];
+    data[len + 1] = p0[1];
+    data[len + 2] = p0[2];
+    data[len + 3] = p1[0];
+    data[len + 4] = p1[1];
+    data[len + 5] = p1[2];
+    data[len + 6] = p2[0];
+    data[len + 7] = p2[1];
+    data[len + 8] = p2[2];
+    len += 9;
+  };
+
   let lower = sliceAt(0);
   let minX = Infinity,
     minY = Infinity,
@@ -278,6 +323,11 @@ export function generateMesh(
     maxY = -Infinity,
     maxZ = -Infinity;
 
+  // Refine the zero crossing along an edge. The grid values give a linear first
+  // guess; we then run a few regula-falsi steps that evaluate the *real* signed
+  // field to home in on the true surface, which places each vertex far more
+  // accurately than a single linear interpolation and visibly sharpens the mesh.
+  const REFINE_STEPS = 5;
   const vert = (
     cornerA: number[],
     cornerB: number[],
@@ -287,13 +337,37 @@ export function generateMesh(
     by: number,
     bz: number
   ): [number, number, number] => {
-    // Linear interpolation of the zero crossing along the edge.
-    const denom = valB - valA;
-    const t = Math.abs(denom) < 1e-12 ? 0.5 : -valA / denom;
-    const x = bx + (cornerA[0] + t * (cornerB[0] - cornerA[0])) * step;
-    const y = by + (cornerA[1] + t * (cornerB[1] - cornerA[1])) * step;
-    const z = bz + (cornerA[2] + t * (cornerB[2] - cornerA[2])) * step;
-    return [x, y, z];
+    let ax = bx + cornerA[0] * step;
+    let ay = by + cornerA[1] * step;
+    let az = bz + cornerA[2] * step;
+    let bxx = bx + cornerB[0] * step;
+    let byy = by + cornerB[1] * step;
+    let bzz = bz + cornerB[2] * step;
+    let va = valA;
+    let vb = valB;
+    for (let s = 0; s < REFINE_STEPS; s++) {
+      const denom = vb - va;
+      const t = Math.abs(denom) < 1e-12 ? 0.5 : -va / denom;
+      const mx = ax + t * (bxx - ax);
+      const my = ay + t * (byy - ay);
+      const mz = az + t * (bzz - az);
+      const vm = field(mx, my, mz);
+      if (Math.abs(vm) < 1e-7) return [mx, my, mz];
+      if (vm < 0 === va < 0) {
+        va = vm;
+        ax = mx;
+        ay = my;
+        az = mz;
+      } else {
+        vb = vm;
+        bxx = mx;
+        byy = my;
+        bzz = mz;
+      }
+    }
+    const denom = vb - va;
+    const t = Math.abs(denom) < 1e-12 ? 0.5 : -va / denom;
+    return [ax + t * (bxx - ax), ay + t * (byy - ay), az + t * (bzz - az)];
   };
 
   const cube = new Float32Array(8);
@@ -340,17 +414,7 @@ export function generateMesh(
           const p0 = ev[tri[t]]!;
           const p1 = ev[tri[t + 1]]!;
           const p2 = ev[tri[t + 2]]!;
-          positions.push(
-            p0[0],
-            p0[1],
-            p0[2],
-            p1[0],
-            p1[1],
-            p1[2],
-            p2[0],
-            p2[1],
-            p2[2]
-          );
+          emit(p0, p1, p2);
           for (const p of [p0, p1, p2]) {
             if (p[0] < minX) minX = p[0];
             if (p[1] < minY) minY = p[1];
@@ -367,7 +431,7 @@ export function generateMesh(
   }
   onProgress?.(1);
 
-  const arr = new Float32Array(positions);
+  const arr = data.subarray(0, len);
   return {
     positions: arr,
     triangles: arr.length / 9,
@@ -430,32 +494,76 @@ export function meshToBinarySTL(positions: Float32Array): ArrayBuffer {
   return buf;
 }
 
-/** Wavefront OBJ with welded vertices to keep the file compact. */
+/**
+ * Wavefront OBJ with welded vertices and smooth per-vertex normals.
+ *
+ * Welding shared vertices keeps the file compact; accumulating the adjacent
+ * face normals at each vertex gives smooth shading in viewers and slicers
+ * instead of the faceted look of raw marching-cubes output.
+ */
 export function meshToOBJ(positions: Float32Array): string {
   const map = new Map<string, number>();
   const verts: number[] = [];
+  const normals: number[] = []; // running sum of adjacent face normals per vertex
   const faces: number[] = [];
   const key = (x: number, y: number, z: number) =>
     `${Math.round(x * 1e5)},${Math.round(y * 1e5)},${Math.round(z * 1e5)}`;
-  for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i],
-      y = positions[i + 1],
-      z = positions[i + 2];
+  const idOf = (x: number, y: number, z: number): number => {
     const k = key(x, y, z);
     let id = map.get(k);
     if (id === undefined) {
       verts.push(x, y, z);
+      normals.push(0, 0, 0);
       id = verts.length / 3;
       map.set(k, id);
     }
-    faces.push(id);
+    return id;
+  };
+  for (let i = 0; i < positions.length; i += 9) {
+    const ax = positions[i],
+      ay = positions[i + 1],
+      az = positions[i + 2];
+    const bx = positions[i + 3],
+      by = positions[i + 4],
+      bz = positions[i + 5];
+    const cx = positions[i + 6],
+      cy = positions[i + 7],
+      cz = positions[i + 8];
+    const ia = idOf(ax, ay, az);
+    const ib = idOf(bx, by, bz);
+    const ic = idOf(cx, cy, cz);
+    faces.push(ia, ib, ic);
+    // Area-weighted face normal (cross product is proportional to area), added
+    // to each of the triangle's three vertices.
+    const nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay);
+    const ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
+    const nz = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    for (const id of [ia, ib, ic]) {
+      const o = (id - 1) * 3;
+      normals[o] += nx;
+      normals[o + 1] += ny;
+      normals[o + 2] += nz;
+    }
   }
   const lines: string[] = ["# Fractal Lab 3D export — timgivney.com/fractal3d"];
   for (let i = 0; i < verts.length; i += 3) {
     lines.push(`v ${verts[i]} ${verts[i + 1]} ${verts[i + 2]}`);
   }
+  for (let i = 0; i < normals.length; i += 3) {
+    let nx = normals[i],
+      ny = normals[i + 1],
+      nz = normals[i + 2];
+    const l = Math.hypot(nx, ny, nz) || 1;
+    nx /= l;
+    ny /= l;
+    nz /= l;
+    lines.push(`vn ${nx} ${ny} ${nz}`);
+  }
   for (let i = 0; i < faces.length; i += 3) {
-    lines.push(`f ${faces[i]} ${faces[i + 1]} ${faces[i + 2]}`);
+    const a = faces[i],
+      b = faces[i + 1],
+      c = faces[i + 2];
+    lines.push(`f ${a}//${a} ${b}//${b} ${c}//${c}`);
   }
   return lines.join("\n");
 }
