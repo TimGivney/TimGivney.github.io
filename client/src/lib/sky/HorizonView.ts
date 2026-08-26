@@ -330,7 +330,11 @@ export class HorizonView {
     const az = azDeg * DEG;
     const ca = Math.cos(alt);
     const v = out || new THREE.Vector3();
-    return v.set(r * ca * Math.sin(az), r * Math.sin(alt), -r * ca * Math.cos(az));
+    return v.set(
+      r * ca * Math.sin(az),
+      r * Math.sin(alt),
+      -r * ca * Math.cos(az)
+    );
   }
 
   private rebuild() {
@@ -356,7 +360,8 @@ export class HorizonView {
     this.skyMat.uniforms.uDayness.value = this.dayness;
     this.starMat.uniforms.uStarAlpha.value = this.starAlpha;
     this.lineMat.opacity = 0.32 * this.starAlpha;
-    this.lineMat.visible = this.opts.showConstellations && this.starAlpha > 0.02;
+    this.lineMat.visible =
+      this.opts.showConstellations && this.starAlpha > 0.02;
 
     this.buildStars();
     this.buildLines();
@@ -703,7 +708,10 @@ export class HorizonView {
             kind: "sun",
             title: "The Sun",
             subtitle: "Our star",
-            facts: [`Altitude ${sun.alt.toFixed(0)}°`, "G-type main-sequence star"],
+            facts: [
+              `Altitude ${sun.alt.toFixed(0)}°`,
+              "G-type main-sequence star",
+            ],
           },
         });
         if (this.selectedTitle === "The Sun") this.drawRing(ctx, s.x, s.y, 12);
@@ -778,7 +786,10 @@ export class HorizonView {
           kind: "planet",
           title: p.name,
           subtitle: "Planet",
-          facts: [`Magnitude ${mag.toFixed(1)}`, `Altitude ${pa.alt.toFixed(0)}°`],
+          facts: [
+            `Magnitude ${mag.toFixed(1)}`,
+            `Altitude ${pa.alt.toFixed(0)}°`,
+          ],
         },
       });
       if (this.selectedTitle === p.name) this.drawRing(ctx, s.x, s.y, rr + 5);

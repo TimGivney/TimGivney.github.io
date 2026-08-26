@@ -8,10 +8,23 @@
       // client-side routes, bounce to the app (which restores the URL); otherwise
       // show the branded 404 below.
       (function () {
-        var spaRoutes = ["/cube", "/fractal", "/fractal3d", "/sky", "/toxic", "/ausengine", "/foundation", "/falls-creek", "/redback"];
+        var spaRoutes = [
+          "/cube",
+          "/fractal",
+          "/fractal3d",
+          "/sky",
+          "/toxic",
+          "/ausengine",
+          "/foundation",
+          "/falls-creek",
+          "/redback",
+        ];
         var path = location.pathname.replace(/\/$/, "");
         if (spaRoutes.indexOf(path) !== -1) {
-          sessionStorage.setItem("spaRedirect", path + location.search + location.hash);
+          sessionStorage.setItem(
+            "spaRedirect",
+            path + location.search + location.hash
+          );
           location.replace("/");
         }
       })();
@@ -34,10 +47,21 @@
         --gold: #c9a84c;
         --bg: #eef3f9;
       }
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body { height: 100%; }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
       body {
-        font-family: "Source Sans 3", system-ui, -apple-system, sans-serif;
+        height: 100%;
+      }
+      body {
+        font-family:
+          "Source Sans 3",
+          system-ui,
+          -apple-system,
+          sans-serif;
         background: var(--bg);
         color: #1f2937;
         display: flex;
@@ -46,7 +70,10 @@
         padding: 2rem;
         min-height: 100vh;
       }
-      .card { max-width: 34rem; text-align: center; }
+      .card {
+        max-width: 34rem;
+        text-align: center;
+      }
       .code {
         font-family: "JetBrains Mono", monospace;
         font-size: 0.8rem;
@@ -76,7 +103,11 @@
         margin: 1.25rem auto;
         border-radius: 2px;
       }
-      p { font-size: 1.05rem; color: #4b5563; margin-bottom: 2rem; }
+      p {
+        font-size: 1.05rem;
+        color: #4b5563;
+        margin-bottom: 2rem;
+      }
       .btn {
         display: inline-block;
         background: var(--cobalt);
@@ -85,9 +116,14 @@
         font-weight: 600;
         padding: 0.85rem 1.75rem;
         border-radius: 0.5rem;
-        transition: transform 0.2s ease, background 0.2s ease;
+        transition:
+          transform 0.2s ease,
+          background 0.2s ease;
       }
-      .btn:hover { transform: translateY(-2px); background: #16335a; }
+      .btn:hover {
+        transform: translateY(-2px);
+        background: #16335a;
+      }
     </style>
   </head>
   <body>
@@ -96,7 +132,10 @@
       <h1>404</h1>
       <h2>Page not found</h2>
       <div class="divider"></div>
-      <p>The page you're looking for doesn't exist or may have moved. Let's get you back on track.</p>
+      <p>
+        The page you're looking for doesn't exist or may have moved. Let's get
+        you back on track.
+      </p>
       <a class="btn" href="/">← Back to home</a>
     </main>
   </body>

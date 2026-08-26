@@ -179,12 +179,7 @@ function fbm(x: number, y: number, seed: number, octaves = 4): number {
 // Synthetic terrain presets.
 // ---------------------------------------------------------------------------
 
-export type TerrainPreset =
-  | "sloped"
-  | "rolling"
-  | "ridge"
-  | "gully"
-  | "gentle";
+export type TerrainPreset = "sloped" | "rolling" | "ridge" | "gully" | "gentle";
 
 export interface PresetSpec {
   id: TerrainPreset;
@@ -193,11 +188,31 @@ export interface PresetSpec {
 }
 
 export const TERRAIN_PRESETS: PresetSpec[] = [
-  { id: "sloped", label: "Sloping block", description: "A steady cross-fall — the classic sloping site." },
-  { id: "rolling", label: "Rolling terrain", description: "Undulating ground with soft high and low points." },
-  { id: "ridge", label: "Ridge", description: "A raised spine falling away on both sides." },
-  { id: "gully", label: "Gully", description: "A drainage low running through the site." },
-  { id: "gentle", label: "Gentle fall", description: "An almost-flat site with a slight fall." },
+  {
+    id: "sloped",
+    label: "Sloping block",
+    description: "A steady cross-fall — the classic sloping site.",
+  },
+  {
+    id: "rolling",
+    label: "Rolling terrain",
+    description: "Undulating ground with soft high and low points.",
+  },
+  {
+    id: "ridge",
+    label: "Ridge",
+    description: "A raised spine falling away on both sides.",
+  },
+  {
+    id: "gully",
+    label: "Gully",
+    description: "A drainage low running through the site.",
+  },
+  {
+    id: "gentle",
+    label: "Gentle fall",
+    description: "An almost-flat site with a slight fall.",
+  },
 ];
 
 /**
@@ -231,7 +246,9 @@ export function synthTerrain(
           h = slope * (1 - v) + roughness * (fbm(u * 3, v * 3, seed) - 0.5);
           break;
         case "gentle":
-          h = 0.35 * slope * (1 - v) + 0.4 * roughness * (fbm(u * 2, v * 2, seed) - 0.5);
+          h =
+            0.35 * slope * (1 - v) +
+            0.4 * roughness * (fbm(u * 2, v * 2, seed) - 0.5);
           break;
         case "rolling":
           h =
@@ -318,7 +335,10 @@ export function parsePointCloud(text: string, filename: string): ParseResult {
   const lower = filename.toLowerCase();
   if (lower.endsWith(".obj")) return { points: parseObj(text), format: "OBJ" };
   if (lower.endsWith(".ply")) return { points: parsePly(text), format: "PLY" };
-  return { points: parseXyz(text), format: lower.endsWith(".csv") ? "CSV" : "XYZ" };
+  return {
+    points: parseXyz(text),
+    format: lower.endsWith(".csv") ? "CSV" : "XYZ",
+  };
 }
 
 function parseXyz(text: string): Point3[] {
@@ -550,8 +570,12 @@ export function analyseTerrain(dem: Dem): TerrainStats {
       const cr = Math.min(dem.cols - 1, c + 1);
       const rd = Math.max(0, r - 1);
       const ru = Math.min(dem.rows - 1, r + 1);
-      const dzdx = (dem.z[r * dem.cols + cr] - dem.z[r * dem.cols + cl]) / ((cr - cl) * dem.cellX || 1);
-      const dzdy = (dem.z[ru * dem.cols + c] - dem.z[rd * dem.cols + c]) / ((ru - rd) * dem.cellY || 1);
+      const dzdx =
+        (dem.z[r * dem.cols + cr] - dem.z[r * dem.cols + cl]) /
+        ((cr - cl) * dem.cellX || 1);
+      const dzdy =
+        (dem.z[ru * dem.cols + c] - dem.z[rd * dem.cols + c]) /
+        ((ru - rd) * dem.cellY || 1);
       const g = Math.hypot(dzdx, dzdy);
       const slopeDeg = Math.atan(g) * (180 / Math.PI);
       if (slopeDeg > maxSlope) maxSlope = slopeDeg;
@@ -630,10 +654,8 @@ export function designFoundation(dem: Dem, params: DesignParams): DesignResult {
   const w = Math.min(params.footprintW, siteW);
   const l = Math.min(params.footprintL, siteL);
 
-  const x0 =
-    params.originX ?? dem.minX + (siteW - w) / 2;
-  const y0 =
-    params.originY ?? dem.minY + (siteL - l) / 2;
+  const x0 = params.originX ?? dem.minX + (siteW - w) / 2;
+  const y0 = params.originY ?? dem.minY + (siteL - l) / 2;
   const x1 = x0 + w;
   const y1 = y0 + l;
 
@@ -801,7 +823,13 @@ export function scheduleToDxf(result: DesignResult): string {
   e(0, "SECTION");
   e(2, "ENTITIES");
 
-  const line = (x1: number, y1: number, x2: number, y2: number, layer: string) => {
+  const line = (
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    layer: string
+  ) => {
     e(0, "LINE");
     e(8, layer);
     e(10, x1);

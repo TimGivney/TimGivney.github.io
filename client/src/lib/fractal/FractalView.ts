@@ -260,9 +260,7 @@ export class FractalView {
     gl.attachShader(program, fs);
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      throw new Error(
-        "Program link error: " + gl.getProgramInfoLog(program)
-      );
+      throw new Error("Program link error: " + gl.getProgramInfoLog(program));
     }
     this.program = program;
     gl.useProgram(program);
@@ -525,7 +523,11 @@ export class FractalView {
       this.canvas.width,
       this.canvas.height
     );
-    gl.uniform2f(this.uniforms.u_center, this.state.centerX, this.state.centerY);
+    gl.uniform2f(
+      this.uniforms.u_center,
+      this.state.centerX,
+      this.state.centerY
+    );
     // df64 split of the centre for the deep-precision path
     const hx = Math.fround(this.state.centerX);
     const hy = Math.fround(this.state.centerY);

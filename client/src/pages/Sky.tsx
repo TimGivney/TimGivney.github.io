@@ -60,8 +60,18 @@ function saOffsetHours(approxLocal: Date): number {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 export default function Sky() {
@@ -264,7 +274,9 @@ export default function Sky() {
       {error && (
         <div className="absolute inset-0 z-20 flex items-center justify-center px-6 text-center">
           <div className="max-w-md rounded-xl border border-white/10 bg-black/60 p-6 backdrop-blur">
-            <p className="font-mono text-sm text-rose-300">Couldn’t load the sky</p>
+            <p className="font-mono text-sm text-rose-300">
+              Couldn’t load the sky
+            </p>
             <p className="mt-2 text-xs text-zinc-400">{error}</p>
           </div>
         </div>
@@ -468,116 +480,116 @@ export default function Sky() {
 
       {/* Bottom controls */}
       {!hideUI && (
-      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-white/10 bg-black/45 p-3 backdrop-blur">
-          {/* Time row */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setPlaying(p => !p)}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#C9A84C] text-[#1a1a2e] transition hover:brightness-110"
-              title={playing ? "Pause" : "Play time-lapse"}
-            >
-              {playing ? (
-                <Pause className="h-4 w-4" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-            </button>
-            <div className="flex-1">
-              <input
-                type="range"
-                min={0}
-                max={1439}
-                step={1}
-                value={minutes}
-                onChange={e => setMinutes(Number(e.target.value))}
-                className="w-full accent-[#C9A84C]"
-              />
+        <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
+          <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-white/10 bg-black/45 p-3 backdrop-blur">
+            {/* Time row */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPlaying(p => !p)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#C9A84C] text-[#1a1a2e] transition hover:brightness-110"
+                title={playing ? "Pause" : "Play time-lapse"}
+              >
+                {playing ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+              </button>
+              <div className="flex-1">
+                <input
+                  type="range"
+                  min={0}
+                  max={1439}
+                  step={1}
+                  value={minutes}
+                  onChange={e => setMinutes(Number(e.target.value))}
+                  className="w-full accent-[#C9A84C]"
+                />
+              </div>
+              <div className="w-32 shrink-0 text-right font-mono text-sm">
+                <span className="text-zinc-100">{timeLabel}</span>{" "}
+                <span className="text-[10px] text-zinc-500">{offsetLabel}</span>
+              </div>
             </div>
-            <div className="w-32 shrink-0 text-right font-mono text-sm">
-              <span className="text-zinc-100">{timeLabel}</span>{" "}
-              <span className="text-[10px] text-zinc-500">{offsetLabel}</span>
+
+            {/* Date + toggles */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setDayOffset(d => d - 1)}
+                  className={`${toggle} ${toggleOff}`}
+                  title="Previous day"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-[5.5rem] text-center font-mono text-xs text-zinc-200">
+                  {dateLabel}
+                </span>
+                <button
+                  onClick={() => setDayOffset(d => d + 1)}
+                  className={`${toggle} ${toggleOff}`}
+                  title="Next day"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={goNow}
+                  className={`${toggle} ${toggleOff} inline-flex items-center gap-1`}
+                  title="Jump to now"
+                >
+                  <Clock className="h-3.5 w-3.5" /> Now
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setShowConstellations(v => !v)}
+                  className={`${toggle} ${showConstellations ? toggleOn : toggleOff}`}
+                >
+                  Constellations
+                </button>
+                <button
+                  onClick={() => setShowPlanets(v => !v)}
+                  className={`${toggle} ${showPlanets ? toggleOn : toggleOff}`}
+                >
+                  Planets
+                </button>
+                <button
+                  onClick={() => setShowDSO(v => !v)}
+                  className={`${toggle} ${showDSO ? toggleOn : toggleOff}`}
+                >
+                  Clusters
+                </button>
+                <button
+                  onClick={() => setShowLabels(v => !v)}
+                  className={`${toggle} ${showLabels ? toggleOn : toggleOff}`}
+                >
+                  Labels
+                </button>
+              </div>
             </div>
+
+            <p className="text-center font-mono text-[10px] text-zinc-500">
+              <Sparkles className="mr-1 inline h-3 w-3 text-[#C9A84C]" />
+              Tap any star, planet or cluster to identify it ·{" "}
+              {mode === "horizon"
+                ? "drag to look around, scroll to zoom"
+                : "zenith is centre, horizon is the rim (N up, E left)"}
+            </p>
+
+            <p className="text-center font-mono text-[10px] text-zinc-600">
+              Made by Tim, for Tim ·{" "}
+              <a
+                href="https://github.com/TimGivney/TimGivney.github.io"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
+              >
+                <Github className="h-3 w-3" /> Open source on GitHub
+              </a>
+            </p>
           </div>
-
-          {/* Date + toggles */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setDayOffset(d => d - 1)}
-                className={`${toggle} ${toggleOff}`}
-                title="Previous day"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <span className="min-w-[5.5rem] text-center font-mono text-xs text-zinc-200">
-                {dateLabel}
-              </span>
-              <button
-                onClick={() => setDayOffset(d => d + 1)}
-                className={`${toggle} ${toggleOff}`}
-                title="Next day"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={goNow}
-                className={`${toggle} ${toggleOff} inline-flex items-center gap-1`}
-                title="Jump to now"
-              >
-                <Clock className="h-3.5 w-3.5" /> Now
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                onClick={() => setShowConstellations(v => !v)}
-                className={`${toggle} ${showConstellations ? toggleOn : toggleOff}`}
-              >
-                Constellations
-              </button>
-              <button
-                onClick={() => setShowPlanets(v => !v)}
-                className={`${toggle} ${showPlanets ? toggleOn : toggleOff}`}
-              >
-                Planets
-              </button>
-              <button
-                onClick={() => setShowDSO(v => !v)}
-                className={`${toggle} ${showDSO ? toggleOn : toggleOff}`}
-              >
-                Clusters
-              </button>
-              <button
-                onClick={() => setShowLabels(v => !v)}
-                className={`${toggle} ${showLabels ? toggleOn : toggleOff}`}
-              >
-                Labels
-              </button>
-            </div>
-          </div>
-
-          <p className="text-center font-mono text-[10px] text-zinc-500">
-            <Sparkles className="mr-1 inline h-3 w-3 text-[#C9A84C]" />
-            Tap any star, planet or cluster to identify it ·{" "}
-            {mode === "horizon"
-              ? "drag to look around, scroll to zoom"
-              : "zenith is centre, horizon is the rim (N up, E left)"}
-          </p>
-
-          <p className="text-center font-mono text-[10px] text-zinc-600">
-            Made by Tim, for Tim ·{" "}
-            <a
-              href="https://github.com/TimGivney/TimGivney.github.io"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
-            >
-              <Github className="h-3 w-3" /> Open source on GitHub
-            </a>
-          </p>
         </div>
-      </div>
       )}
     </div>
   );

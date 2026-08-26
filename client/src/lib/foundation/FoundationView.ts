@@ -82,7 +82,10 @@ export class FoundationView {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x05060a);
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = pmrem.fromScene(
+      new RoomEnvironment(),
+      0.04
+    ).texture;
     this.scene.environmentIntensity = 0.5;
     pmrem.dispose();
 
@@ -224,7 +227,11 @@ export class FoundationView {
     // subtle wireframe overlay to read the survey grid
     const wire = new THREE.LineSegments(
       new THREE.WireframeGeometry(geo),
-      new THREE.LineBasicMaterial({ color: 0x2b3f57, transparent: true, opacity: 0.14 })
+      new THREE.LineBasicMaterial({
+        color: 0x2b3f57,
+        transparent: true,
+        opacity: 0.14,
+      })
     );
     wire.name = "terrain-wire";
 
@@ -240,7 +247,10 @@ export class FoundationView {
     const maxH = Math.max(0.001, ...result.piers.map(p => p.height));
     const c = new THREE.Color();
     for (const p of result.piers) {
-      const hWorld = Math.max(0.02, (p.topZ - p.groundZ) * this.s * this.toggles.exaggeration);
+      const hWorld = Math.max(
+        0.02,
+        (p.topZ - p.groundZ) * this.s * this.toggles.exaggeration
+      );
       const rad = (p.diameter / 2000) * this.s;
       const geo = new THREE.CylinderGeometry(rad, rad * 1.08, hWorld, 20);
       if (p.aboveMax) c.copy(OVER);
@@ -253,12 +263,24 @@ export class FoundationView {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      mesh.position.set(this.tx(p.x), this.ty(p.groundZ) + hWorld / 2, this.tz(p.y));
+      mesh.position.set(
+        this.tx(p.x),
+        this.ty(p.groundZ) + hWorld / 2,
+        this.tz(p.y)
+      );
       grp.add(mesh);
 
       // small footing pad
-      const padGeo = new THREE.CylinderGeometry(rad * 1.6, rad * 1.8, hWorld * 0.05 + 0.01, 20);
-      const padMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b0, roughness: 0.9 });
+      const padGeo = new THREE.CylinderGeometry(
+        rad * 1.6,
+        rad * 1.8,
+        hWorld * 0.05 + 0.01,
+        20
+      );
+      const padMat = new THREE.MeshStandardMaterial({
+        color: 0x9aa4b0,
+        roughness: 0.9,
+      });
       const pad = new THREE.Mesh(padGeo, padMat);
       pad.position.set(this.tx(p.x), this.ty(p.groundZ) + 0.005, this.tz(p.y));
       pad.receiveShadow = true;
@@ -272,17 +294,16 @@ export class FoundationView {
     grp.name = "beams";
     const yTop = this.ty(result.datumZ);
     const sec = 0.06 * this.s * 2; // beam cross-section in world units
-    const mat = new THREE.MeshStandardMaterial({ color: 0xb08d3c, roughness: 0.5, metalness: 0.4 });
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xb08d3c,
+      roughness: 0.5,
+      metalness: 0.4,
+    });
 
     const byGrid = new Map<string, (typeof result.piers)[number]>();
     for (const p of result.piers) byGrid.set(`${p.ix},${p.iy}`, p);
 
-    const beam = (
-      x1: number,
-      y1: number,
-      x2: number,
-      y2: number
-    ) => {
+    const beam = (x1: number, y1: number, x2: number, y2: number) => {
       const ax = this.tx(x1);
       const az = this.tz(y1);
       const bx = this.tx(x2);
@@ -331,11 +352,19 @@ export class FoundationView {
     mesh.name = "deck";
     const midX = (fp.x0 + fp.x1) / 2;
     const midY = (fp.y0 + fp.y1) / 2;
-    mesh.position.set(this.tx(midX), this.ty(result.datumZ) + 0.02, this.tz(midY));
+    mesh.position.set(
+      this.tx(midX),
+      this.ty(result.datumZ) + 0.02,
+      this.tz(midY)
+    );
 
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(geo),
-      new THREE.LineBasicMaterial({ color: 0x69a0ff, transparent: true, opacity: 0.6 })
+      new THREE.LineBasicMaterial({
+        color: 0x69a0ff,
+        transparent: true,
+        opacity: 0.6,
+      })
     );
     edges.position.copy(mesh.position);
 
@@ -349,7 +378,8 @@ export class FoundationView {
 
   setToggles(t: Partial<ViewToggles>) {
     const exaggerationChanged =
-      t.exaggeration !== undefined && t.exaggeration !== this.toggles.exaggeration;
+      t.exaggeration !== undefined &&
+      t.exaggeration !== this.toggles.exaggeration;
     this.toggles = { ...this.toggles, ...t };
     this.applyToggles();
     return exaggerationChanged;
@@ -395,7 +425,8 @@ export class FoundationView {
   private loop = () => {
     if (this.disposed) return;
     const cw = this.container.clientWidth;
-    if (cw > 0 && this.renderer.domElement.width !== cw * this.dpr) this.resize();
+    if (cw > 0 && this.renderer.domElement.width !== cw * this.dpr)
+      this.resize();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
     this.raf = requestAnimationFrame(this.loop);

@@ -83,7 +83,8 @@ const PLANETS: { body: Astronomy.Body; name: string; color: string }[] = [
 // Map asterism member star-names so we can look them up in the catalogue.
 const ASTERISM_BY_STAR = new Map<string, string>();
 for (const a of ASTERISMS) {
-  for (const s of a.stars) if (!ASTERISM_BY_STAR.has(s)) ASTERISM_BY_STAR.set(s, a.name);
+  for (const s of a.stars)
+    if (!ASTERISM_BY_STAR.has(s)) ASTERISM_BY_STAR.set(s, a.name);
 }
 
 function clamp01(x: number) {
@@ -254,10 +255,7 @@ export class SkyView {
     g.addColorStop(0, zen);
     g.addColorStop(0.78, hor);
     if (twilight > 0.05 && dayness < 0.7) {
-      g.addColorStop(
-        1,
-        `rgba(${200},${120},${70},${0.5 * twilight})`
-      );
+      g.addColorStop(1, `rgba(${200},${120},${70},${0.5 * twilight})`);
     } else {
       g.addColorStop(1, hor);
     }
@@ -449,7 +447,10 @@ export class SkyView {
           kind: "sun",
           title: "The Sun",
           subtitle: "Our star",
-          facts: [`Altitude ${sun.alt.toFixed(0)}°`, "G-type main-sequence star"],
+          facts: [
+            `Altitude ${sun.alt.toFixed(0)}°`,
+            "G-type main-sequence star",
+          ],
         },
       });
       if (this.selectedTitle === "The Sun")
@@ -464,7 +465,13 @@ export class SkyView {
       true,
       true
     );
-    const moon = this.altaz(moonEq.ra * 15, moonEq.dec, gastDeg, sinLat, cosLat);
+    const moon = this.altaz(
+      moonEq.ra * 15,
+      moonEq.dec,
+      gastDeg,
+      sinLat,
+      cosLat
+    );
     if (moon.alt > -1) {
       const { x, y } = this.project(moon.alt, moon.az);
       const illum = Astronomy.Illumination(Astronomy.Body.Moon, this.time);
@@ -507,9 +514,7 @@ export class SkyView {
       ctx.arc(x, y, rr, 0, 2 * Math.PI);
       ctx.fill();
       ctx.beginPath();
-      ctx.fillStyle = p.color
-        .replace("rgb", "rgba")
-        .replace(")", ",0.2)");
+      ctx.fillStyle = p.color.replace("rgb", "rgba").replace(")", ",0.2)");
       // soft halo (color is hex, so just draw faint white)
       ctx.fillStyle = "rgba(255,255,255,0.12)";
       ctx.arc(x, y, rr * 2, 0, 2 * Math.PI);
@@ -528,7 +533,10 @@ export class SkyView {
           kind: "planet",
           title: p.name,
           subtitle: "Planet",
-          facts: [`Magnitude ${mag.toFixed(1)}`, `Altitude ${pa.alt.toFixed(0)}°`],
+          facts: [
+            `Magnitude ${mag.toFixed(1)}`,
+            `Altitude ${pa.alt.toFixed(0)}°`,
+          ],
         },
       });
       if (this.selectedTitle === p.name)
