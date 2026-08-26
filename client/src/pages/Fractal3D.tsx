@@ -69,13 +69,24 @@ const RES_OPTIONS: { label: string; longEdge: number }[] = [
   { label: "8K", longEdge: 7680 },
 ];
 
-// Voxel grid resolution for the 3D-printable mesh export.
+// Voxel grid resolution for the 3D-printable mesh export. Higher grids resolve
+// finer surface detail; the mesher also lifts its iteration count and refines
+// each vertex onto the true surface, so every tier is noticeably sharper.
 const MESH_RES: { label: string; res: number }[] = [
-  { label: "Draft", res: 64 },
-  { label: "Standard", res: 128 },
-  { label: "High", res: 192 },
-  { label: "Ultra", res: 256 },
+  { label: "Draft", res: 96 },
+  { label: "Standard", res: 160 },
+  { label: "High", res: 256 },
+  { label: "Ultra", res: 320 },
 ];
+
+// The Mandelbox is a dense, blocky solid that produces ~4× the triangles of the
+// organic Mandelbulb/Julia at the same grid size, so it's capped to keep export
+// files (and browser memory) sane.
+const MAX_MESH_RES: Record<Fractal3DType, number> = {
+  mandelbulb: 320,
+  julia: 320,
+  mandelbox: 256,
+};
 
 export default function Fractal3D() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -228,7 +239,7 @@ export default function Fractal3D() {
         boxScale,
         juliaC,
         iterations,
-        resolution: MESH_RES[meshResIdx].res,
+        resolution: Math.min(MESH_RES[meshResIdx].res, MAX_MESH_RES[type]),
       },
       format: meshFormat,
     };
