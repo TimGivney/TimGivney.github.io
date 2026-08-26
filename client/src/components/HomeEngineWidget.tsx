@@ -66,7 +66,8 @@ export default function HomeEngineWidget() {
     const view = viewRef.current;
     if (!view) return;
     let next = current;
-    while (next === current) next = SPOTS[Math.floor(Math.random() * SPOTS.length)];
+    while (next === current)
+      next = SPOTS[Math.floor(Math.random() * SPOTS.length)];
     setCurrent(next);
     view.setEngine(next);
     view.resetView();

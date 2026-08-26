@@ -1,13 +1,13 @@
-import { useState, type FormEvent } from 'react';
-import HomeCubeWidget from '@/components/HomeCubeWidget';
-import HomeFractalWidget from '@/components/HomeFractalWidget';
-import HomeFractal3DWidget from '@/components/HomeFractal3DWidget';
-import HomeFallsCreekWidget from '@/components/HomeFallsCreekWidget';
-import HomeSkyWidget from '@/components/HomeSkyWidget';
-import HomeToxicWidget from '@/components/HomeToxicWidget';
-import HomeEngineWidget from '@/components/HomeEngineWidget';
-import HomeFoundationWidget from '@/components/HomeFoundationWidget';
-import HomeRedbackWidget from '@/components/HomeRedbackWidget';
+import { useState, type FormEvent } from "react";
+import HomeCubeWidget from "@/components/HomeCubeWidget";
+import HomeFractalWidget from "@/components/HomeFractalWidget";
+import HomeFractal3DWidget from "@/components/HomeFractal3DWidget";
+import HomeFallsCreekWidget from "@/components/HomeFallsCreekWidget";
+import HomeSkyWidget from "@/components/HomeSkyWidget";
+import HomeToxicWidget from "@/components/HomeToxicWidget";
+import HomeEngineWidget from "@/components/HomeEngineWidget";
+import HomeFoundationWidget from "@/components/HomeFoundationWidget";
+import HomeRedbackWidget from "@/components/HomeRedbackWidget";
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -18,189 +18,210 @@ import HomeRedbackWidget from '@/components/HomeRedbackWidget';
  */
 
 // Web3Forms public access key (client-side beacon, not a secret).
-const WEB3FORMS_ACCESS_KEY = '7d55d5f3-5904-4d30-bc13-be0b0b63936f';
+const WEB3FORMS_ACCESS_KEY = "7d55d5f3-5904-4d30-bc13-be0b0b63936f";
 
 export default function Home() {
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
-  const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [formStatus, setFormStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
 
   async function handleContactSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    setFormStatus('submitting');
+    setFormStatus("submitting");
     const formData = new FormData(form);
-    formData.append('access_key', WEB3FORMS_ACCESS_KEY);
-    formData.append('subject', 'New message from timgivney.com');
-    formData.append('from_name', 'timgivney.com contact form');
+    formData.append("access_key", WEB3FORMS_ACCESS_KEY);
+    formData.append("subject", "New message from timgivney.com");
+    formData.append("from_name", "timgivney.com contact form");
     try {
-      const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
+      const res = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
         body: formData,
       });
       const data = await res.json();
       if (data.success) {
-        setFormStatus('success');
+        setFormStatus("success");
         form.reset();
       } else {
-        setFormStatus('error');
+        setFormStatus("error");
       }
     } catch {
-      setFormStatus('error');
+      setFormStatus("error");
     }
   }
 
   const projects = [
     {
-      id: 'ap50',
-      title: 'AP+ AP50 Diaphragm Pump',
+      id: "ap50",
+      title: "AP+ AP50 Diaphragm Pump",
       directLink: true,
-      subtitle: 'Lead Designer & Product Development',
-      description: 'Precision vacuum diaphragm pump designed for industrial applications. Engineered high-performance 50CFM pump with optimised casting, FEA analysis, and precision manufacturing workflows.',
-      tags: ['CAD', 'FEA', 'Manufacturing', 'Product Design'],
-      image: '/assets/ASM-DP-APP-50CFM_AP50-AP-PLUS-50CFM-DIAPHRAGM-PUMP-VIEW-5-WITH-QD-BUSH-PULLEY-scaled_4bff7966.jpg',
-      link: 'https://partsbender.com/product/ap-ap50-50-cfm-vacuum-diaphragm-pump/'
+      subtitle: "Lead Designer & Product Development",
+      description:
+        "Precision vacuum diaphragm pump designed for industrial applications. Engineered high-performance 50CFM pump with optimised casting, FEA analysis, and precision manufacturing workflows.",
+      tags: ["CAD", "FEA", "Manufacturing", "Product Design"],
+      image:
+        "/assets/ASM-DP-APP-50CFM_AP50-AP-PLUS-50CFM-DIAPHRAGM-PUMP-VIEW-5-WITH-QD-BUSH-PULLEY-scaled_4bff7966.jpg",
+      link: "https://partsbender.com/product/ap-ap50-50-cfm-vacuum-diaphragm-pump/",
     },
     {
-      id: '2c440',
-      title: 'AP+ 2C440 Air Compressor',
+      id: "2c440",
+      title: "AP+ 2C440 Air Compressor",
       directLink: true,
-      subtitle: 'Lead Design & Development',
-      description: 'Advanced air compressor system with precision engineering and thermal optimization. Developed through iterative testing and FEA analysis to deliver high-performance industrial compression.',
-      tags: ['Air Compressor', 'Thermal Analysis', 'Manufacturing', 'FEA'],
-      image: '/assets/AP-AP37-CFM-2C440-Air-Compressor-Crankcase-Cut-In-Half-Checking-Porisity-First-Samples_Jun2025_3_d9586f9d.jpg',
-      link: 'https://partsbender.com/product/ap-air-compressor-37-cfm-coming-soon/'
+      subtitle: "Lead Design & Development",
+      description:
+        "Advanced air compressor system with precision engineering and thermal optimization. Developed through iterative testing and FEA analysis to deliver high-performance industrial compression.",
+      tags: ["Air Compressor", "Thermal Analysis", "Manufacturing", "FEA"],
+      image:
+        "/assets/AP-AP37-CFM-2C440-Air-Compressor-Crankcase-Cut-In-Half-Checking-Porisity-First-Samples_Jun2025_3_d9586f9d.jpg",
+      link: "https://partsbender.com/product/ap-air-compressor-37-cfm-coming-soon/",
     },
     {
-      id: 'skapa',
-      title: 'SKAPA Sunglasses',
+      id: "skapa",
+      title: "SKAPA Sunglasses",
       directLink: true,
-      subtitle: 'Product Design & Manufacturing',
-      description: 'High-performance sunglasses engineered for durability and style. Designed with precision manufacturing techniques and optimised for comfort and visual clarity in demanding environments.',
-      tags: ['Product Design', 'Manufacturing', 'Materials', 'CAD'],
-      image: '/assets/instagram-image-1_7d10d541.jpg',
-      link: 'https://www.instagram.com/skapa.designs/',
-      nativeRatio: true
+      subtitle: "Product Design & Manufacturing",
+      description:
+        "High-performance sunglasses engineered for durability and style. Designed with precision manufacturing techniques and optimised for comfort and visual clarity in demanding environments.",
+      tags: ["Product Design", "Manufacturing", "Materials", "CAD"],
+      image: "/assets/instagram-image-1_7d10d541.jpg",
+      link: "https://www.instagram.com/skapa.designs/",
+      nativeRatio: true,
     },
     {
-      id: 'lora',
-      title: 'Long Range Radio (LoRa) Weather and Air Quality Station',
-      subtitle: 'IoT & Environmental Monitoring',
-      description: 'A battery-powered long-range weather and air quality monitoring station built with a Raspberry Pi Pico and LoRaWAN, capable of transmitting environmental data to a live online dashboard for remote monitoring and alerts.',
-      tags: ['LoRaWAN', 'Raspberry Pi Pico', 'IoT', 'Environmental Monitoring'],
-      image: '/assets/lora-weather-station_4c46c7eb.jpg',
-      link: 'https://partsbender.com'
+      id: "lora",
+      title: "Long Range Radio (LoRa) Weather and Air Quality Station",
+      subtitle: "IoT & Environmental Monitoring",
+      description:
+        "A battery-powered long-range weather and air quality monitoring station built with a Raspberry Pi Pico and LoRaWAN, capable of transmitting environmental data to a live online dashboard for remote monitoring and alerts.",
+      tags: ["LoRaWAN", "Raspberry Pi Pico", "IoT", "Environmental Monitoring"],
+      image: "/assets/lora-weather-station_4c46c7eb.jpg",
+      link: "https://partsbender.com",
     },
     {
-      id: 'wled',
-      title: 'WLED Smart Lighting',
-      searchQuery: 'How to Easily Control Addressable LEDs with an ESP32 or ESP8266',
-      subtitle: 'Technical Education & IoT',
-      description: 'How to Easily Control Addressable LEDs with an ESP32 or ESP8266 | WLED Project. Comprehensive guide reaching 580k+ views, demonstrating custom pixel art and LED effects without coding.',
-      tags: ['ESP32', 'IoT', 'Electronics', 'Education'],
-      image: '/assets/wled-project_967547a3.jpg',
-      link: 'https://www.youtube.com/@timgivney',
-      nativeRatio: true
-    }
+      id: "wled",
+      title: "WLED Smart Lighting",
+      searchQuery:
+        "How to Easily Control Addressable LEDs with an ESP32 or ESP8266",
+      subtitle: "Technical Education & IoT",
+      description:
+        "How to Easily Control Addressable LEDs with an ESP32 or ESP8266 | WLED Project. Comprehensive guide reaching 580k+ views, demonstrating custom pixel art and LED effects without coding.",
+      tags: ["ESP32", "IoT", "Electronics", "Education"],
+      image: "/assets/wled-project_967547a3.jpg",
+      link: "https://www.youtube.com/@timgivney",
+      nativeRatio: true,
+    },
   ];
 
   const experience = [
     {
-      company: 'PartsBender',
-      role: 'Engineer and Operations',
-      period: '2024 – Present',
-      description: 'Supporting industrial engineering and manufacturing operations across product development, CAD systems, production preparation, inventory coordination, and technical e-commerce.'
+      company: "PartsBender",
+      role: "Engineer and Operations",
+      period: "2024 – Present",
+      description:
+        "Supporting industrial engineering and manufacturing operations across product development, CAD systems, production preparation, inventory coordination, and technical e-commerce.",
     },
     {
-      company: 'Cobalt CNC',
-      role: 'CNC Workshop Operator',
-      period: '2023 – 2024',
-      description: 'Operated SYIL X11 CNC systems for precision machining and fabrication. Utilised 3D scanning technologies and CAD workflow support for product development.'
+      company: "Cobalt CNC",
+      role: "CNC Workshop Operator",
+      period: "2023 – 2024",
+      description:
+        "Operated SYIL X11 CNC systems for precision machining and fabrication. Utilised 3D scanning technologies and CAD workflow support for product development.",
     },
     {
-      company: 'Core Electronics',
-      role: 'Creative Technologist / Engineer',
-      period: '2020 – 2023',
-      description: 'Produced 100+ educational videos and technical resources for the maker community, accumulating 6M+ YouTube views. Facilitated workshops and technical communication.'
+      company: "Core Electronics",
+      role: "Creative Technologist / Engineer",
+      period: "2020 – 2023",
+      description:
+        "Produced 100+ educational videos and technical resources for the maker community, accumulating 6M+ YouTube views. Facilitated workshops and technical communication.",
     },
     {
-      company: 'CASMAT Pty Ltd',
-      role: 'Contract Engineer',
-      period: '2019 – 2020',
-      description: 'Executed critical industrial maintenance projects within high-stakes, heavy-industry sites including the Tomago Aluminium Smelter and Liddell Power Station under strict safety compliance.'
+      company: "CASMAT Pty Ltd",
+      role: "Contract Engineer",
+      period: "2019 – 2020",
+      description:
+        "Executed critical industrial maintenance projects within high-stakes, heavy-industry sites including the Tomago Aluminium Smelter and Liddell Power Station under strict safety compliance.",
     },
     {
-      company: 'Coal Mines (Mount Thorley & Hunter Valley)',
-      role: 'Industrial Machinery Servicing',
-      period: '2018',
-      description: 'Handled heavy machinery asset maintenance at Mount Thorley and Hunter Valley Coal Mines, ensuring operational reliability in demanding industrial environments.'
-    }
+      company: "Coal Mines (Mount Thorley & Hunter Valley)",
+      role: "Industrial Machinery Servicing",
+      period: "2018",
+      description:
+        "Handled heavy machinery asset maintenance at Mount Thorley and Hunter Valley Coal Mines, ensuring operational reliability in demanding industrial environments.",
+    },
   ];
 
-  const interests: { image: string; alt: string; fullWidth?: boolean; contain?: boolean }[] = [
+  const interests: {
+    image: string;
+    alt: string;
+    fullWidth?: boolean;
+    contain?: boolean;
+  }[] = [
     {
-      image: '/assets/tim-main-photo_215ad6e8.jpg',
-      alt: 'Tim Givney'
+      image: "/assets/tim-main-photo_215ad6e8.jpg",
+      alt: "Tim Givney",
     },
     {
-      image: '/assets/instagram-image-2_299dc666.jpg',
-      alt: 'Adventure'
+      image: "/assets/instagram-image-2_299dc666.jpg",
+      alt: "Adventure",
     },
     {
-      image: '/assets/50CFM-Vacuum-Pump-AP-AP50-AP_50CFM-Production-Castings_24_5d3d5a3c.jpg',
-      alt: 'Manufacturing'
+      image:
+        "/assets/50CFM-Vacuum-Pump-AP-AP50-AP_50CFM-Production-Castings_24_5d3d5a3c.jpg",
+      alt: "Manufacturing",
     },
     {
-      image: '/assets/thermal-imaging_0bc375a1.jpg',
-      alt: 'Engineering'
+      image: "/assets/thermal-imaging_0bc375a1.jpg",
+      alt: "Engineering",
     },
     {
-      image: '/assets/interests-image-1_fa0650ad.jpg',
-      alt: 'Project work'
+      image: "/assets/interests-image-1_fa0650ad.jpg",
+      alt: "Project work",
     },
     {
-      image: '/assets/interests-image-2_ddc23267.jpg',
-      alt: 'Outdoor exploration'
+      image: "/assets/interests-image-2_ddc23267.jpg",
+      alt: "Outdoor exploration",
     },
     {
-      image: '/assets/interests-image-3_d21ba2c7.jpg',
-      alt: 'Nature photography'
+      image: "/assets/interests-image-3_d21ba2c7.jpg",
+      alt: "Nature photography",
     },
     {
-      image: '/assets/interests-image-7_b0c377b2.jpg',
-      alt: 'Wildlife'
+      image: "/assets/interests-image-7_b0c377b2.jpg",
+      alt: "Wildlife",
     },
     {
-      image: '/assets/parrot-photo_093f39bc.webp',
-      alt: 'Australian birdlife'
+      image: "/assets/parrot-photo_093f39bc.webp",
+      alt: "Australian birdlife",
     },
     {
-      image: '/assets/extra-1_3739e11d.jpg',
-      alt: 'Exploration'
+      image: "/assets/extra-1_3739e11d.jpg",
+      alt: "Exploration",
     },
     {
-      image: '/assets/car-restoration_ab1305d7.jpg',
-      alt: 'Car restoration project'
+      image: "/assets/car-restoration_ab1305d7.jpg",
+      alt: "Car restoration project",
     },
     {
-      image: '/assets/extra-4_d7ec8dde.jpeg',
-      alt: 'Industrial work'
+      image: "/assets/extra-4_d7ec8dde.jpeg",
+      alt: "Industrial work",
     },
     {
-      image: '/assets/race-car_48cc937c.webp',
-      alt: 'Historic racing'
+      image: "/assets/race-car_48cc937c.webp",
+      alt: "Historic racing",
     },
     {
-      image: '/assets/macaw_1c65cbdd.webp',
-      alt: 'Australian wildlife'
+      image: "/assets/macaw_1c65cbdd.webp",
+      alt: "Australian wildlife",
     },
     {
-      image: '/assets/hawk-photo_ce2b499d.jpg',
-      alt: 'Australian bird of prey'
+      image: "/assets/hawk-photo_ce2b499d.jpg",
+      alt: "Australian bird of prey",
     },
     {
-      image: '/assets/cockatoo-photo_7153e368.jpg',
-      alt: 'Cockatoo in the wild'
-    }
+      image: "/assets/cockatoo-photo_7153e368.jpg",
+      alt: "Cockatoo in the wild",
+    },
   ];
 
   return (
@@ -208,14 +229,48 @@ export default function Home() {
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <a href="#about" className="shrink-0 whitespace-nowrap text-xl sm:text-2xl font-bold" style={{ color: '#1B3F6B' }} aria-label="Tim Givney - home">Tim Givney</a>
+          <a
+            href="#about"
+            className="shrink-0 whitespace-nowrap text-xl sm:text-2xl font-bold"
+            style={{ color: "#1B3F6B" }}
+            aria-label="Tim Givney - home"
+          >
+            Tim Givney
+          </a>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm sm:flex-nowrap sm:gap-8">
-            <a href="#about" className="hover:text-blue-700 transition-colors">About</a>
-            <a href="#experience" className="hover:text-blue-700 transition-colors">Experience</a>
-            <a href="#projects" className="hover:text-blue-700 transition-colors">Projects</a>
-            <a href="#leadership" className="hover:text-blue-700 transition-colors">Leadership</a>
-            <a href="#education" className="hover:text-blue-700 transition-colors">Education</a>
-            <a href="#extracurricular" className="hover:text-blue-700 transition-colors">Extracurricular</a>
+            <a href="#about" className="hover:text-blue-700 transition-colors">
+              About
+            </a>
+            <a
+              href="#experience"
+              className="hover:text-blue-700 transition-colors"
+            >
+              Experience
+            </a>
+            <a
+              href="#projects"
+              className="hover:text-blue-700 transition-colors"
+            >
+              Projects
+            </a>
+            <a
+              href="#leadership"
+              className="hover:text-blue-700 transition-colors"
+            >
+              Leadership
+            </a>
+            <a
+              href="#education"
+              className="hover:text-blue-700 transition-colors"
+            >
+              Education
+            </a>
+            <a
+              href="#extracurricular"
+              className="hover:text-blue-700 transition-colors"
+            >
+              Extracurricular
+            </a>
           </div>
         </div>
       </nav>
@@ -225,48 +280,79 @@ export default function Home() {
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Left: Content */}
           <div>
-            <h1 className="text-6xl font-bold mb-4" style={{ color: '#1B3F6B' }}>Tim Givney</h1>
-            <p className="text-lg mb-6" style={{ color: '#1B3F6B' }}>Industrial Engineering • Manufacturing • Technical Systems</p>
-            <p className="text-base leading-relaxed text-gray-700 mb-12">I design, manufacture, and field-test high-reliability mechanical and electronic systems that survive the harshest real-world environments. From heavy-industry mine sites to precision CNC machining and technical media collectively garnering millions of views, I combine hardcore workshop execution with advanced engineering to turn complex concepts into working hardware.</p>
-            
+            <h1
+              className="text-6xl font-bold mb-4"
+              style={{ color: "#1B3F6B" }}
+            >
+              Tim Givney
+            </h1>
+            <p className="text-lg mb-6" style={{ color: "#1B3F6B" }}>
+              Industrial Engineering • Manufacturing • Technical Systems
+            </p>
+            <p className="text-base leading-relaxed text-gray-700 mb-12">
+              I design, manufacture, and field-test high-reliability mechanical
+              and electronic systems that survive the harshest real-world
+              environments. From heavy-industry mine sites to precision CNC
+              machining and technical media collectively garnering millions of
+              views, I combine hardcore workshop execution with advanced
+              engineering to turn complex concepts into working hardware.
+            </p>
+
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8">
               <div>
-                <div className="text-4xl font-bold" style={{ color: '#C9A84C' }}>6M+</div>
+                <div
+                  className="text-4xl font-bold"
+                  style={{ color: "#C9A84C" }}
+                >
+                  6M+
+                </div>
                 <div className="text-xs label mt-2">YouTube Views</div>
               </div>
               <div>
-                <div className="text-4xl font-bold" style={{ color: '#C9A84C' }}>15+</div>
+                <div
+                  className="text-4xl font-bold"
+                  style={{ color: "#C9A84C" }}
+                >
+                  15+
+                </div>
                 <div className="text-xs label mt-2">Years Experience</div>
               </div>
               <div>
-                <div className="text-2xl font-bold" style={{ color: '#C9A84C' }}>Newcastle</div>
+                <div
+                  className="text-2xl font-bold"
+                  style={{ color: "#C9A84C" }}
+                >
+                  Newcastle
+                </div>
                 <div className="text-xs label mt-2">NSW Australia</div>
               </div>
             </div>
-            
+
             {/* Download Button */}
             <div className="mt-12">
-              <a 
-                href="/timgivney-website.zip" 
+              <a
+                href="/timgivney-website.zip"
                 download="timgivney-website.zip"
                 className="inline-block px-8 py-3 font-semibold rounded transition-all duration-200"
-                style={{ backgroundColor: '#1B3F6B', color: '#FFFFFF' }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                style={{ backgroundColor: "#1B3F6B", color: "#FFFFFF" }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = "0.9")}
+                onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
               >
                 Download Webpage
               </a>
             </div>
           </div>
-          
+
           {/* Right: Image */}
           <div className="flex justify-center">
-            <img 
-              src="/assets/tim-horse-hero_65c8126c.jpg" 
-              alt="Tim Givney, mechanical engineer" 
-              width={896} height={1152}
-              fetchPriority="high" decoding="async"
+            <img
+              src="/assets/tim-horse-hero_65c8126c.jpg"
+              alt="Tim Givney, mechanical engineer"
+              width={896}
+              height={1152}
+              fetchPriority="high"
+              decoding="async"
               className="w-full max-w-sm rounded-lg shadow-lg transition-transform duration-300 hover:scale-105"
             />
           </div>
@@ -277,24 +363,43 @@ export default function Home() {
       <section id="about" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>About</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              About
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6 text-gray-700">
-              <p>I'm a Mechanical Engineer building systems that survive the real world. My work sits between high-level design and hands-on execution, spanning CNC machining, industrial manufacturing, reverse engineering, and embedded electronics. I focus on practical engineering where reliability, usability, and manufacturability matter most.</p>
-              
-              <p>Alongside engineering, I build technical education content. I produce technical content spanning embedded systems, microcontroller and microprocessor development, wireless communications (including long-range radio systems), computer vision and applied AI, electronics design, and 3D printing and fabrication workflows. This work has reached over 6 million views on YouTube globally.</p>
-              
+              <p>
+                I'm a Mechanical Engineer building systems that survive the real
+                world. My work sits between high-level design and hands-on
+                execution, spanning CNC machining, industrial manufacturing,
+                reverse engineering, and embedded electronics. I focus on
+                practical engineering where reliability, usability, and
+                manufacturability matter most.
+              </p>
 
+              <p>
+                Alongside engineering, I build technical education content. I
+                produce technical content spanning embedded systems,
+                microcontroller and microprocessor development, wireless
+                communications (including long-range radio systems), computer
+                vision and applied AI, electronics design, and 3D printing and
+                fabrication workflows. This work has reached over 6 million
+                views on YouTube globally.
+              </p>
             </div>
-            
+
             <div className="flex justify-center">
-              <img 
-                src="/assets/Tim-Partsbender-Organising-Product-whilst-running-CNC-Machine-in-background-Thumbs-Up_805a7cf4.jpg" 
-                alt="Tim Givney organising product while running a CNC machine at PartsBender" 
-                loading="lazy" decoding="async"
+              <img
+                src="/assets/Tim-Partsbender-Organising-Product-whilst-running-CNC-Machine-in-background-Thumbs-Up_805a7cf4.jpg"
+                alt="Tim Givney organising product while running a CNC machine at PartsBender"
+                loading="lazy"
+                decoding="async"
                 className="w-full max-w-sm rounded-lg shadow-lg transition-transform duration-300 hover:scale-105"
               />
             </div>
@@ -303,21 +408,46 @@ export default function Home() {
       </section>
 
       {/* Experience Section */}
-      <section id="experience" className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#EEF3F9' }}>
+      <section
+        id="experience"
+        className="py-20 px-4 sm:px-6 lg:px-8"
+        style={{ backgroundColor: "#EEF3F9" }}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Experience</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Experience
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="space-y-8">
             {experience.map((item, idx) => (
-              <div key={idx} className="border-l-4 pl-6" style={{ borderColor: '#C9A84C' }}>
+              <div
+                key={idx}
+                className="border-l-4 pl-6"
+                style={{ borderColor: "#C9A84C" }}
+              >
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-2xl font-bold" style={{ color: '#1B3F6B' }}>{item.company}</h3>
-                  <span className="label" style={{ color: '#71717A' }}>{item.period}</span>
+                  <h3
+                    className="text-2xl font-bold"
+                    style={{ color: "#1B3F6B" }}
+                  >
+                    {item.company}
+                  </h3>
+                  <span className="label" style={{ color: "#71717A" }}>
+                    {item.period}
+                  </span>
                 </div>
-                <h4 className="text-lg font-semibold mb-3" style={{ color: '#1B3F6B' }}>{item.role}</h4>
+                <h4
+                  className="text-lg font-semibold mb-3"
+                  style={{ color: "#1B3F6B" }}
+                >
+                  {item.role}
+                </h4>
                 <p className="text-gray-700">{item.description}</p>
               </div>
             ))}
@@ -329,69 +459,116 @@ export default function Home() {
       <section id="projects" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Featured Products</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Featured Products
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="space-y-16">
-            {projects.map((project) => (
-              <div 
+            {projects.map(project => (
+              <div
                 key={project.id}
                 className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
                 onMouseEnter={() => setHoveredProject(project.id)}
                 onMouseLeave={() => setHoveredProject(null)}
               >
                 {/* Content on left */}
-                <div className="border-l-4 pl-6" style={{ borderColor: '#C9A84C' }}>
-                  <h3 className="text-2xl font-bold mb-2" style={{ color: '#1B3F6B' }}>{project.title}</h3>
+                <div
+                  className="border-l-4 pl-6"
+                  style={{ borderColor: "#C9A84C" }}
+                >
+                  <h3
+                    className="text-2xl font-bold mb-2"
+                    style={{ color: "#1B3F6B" }}
+                  >
+                    {project.title}
+                  </h3>
                   <p className="text-sm label mb-4">{project.subtitle}</p>
                   <p className="text-gray-700 mb-6">{project.description}</p>
                   <div className="flex flex-wrap gap-2 mb-6">
                     {project.tags.map((tag, i) => (
-                      <span key={i} className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#EEF3F9', color: '#1B3F6B', border: '1px solid #C9A84C' }}>
+                      <span
+                        key={i}
+                        className="text-xs px-3 py-1 rounded"
+                        style={{
+                          backgroundColor: "#EEF3F9",
+                          color: "#1B3F6B",
+                          border: "1px solid #C9A84C",
+                        }}
+                      >
                         {tag}
                       </span>
                     ))}
                   </div>
                   {project.link && (
-                    <a 
-                      href={project.directLink ? project.link : `https://letmegooglethat.com/?q=${encodeURIComponent(project.searchQuery ?? project.title)}`}
-                      target="_blank" 
+                    <a
+                      href={
+                        project.directLink
+                          ? project.link
+                          : `https://letmegooglethat.com/?q=${encodeURIComponent(project.searchQuery ?? project.title)}`
+                      }
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="inline-block text-sm font-semibold transition-colors duration-200"
-                      style={{ color: '#C9A84C' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                      onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-                      aria-label={project.directLink ? `View ${project.title}` : `Search for ${project.title}`}
+                      style={{ color: "#C9A84C" }}
+                      onMouseEnter={e =>
+                        (e.currentTarget.style.textDecoration = "underline")
+                      }
+                      onMouseLeave={e =>
+                        (e.currentTarget.style.textDecoration = "none")
+                      }
+                      aria-label={
+                        project.directLink
+                          ? `View ${project.title}`
+                          : `Search for ${project.title}`
+                      }
                     >
                       View Project →
                     </a>
                   )}
                 </div>
-                
+
                 {/* Image on right - square or native ratio */}
                 <div className="flex justify-center">
                   {project.nativeRatio ? (
-                    <div className="w-full max-w-sm overflow-hidden rounded-lg shadow-lg" style={{ borderTop: '4px solid #C9A84C' }}>
-                      <img 
-                        src={project.image} 
+                    <div
+                      className="w-full max-w-sm overflow-hidden rounded-lg shadow-lg"
+                      style={{ borderTop: "4px solid #C9A84C" }}
+                    >
+                      <img
+                        src={project.image}
                         alt={`${project.title} - ${project.subtitle}`}
-                        loading="lazy" decoding="async"
+                        loading="lazy"
+                        decoding="async"
                         className="w-full object-cover transition-transform duration-300"
                         style={{
-                          transform: hoveredProject === project.id ? 'scale(1.04)' : 'scale(1)'
+                          transform:
+                            hoveredProject === project.id
+                              ? "scale(1.04)"
+                              : "scale(1)",
                         }}
                       />
                     </div>
                   ) : (
-                    <div className="w-full max-w-sm aspect-square overflow-hidden rounded-lg shadow-lg" style={{ borderTop: '4px solid #C9A84C' }}>
-                      <img 
-                        src={project.image} 
+                    <div
+                      className="w-full max-w-sm aspect-square overflow-hidden rounded-lg shadow-lg"
+                      style={{ borderTop: "4px solid #C9A84C" }}
+                    >
+                      <img
+                        src={project.image}
                         alt={`${project.title} - ${project.subtitle}`}
-                        loading="lazy" decoding="async"
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover transition-transform duration-300"
                         style={{
-                          transform: hoveredProject === project.id ? 'scale(1.04)' : 'scale(1)'
+                          transform:
+                            hoveredProject === project.id
+                              ? "scale(1.04)"
+                              : "scale(1)",
                         }}
                       />
                     </div>
@@ -404,31 +581,86 @@ export default function Home() {
       </section>
 
       {/* Leadership & Volunteer Work Section */}
-      <section id="leadership" className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#EEF3F9' }}>
+      <section
+        id="leadership"
+        className="py-20 px-4 sm:px-6 lg:px-8"
+        style={{ backgroundColor: "#EEF3F9" }}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Leadership & Volunteer Work</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Leadership & Volunteer Work
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="border-l-4 pl-6" style={{ borderColor: '#C9A84C' }}>
-              <h3 className="text-2xl font-bold mb-2" style={{ color: '#1B3F6B' }}>Save Our Coast</h3>
-              <p className="text-sm label mb-4">Board Director & Treasurer (Volunteer) | 2019 – Present</p>
-              <p className="text-gray-700 mb-4">Environmental leadership and strategic planning for marine conservation. Direct financial records, corporate governance, and strategic funding initiatives-including securing grants from Patagonia Inc.'s 1% Program.</p>
-              <p className="text-gray-700 mb-4">Spearheaded operations for large-scale public events drawing 1,500+ attendees. Contributed to historic grassroots conservation victories, including collecting 77,000+ signatures that successfully halted offshore seismic testing and fossil fuel exploration (PEP11) along the NSW coastline.</p>
+            <div className="border-l-4 pl-6" style={{ borderColor: "#C9A84C" }}>
+              <h3
+                className="text-2xl font-bold mb-2"
+                style={{ color: "#1B3F6B" }}
+              >
+                Save Our Coast
+              </h3>
+              <p className="text-sm label mb-4">
+                Board Director & Treasurer (Volunteer) | 2019 – Present
+              </p>
+              <p className="text-gray-700 mb-4">
+                Environmental leadership and strategic planning for marine
+                conservation. Direct financial records, corporate governance,
+                and strategic funding initiatives-including securing grants from
+                Patagonia Inc.'s 1% Program.
+              </p>
+              <p className="text-gray-700 mb-4">
+                Spearheaded operations for large-scale public events drawing
+                1,500+ attendees. Contributed to historic grassroots
+                conservation victories, including collecting 77,000+ signatures
+                that successfully halted offshore seismic testing and fossil
+                fuel exploration (PEP11) along the NSW coastline.
+              </p>
               <div className="flex flex-wrap gap-2">
-                <span className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FFFFFF', color: '#1B3F6B', border: '1px solid #C9A84C' }}>Environmental Leadership</span>
-                <span className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FFFFFF', color: '#1B3F6B', border: '1px solid #C9A84C' }}>Marine Conservation</span>
-                <span className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FFFFFF', color: '#1B3F6B', border: '1px solid #C9A84C' }}>Strategic Planning</span>
+                <span
+                  className="text-xs px-3 py-1 rounded"
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    color: "#1B3F6B",
+                    border: "1px solid #C9A84C",
+                  }}
+                >
+                  Environmental Leadership
+                </span>
+                <span
+                  className="text-xs px-3 py-1 rounded"
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    color: "#1B3F6B",
+                    border: "1px solid #C9A84C",
+                  }}
+                >
+                  Marine Conservation
+                </span>
+                <span
+                  className="text-xs px-3 py-1 rounded"
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    color: "#1B3F6B",
+                    border: "1px solid #C9A84C",
+                  }}
+                >
+                  Strategic Planning
+                </span>
               </div>
             </div>
-            
+
             <div className="flex justify-center">
-              <img 
-                src="/assets/Save_Our_Coast_2-1024x326_bf737df2.webp" 
-                alt="Save Our Coast - marine conservation organisation" 
-                loading="lazy" decoding="async"
+              <img
+                src="/assets/Save_Our_Coast_2-1024x326_bf737df2.webp"
+                alt="Save Our Coast - marine conservation organisation"
+                loading="lazy"
+                decoding="async"
                 className="w-full rounded-lg shadow-lg transition-transform duration-300 hover:scale-105"
               />
             </div>
@@ -440,13 +672,23 @@ export default function Home() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Technical Capabilities & Expertise</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Technical Capabilities & Expertise
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <div>
-              <h3 className="text-lg font-bold mb-4" style={{ color: '#1B3F6B' }}>🛠️ Mechanical Engineering & Industrial Manufacturing</h3>
+              <h3
+                className="text-lg font-bold mb-4"
+                style={{ color: "#1B3F6B" }}
+              >
+                🛠️ Mechanical Engineering & Industrial Manufacturing
+              </h3>
               <ul className="space-y-2 text-gray-700 mb-8">
                 <li>Design & Reverse Engineering</li>
                 <li>Machining & Fabrication</li>
@@ -454,14 +696,24 @@ export default function Home() {
                 <li>Structural Analysis</li>
               </ul>
 
-              <h3 className="text-lg font-bold mb-4" style={{ color: '#1B3F6B' }}>⚡ Hardware, Firmware & Intelligent Systems</h3>
+              <h3
+                className="text-lg font-bold mb-4"
+                style={{ color: "#1B3F6B" }}
+              >
+                ⚡ Hardware, Firmware & Intelligent Systems
+              </h3>
               <ul className="space-y-2 text-gray-700 mb-8">
                 <li>Microcontrollers & Hardware</li>
                 <li>Firmware & Automation</li>
                 <li>IoT & Integration</li>
               </ul>
 
-              <h3 className="text-lg font-bold mb-4" style={{ color: '#1B3F6B' }}>💻 Software, CAD & Engineering Tools</h3>
+              <h3
+                className="text-lg font-bold mb-4"
+                style={{ color: "#1B3F6B" }}
+              >
+                💻 Software, CAD & Engineering Tools
+              </h3>
               <ul className="space-y-2 text-gray-700">
                 <li>Design & Simulation</li>
                 <li>Programming & Systems</li>
@@ -470,14 +722,24 @@ export default function Home() {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold mb-4" style={{ color: '#1B3F6B' }}>📢 Technical Communication & Operations</h3>
+              <h3
+                className="text-lg font-bold mb-4"
+                style={{ color: "#1B3F6B" }}
+              >
+                📢 Technical Communication & Operations
+              </h3>
               <ul className="space-y-2 text-gray-700 mb-8">
                 <li>Engineering Media</li>
                 <li>Documentation</li>
                 <li>Leadership & Compliance</li>
               </ul>
 
-              <h3 className="text-lg font-bold mb-4" style={{ color: '#1B3F6B' }}>📸 Commercial Media & Industrial Imaging</h3>
+              <h3
+                className="text-lg font-bold mb-4"
+                style={{ color: "#1B3F6B" }}
+              >
+                📸 Commercial Media & Industrial Imaging
+              </h3>
               <ul className="space-y-2 text-gray-700">
                 <li>Visual Asset Creation</li>
                 <li>Corporate & Site Media</li>
@@ -489,22 +751,43 @@ export default function Home() {
       </section>
 
       {/* Education Section */}
-      <section id="education" className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#EEF3F9' }}>
+      <section
+        id="education"
+        className="py-20 px-4 sm:px-6 lg:px-8"
+        style={{ backgroundColor: "#EEF3F9" }}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Education & Certifications</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Education & Certifications
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <div>
-              <h3 className="text-2xl font-bold mb-2" style={{ color: '#1B3F6B' }}>Bachelor of Mechanical Engineering (Honours)</h3>
-              <p className="text-lg font-semibold mb-2">The University of Sydney</p>
+              <h3
+                className="text-2xl font-bold mb-2"
+                style={{ color: "#1B3F6B" }}
+              >
+                Bachelor of Mechanical Engineering (Honours)
+              </h3>
+              <p className="text-lg font-semibold mb-2">
+                The University of Sydney
+              </p>
               <p className="text-gray-700">Graduated 2016</p>
             </div>
-            
+
             <div>
-              <h3 className="text-xl font-bold mb-4" style={{ color: '#1B3F6B' }}>Professional Certifications</h3>
+              <h3
+                className="text-xl font-bold mb-4"
+                style={{ color: "#1B3F6B" }}
+              >
+                Professional Certifications
+              </h3>
               <ul className="space-y-2 text-gray-700">
                 <li>• Forklift Licence</li>
                 <li>• Working at Heights & Confined Spaces</li>
@@ -521,33 +804,42 @@ export default function Home() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Interests & Passions</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Interests & Passions
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="mb-8">
-            <p className="text-gray-700 text-lg mb-8">Outside engineering, I spend time rock climbing, skiing, restoring vehicles, exploring fabrication projects, and photographing Australian birdlife - interests that continue to shape my attention to detail, patience, and observation.</p>
+            <p className="text-gray-700 text-lg mb-8">
+              Outside engineering, I spend time rock climbing, skiing, restoring
+              vehicles, exploring fabrication projects, and photographing
+              Australian birdlife - interests that continue to shape my
+              attention to detail, patience, and observation.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {interests.map((item, idx) => (
-              <div 
+              <div
                 key={idx}
                 className={`overflow-hidden rounded-lg shadow-md transition-transform duration-300 hover:scale-105 ${
-                  item.fullWidth ? 'lg:col-span-4' : ''
+                  item.fullWidth ? "lg:col-span-4" : ""
                 }`}
-                style={{ borderTop: '4px solid #C9A84C' }}
+                style={{ borderTop: "4px solid #C9A84C" }}
               >
-                <img 
-                  src={item.image} 
+                <img
+                  src={item.image}
                   alt={item.alt}
-                  loading="lazy" decoding="async"
+                  loading="lazy"
+                  decoding="async"
                   className={`w-full ${
-                    item.contain ? 'object-contain' : 'object-cover'
-                  } ${
-                    item.fullWidth ? 'h-96' : 'h-64'
-                  }`}
-                  style={item.contain ? { backgroundColor: '#f5f5f5' } : {}}
+                    item.contain ? "object-contain" : "object-cover"
+                  } ${item.fullWidth ? "h-96" : "h-64"}`}
+                  style={item.contain ? { backgroundColor: "#f5f5f5" } : {}}
                 />
               </div>
             ))}
@@ -556,34 +848,58 @@ export default function Home() {
       </section>
 
       {/* Contact Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#EEF3F9' }}>
+      <section
+        className="py-20 px-4 sm:px-6 lg:px-8"
+        style={{ backgroundColor: "#EEF3F9" }}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-12">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Get in Touch</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Get in Touch
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
-          
+
           <div className="grid lg:grid-cols-3 gap-12 items-start">
             {/* Left: intro + direct contact details */}
             <div className="lg:col-span-1">
-              <p className="text-lg text-gray-700 mb-10">Whether it's manufacturing, product development, technical systems, or solving real-world engineering problems, I'm always interested in meaningful projects and new challenges. Feel free to get in touch if you are too.</p>
+              <p className="text-lg text-gray-700 mb-10">
+                Whether it's manufacturing, product development, technical
+                systems, or solving real-world engineering problems, I'm always
+                interested in meaningful projects and new challenges. Feel free
+                to get in touch if you are too.
+              </p>
 
               <div className="space-y-6">
                 <div>
                   <p className="text-sm label mb-2">Email</p>
-                  <a href="mailto:timgivney@gmail.com" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
+                  <a
+                    href="mailto:timgivney@gmail.com"
+                    className="text-lg font-semibold"
+                    style={{ color: "#1B3F6B" }}
+                  >
                     timgivney@gmail.com
                   </a>
                 </div>
                 <div>
                   <p className="text-sm label mb-2">Phone</p>
-                  <a href="tel:+61432504302" className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
+                  <a
+                    href="tel:+61432504302"
+                    className="text-lg font-semibold"
+                    style={{ color: "#1B3F6B" }}
+                  >
                     +61 432 504 302
                   </a>
                 </div>
                 <div>
                   <p className="text-sm label mb-2">Location</p>
-                  <p className="text-lg font-semibold" style={{ color: '#1B3F6B' }}>
+                  <p
+                    className="text-lg font-semibold"
+                    style={{ color: "#1B3F6B" }}
+                  >
                     NSW, Australia
                   </p>
                 </div>
@@ -592,17 +908,37 @@ export default function Home() {
 
             {/* Right: contact form */}
             <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6 sm:p-8">
-              <h3 className="text-xl font-bold mb-6" style={{ color: '#1B3F6B' }}>Send a message</h3>
-              {formStatus === 'success' ? (
-                <div role="status" className="rounded-md bg-green-50 border border-green-200 p-4 text-green-800">
-                  Thanks for reaching out - your message has been sent. I'll get back to you soon.
+              <h3
+                className="text-xl font-bold mb-6"
+                style={{ color: "#1B3F6B" }}
+              >
+                Send a message
+              </h3>
+              {formStatus === "success" ? (
+                <div
+                  role="status"
+                  className="rounded-md bg-green-50 border border-green-200 p-4 text-green-800"
+                >
+                  Thanks for reaching out - your message has been sent. I'll get
+                  back to you soon.
                 </div>
               ) : (
                 <form onSubmit={handleContactSubmit} className="space-y-5">
                   {/* Honeypot anti-spam field (hidden from users) */}
-                  <input type="checkbox" name="botcheck" tabIndex={-1} autoComplete="off" style={{ display: 'none' }} />
+                  <input
+                    type="checkbox"
+                    name="botcheck"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    style={{ display: "none" }}
+                  />
                   <div>
-                    <label htmlFor="contact-name" className="block text-sm label mb-2">Name</label>
+                    <label
+                      htmlFor="contact-name"
+                      className="block text-sm label mb-2"
+                    >
+                      Name
+                    </label>
                     <input
                       id="contact-name"
                       name="name"
@@ -613,7 +949,12 @@ export default function Home() {
                     />
                   </div>
                   <div>
-                    <label htmlFor="contact-email" className="block text-sm label mb-2">Email</label>
+                    <label
+                      htmlFor="contact-email"
+                      className="block text-sm label mb-2"
+                    >
+                      Email
+                    </label>
                     <input
                       id="contact-email"
                       name="email"
@@ -624,7 +965,12 @@ export default function Home() {
                     />
                   </div>
                   <div>
-                    <label htmlFor="contact-message" className="block text-sm label mb-2">Message</label>
+                    <label
+                      htmlFor="contact-message"
+                      className="block text-sm label mb-2"
+                    >
+                      Message
+                    </label>
                     <textarea
                       id="contact-message"
                       name="message"
@@ -633,40 +979,68 @@ export default function Home() {
                       className="w-full rounded-md border border-gray-300 px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C9A84C] focus:border-transparent resize-y"
                     />
                   </div>
-                  {formStatus === 'error' && (
+                  {formStatus === "error" && (
                     <p className="text-red-600 text-sm">
-                      Something went wrong. Please email me directly at{' '}
-                      <a href="mailto:timgivney@gmail.com" className="underline">timgivney@gmail.com</a>.
+                      Something went wrong. Please email me directly at{" "}
+                      <a
+                        href="mailto:timgivney@gmail.com"
+                        className="underline"
+                      >
+                        timgivney@gmail.com
+                      </a>
+                      .
                     </p>
                   )}
                   <button
                     type="submit"
-                    disabled={formStatus === 'submitting'}
+                    disabled={formStatus === "submitting"}
                     className="inline-flex items-center justify-center rounded-md px-6 py-3 font-semibold text-white transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: '#1B3F6B' }}
+                    style={{ backgroundColor: "#1B3F6B" }}
                   >
-                    {formStatus === 'submitting' ? 'Sending…' : 'Send message'}
+                    {formStatus === "submitting" ? "Sending…" : "Send message"}
                   </button>
                 </form>
               )}
             </div>
           </div>
-          
+
           {/* Extracurricular — interactive playgrounds and side projects */}
-          <div id="extracurricular" className="mt-20 flex scroll-mt-24 items-center gap-4 mb-4">
-            <h2 className="text-4xl font-bold" style={{ color: '#1B3F6B' }}>Extracurricular</h2>
-            <div className="flex-1 h-1" style={{ backgroundColor: '#C9A84C' }}></div>
+          <div
+            id="extracurricular"
+            className="mt-20 flex scroll-mt-24 items-center gap-4 mb-4"
+          >
+            <h2 className="text-4xl font-bold" style={{ color: "#1B3F6B" }}>
+              Extracurricular
+            </h2>
+            <div
+              className="flex-1 h-1"
+              style={{ backgroundColor: "#C9A84C" }}
+            ></div>
           </div>
           <p className="mb-10 max-w-3xl text-gray-600">
-            A few things I build for the joy of it — interactive toys rendered live in the browser. Have a play with the previews, or open the full version of each.
+            A few things I build for the joy of it — interactive toys rendered
+            live in the browser. Have a play with the previews, or open the full
+            version of each.
           </p>
 
           {/* Redback Webkeeper */}
           <div className="grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Redback Webkeeper</h3>
-              <p className="mt-3 text-gray-700">A living procedural spider web guarded by an Australian redback. Tear holes anywhere in the silk and she will detect the damage, rush across the web and spin each strand back into place.</p>
-              <p className="mt-3 text-sm text-gray-500">Keep breaking it and her patience runs out. Eventually she abandons the web and leaves every new hole behind.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Redback Webkeeper
+              </h3>
+              <p className="mt-3 text-gray-700">
+                A living procedural spider web guarded by an Australian redback.
+                Tear holes anywhere in the silk and she will detect the damage,
+                rush across the web and spin each strand back into place.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Keep breaking it and her patience runs out. Eventually she
+                abandons the web and leaves every new hole behind.
+              </p>
             </div>
             <HomeRedbackWidget />
           </div>
@@ -674,9 +1048,21 @@ export default function Home() {
           {/* Cube Studio */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Cube Studio</h3>
-              <p className="mt-3 text-gray-700">An interactive 3D Rubik&apos;s cube. Scramble it, then watch the solver unwind it move by move — every turn animated in real time with Three.js. Drag to rotate the cube in your hands.</p>
-              <p className="mt-3 text-sm text-gray-500">Try the live 5×5 preview, or open the full studio for the complete 2×2–5×5 simulator and solver.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Cube Studio
+              </h3>
+              <p className="mt-3 text-gray-700">
+                An interactive 3D Rubik&apos;s cube. Scramble it, then watch the
+                solver unwind it move by move — every turn animated in real time
+                with Three.js. Drag to rotate the cube in your hands.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Try the live 5×5 preview, or open the full studio for the
+                complete 2×2–5×5 simulator and solver.
+              </p>
             </div>
             <HomeCubeWidget />
           </div>
@@ -684,9 +1070,23 @@ export default function Home() {
           {/* Fractal Lab */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Fractal Lab</h3>
-              <p className="mt-3 text-gray-700">A GPU-accelerated Mandelbrot &amp; Julia explorer. Drag to pan, scroll to zoom toward the cursor, jump to famous landmarks, and recolour with live palettes — all rendered in real time in a WebGL shader.</p>
-              <p className="mt-3 text-sm text-gray-500">Tinker with the live preview, or open the full explorer for iteration depth, Julia constants, colour controls and a deep-zoom mode.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Fractal Lab
+              </h3>
+              <p className="mt-3 text-gray-700">
+                A GPU-accelerated Mandelbrot &amp; Julia explorer. Drag to pan,
+                scroll to zoom toward the cursor, jump to famous landmarks, and
+                recolour with live palettes — all rendered in real time in a
+                WebGL shader.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Tinker with the live preview, or open the full explorer for
+                iteration depth, Julia constants, colour controls and a
+                deep-zoom mode.
+              </p>
             </div>
             <HomeFractalWidget />
           </div>
@@ -694,9 +1094,22 @@ export default function Home() {
           {/* Fractal Lab 3D */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Fractal Lab 3D</h3>
-              <p className="mt-3 text-gray-700">Step into three dimensions. A real-time ray-marched explorer for the Mandelbulb, Mandelbox and quaternion Julia sets — orbit the shape, morph its parameters and recolour it live, all rendered in a WebGL shader.</p>
-              <p className="mt-3 text-sm text-gray-500">Spin the live preview, or open the full explorer for presets, fullscreen, colour drift and 4K/8K stills.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Fractal Lab 3D
+              </h3>
+              <p className="mt-3 text-gray-700">
+                Step into three dimensions. A real-time ray-marched explorer for
+                the Mandelbulb, Mandelbox and quaternion Julia sets — orbit the
+                shape, morph its parameters and recolour it live, all rendered
+                in a WebGL shader.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Spin the live preview, or open the full explorer for presets,
+                fullscreen, colour drift and 4K/8K stills.
+              </p>
             </div>
             <HomeFractal3DWidget />
           </div>
@@ -704,9 +1117,23 @@ export default function Home() {
           {/* Falls Creek Snow Map */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Falls Creek Snow Map</h3>
-              <p className="mt-3 text-gray-700">A live 3D alpine forecast for Falls Creek. The real mountain terrain, ski runs and lift network sit beneath an elevation-aware snow layer driven by the next 168 hours of summit and village weather.</p>
-              <p className="mt-3 text-sm text-gray-500">Scrub hour by hour, animate the forecast, compare existing modelled coverage with fresh and accumulated snow, and inspect freezing level, snow line, rain and summit wind.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Falls Creek Snow Map
+              </h3>
+              <p className="mt-3 text-gray-700">
+                A live 3D alpine forecast for Falls Creek. The real mountain
+                terrain, ski runs and lift network sit beneath an
+                elevation-aware snow layer driven by the next 168 hours of
+                summit and village weather.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Scrub hour by hour, animate the forecast, compare existing
+                modelled coverage with fresh and accumulated snow, and inspect
+                freezing level, snow line, rain and summit wind.
+              </p>
             </div>
             <HomeFallsCreekWidget />
           </div>
@@ -714,9 +1141,24 @@ export default function Home() {
           {/* Night Sky */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Night Sky</h3>
-              <p className="mt-3 text-gray-700">Stand on Vivonne Bay Beach and look up. An interactive planetarium of the real night sky over Kangaroo Island — drag to look around, scrub time to watch the stars wheel overhead, and tap any star, planet or cluster to identify it, mythology and all.</p>
-              <p className="mt-3 text-sm text-gray-500">Watch the live preview wheel through the night, or open the full planetarium for the time slider, horizon view and click-to-identify.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Night Sky
+              </h3>
+              <p className="mt-3 text-gray-700">
+                Stand on Vivonne Bay Beach and look up. An interactive
+                planetarium of the real night sky over Kangaroo Island — drag to
+                look around, scrub time to watch the stars wheel overhead, and
+                tap any star, planet or cluster to identify it, mythology and
+                all.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Watch the live preview wheel through the night, or open the full
+                planetarium for the time slider, horizon view and
+                click-to-identify.
+              </p>
             </div>
             <HomeSkyWidget />
           </div>
@@ -724,9 +1166,25 @@ export default function Home() {
           {/* Toxic */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Toxic</h3>
-              <p className="mt-3 text-gray-700">The dangerous and the beautiful, in 3D. A gallery of pathogens, allergenic pollens — and you — that you can orbit as 3D models, view as they look down the microscope, and measure against the human body on a powers-of-ten scale — an ode to the disease detectives who grow these in a Petri dish and trace communicable diseases back to their source.</p>
-              <p className="mt-3 text-sm text-gray-500">Spin a specimen in the live preview, or open the full gallery for the microscope and scale views — and export any of them to 3D print.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Toxic
+              </h3>
+              <p className="mt-3 text-gray-700">
+                The dangerous and the beautiful, in 3D. A gallery of pathogens,
+                allergenic pollens — and you — that you can orbit as 3D models,
+                view as they look down the microscope, and measure against the
+                human body on a powers-of-ten scale — an ode to the disease
+                detectives who grow these in a Petri dish and trace communicable
+                diseases back to their source.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Spin a specimen in the live preview, or open the full gallery
+                for the microscope and scale views — and export any of them to
+                3D print.
+              </p>
             </div>
             <HomeToxicWidget />
           </div>
@@ -734,9 +1192,25 @@ export default function Home() {
           {/* Aus Engines */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Aus Engines</h3>
-              <p className="mt-3 text-gray-700">An engineering hall of fame for engines designed and/or built in Australia — the Holden and Ford sixes and V8s, the Repco-Brabham V8 that won the 1966 Formula 1 World Championship, home-grown aero and radial engines, the stationary engines that ran the bush, and Ralph Sarich&apos;s orbital oddity. Orbit each one as a 3D model, read its story and specs, and place it on a century-long timeline.</p>
-              <p className="mt-3 text-sm text-gray-500">Spin an engine in the live preview, or open the full catalogue for the timeline — and export any of them to 3D print.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Aus Engines
+              </h3>
+              <p className="mt-3 text-gray-700">
+                An engineering hall of fame for engines designed and/or built in
+                Australia — the Holden and Ford sixes and V8s, the Repco-Brabham
+                V8 that won the 1966 Formula 1 World Championship, home-grown
+                aero and radial engines, the stationary engines that ran the
+                bush, and Ralph Sarich&apos;s orbital oddity. Orbit each one as
+                a 3D model, read its story and specs, and place it on a
+                century-long timeline.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Spin an engine in the live preview, or open the full catalogue
+                for the timeline — and export any of them to 3D print.
+              </p>
             </div>
             <HomeEngineWidget />
           </div>
@@ -744,9 +1218,27 @@ export default function Home() {
           {/* Terrain → Foundation */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Terrain → Foundation</h3>
-              <p className="mt-3 text-gray-700">Turn a site scan into a build-ready foundation in the browser. It reads a terrain point cloud — synthetic, or your own drone / LiDAR / total-station data — builds a ground model, then automatically places a pier grid, sizes every support&apos;s height and diameter, checks the beam spans and produces a foundation schedule and bill of materials. Aimed at the sloping-site niche: adjustable deck pedestals, modular and pole homes.</p>
-              <p className="mt-3 text-sm text-gray-500">Spin the live sample site, or open the full studio to upload a scan (CSV/XYZ/OBJ/PLY), tune the design, and export the schedule to CSV or a DXF setout plan.</p>
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "#1B3F6B" }}
+              >
+                Terrain → Foundation
+              </h3>
+              <p className="mt-3 text-gray-700">
+                Turn a site scan into a build-ready foundation in the browser.
+                It reads a terrain point cloud — synthetic, or your own drone /
+                LiDAR / total-station data — builds a ground model, then
+                automatically places a pier grid, sizes every support&apos;s
+                height and diameter, checks the beam spans and produces a
+                foundation schedule and bill of materials. Aimed at the
+                sloping-site niche: adjustable deck pedestals, modular and pole
+                homes.
+              </p>
+              <p className="mt-3 text-sm text-gray-500">
+                Spin the live sample site, or open the full studio to upload a
+                scan (CSV/XYZ/OBJ/PLY), tune the design, and export the schedule
+                to CSV or a DXF setout plan.
+              </p>
             </div>
             <HomeFoundationWidget />
           </div>
@@ -756,9 +1248,21 @@ export default function Home() {
             href="/meridian/"
             className="group mt-6 block rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
           >
-            <h3 className="text-2xl font-semibold" style={{ color: '#1B3F6B' }}>Meridian</h3>
-            <p className="mt-3 max-w-3xl text-gray-700">The Custodian Lottery Republic — a speculative model of government by civic lottery (sortition). A research archive of essays, case studies and implementation pathways exploring how it might work in practice.</p>
-            <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline" style={{ color: '#C9A84C' }}>Explore Meridian →</span>
+            <h3 className="text-2xl font-semibold" style={{ color: "#1B3F6B" }}>
+              Meridian
+            </h3>
+            <p className="mt-3 max-w-3xl text-gray-700">
+              The Custodian Lottery Republic — a speculative model of government
+              by civic lottery (sortition). A research archive of essays, case
+              studies and implementation pathways exploring how it might work in
+              practice.
+            </p>
+            <span
+              className="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:underline"
+              style={{ color: "#C9A84C" }}
+            >
+              Explore Meridian →
+            </span>
           </a>
 
           {/* Rock climbing photo — caps off the section */}
@@ -766,9 +1270,10 @@ export default function Home() {
             <img
               src="/assets/rock-climbing-finish_a009e264.jpg"
               alt="Tim Givney rock climbing"
-              loading="lazy" decoding="async"
+              loading="lazy"
+              decoding="async"
               className="mx-auto max-h-[34rem] w-full rounded-xl object-contain"
-              style={{ backgroundColor: '#f5f5f5' }}
+              style={{ backgroundColor: "#f5f5f5" }}
             />
           </div>
         </div>
@@ -778,7 +1283,9 @@ export default function Home() {
       <footer className="bg-white border-t border-gray-200 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto text-center text-gray-600 text-sm">
           <p>© 2026 Tim Givney. All rights reserved.</p>
-          <p className="mt-2">Dedicated to precision, reliability, and continuous improvement.</p>
+          <p className="mt-2">
+            Dedicated to precision, reliability, and continuous improvement.
+          </p>
         </div>
       </footer>
     </div>
