@@ -4,7 +4,12 @@ import { ArrowUpRight, RotateCcw, Shuffle } from "lucide-react";
 import type { FoundationView } from "@/lib/foundation/FoundationView";
 import type { TerrainPreset } from "@/lib/foundation/foundation";
 
-const SPOTS: { preset: TerrainPreset; slope: number; rough: number; label: string }[] = [
+const SPOTS: {
+  preset: TerrainPreset;
+  slope: number;
+  rough: number;
+  label: string;
+}[] = [
   { preset: "sloped", slope: 2.8, rough: 0.6, label: "Sloping block" },
   { preset: "rolling", slope: 1.8, rough: 1.1, label: "Rolling terrain" },
   { preset: "ridge", slope: 2.6, rough: 0.7, label: "Ridge" },
@@ -28,9 +33,8 @@ export default function HomeFoundationWidget() {
   const render = async (i: number) => {
     const view = viewRef.current;
     if (!view) return;
-    const [{ synthTerrain, designFoundation, DEFAULT_PARAMS }] = await Promise.all([
-      import("@/lib/foundation/foundation"),
-    ]);
+    const [{ synthTerrain, designFoundation, DEFAULT_PARAMS }] =
+      await Promise.all([import("@/lib/foundation/foundation")]);
     const spot = SPOTS[i];
     const dem = synthTerrain(spot.preset, 12, spot.slope, spot.rough);
     const result = designFoundation(dem, { ...DEFAULT_PARAMS, maxSpan: 2.4 });
@@ -46,7 +50,8 @@ export default function HomeFoundationWidget() {
       async entries => {
         if (!entries[0].isIntersecting || viewRef.current) return;
         io.disconnect();
-        const { FoundationView } = await import("@/lib/foundation/FoundationView");
+        const { FoundationView } =
+          await import("@/lib/foundation/FoundationView");
         if (cancelled || !mountRef.current) return;
         const view = new FoundationView(mountRef.current, { autoRotate: true });
         viewRef.current = view;
@@ -127,8 +132,9 @@ export default function HomeFoundationWidget() {
       </div>
 
       <p className="mt-2 text-xs text-gray-400">
-        Drag to orbit · scroll to zoom. Piers auto-placed &amp; height-scheduled from the terrain — upload
-        your own scan and export the schedule in the full studio.
+        Drag to orbit · scroll to zoom. Piers auto-placed &amp; height-scheduled
+        from the terrain — upload your own scan and export the schedule in the
+        full studio.
       </p>
     </div>
   );

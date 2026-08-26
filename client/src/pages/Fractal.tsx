@@ -16,10 +16,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import {
-  FractalView,
-  type FractalState,
-} from "@/lib/fractal/FractalView";
+import { FractalView, type FractalState } from "@/lib/fractal/FractalView";
 
 const PALETTES = ["Ember", "Ice", "Spectrum", "Gold", "Azure"] as const;
 
@@ -237,267 +234,264 @@ export default function Fractal() {
 
       {/* Top bar */}
       {!uiHidden && (
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <div className="pointer-events-auto flex items-center gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur transition hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Home
-          </Link>
-          <div>
-            <h1 className="font-mono text-sm font-semibold tracking-tight text-zinc-100 sm:text-base">
-              Fractal Lab
-            </h1>
-            <p className="hidden text-[11px] text-zinc-400 sm:block">
-              {julia ? "Julia set" : "Mandelbrot set"} · GPU explorer
-            </p>
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="pointer-events-auto flex items-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur transition hover:bg-white/10"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Home
+            </Link>
+            <div>
+              <h1 className="font-mono text-sm font-semibold tracking-tight text-zinc-100 sm:text-base">
+                Fractal Lab
+              </h1>
+              <p className="hidden text-[11px] text-zinc-400 sm:block">
+                {julia ? "Julia set" : "Mandelbrot set"} · GPU explorer
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="pointer-events-auto flex items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1 backdrop-blur">
+          <div className="pointer-events-auto flex items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1 backdrop-blur">
+              <button
+                onClick={() => setMode(false)}
+                className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
+                  !julia
+                    ? "bg-[#C9A84C] text-[#1a1a2e]"
+                    : "text-zinc-300 hover:bg-white/10"
+                }`}
+              >
+                Mandelbrot
+              </button>
+              <button
+                onClick={() => setMode(true)}
+                className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
+                  julia
+                    ? "bg-[#C9A84C] text-[#1a1a2e]"
+                    : "text-zinc-300 hover:bg-white/10"
+                }`}
+              >
+                Julia
+              </button>
+            </div>
             <button
-              onClick={() => setMode(false)}
-              className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
-                !julia
-                  ? "bg-[#C9A84C] text-[#1a1a2e]"
-                  : "text-zinc-300 hover:bg-white/10"
-              }`}
+              onClick={() => setUiHidden(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 backdrop-blur transition hover:bg-white/10"
+              title="Hide controls (H)"
             >
-              Mandelbrot
+              <EyeOff className="h-4 w-4" />
             </button>
             <button
-              onClick={() => setMode(true)}
-              className={`h-7 rounded-md px-2.5 font-mono text-xs transition ${
-                julia
-                  ? "bg-[#C9A84C] text-[#1a1a2e]"
-                  : "text-zinc-300 hover:bg-white/10"
-              }`}
+              onClick={toggleFullscreen}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 backdrop-blur transition hover:bg-white/10"
+              title={fullscreen ? "Exit fullscreen (F)" : "Fullscreen (F)"}
             >
-              Julia
+              {fullscreen ? (
+                <Minimize className="h-4 w-4" />
+              ) : (
+                <Maximize className="h-4 w-4" />
+              )}
             </button>
           </div>
-          <button
-            onClick={() => setUiHidden(true)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 backdrop-blur transition hover:bg-white/10"
-            title="Hide controls (H)"
-          >
-            <EyeOff className="h-4 w-4" />
-          </button>
-          <button
-            onClick={toggleFullscreen}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 backdrop-blur transition hover:bg-white/10"
-            title={fullscreen ? "Exit fullscreen (F)" : "Fullscreen (F)"}
-          >
-            {fullscreen ? (
-              <Minimize className="h-4 w-4" />
-            ) : (
-              <Maximize className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      </header>
+        </header>
       )}
 
       {/* Zoom / coordinate readout */}
       {!uiHidden && (
-      <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2">
-        <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 font-mono text-[11px] text-zinc-300 backdrop-blur">
-          {formatZoom(view.scale)} · re {view.centerX.toFixed(6)} · im{" "}
-          {view.centerY.toFixed(6)}
-        </span>
-      </div>
+        <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2">
+          <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 font-mono text-[11px] text-zinc-300 backdrop-blur">
+            {formatZoom(view.scale)} · re {view.centerX.toFixed(6)} · im{" "}
+            {view.centerY.toFixed(6)}
+          </span>
+        </div>
       )}
 
       {/* Bottom controls */}
       {!uiHidden && (
-      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur">
-          {/* Presets */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            <span className={label}>{julia ? "Constant" : "Landmark"}</span>
-            {julia
-              ? JULIA_PRESETS.map((p, i) => (
+        <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 sm:px-6">
+          <div className="mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur">
+            {/* Presets */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <span className={label}>{julia ? "Constant" : "Landmark"}</span>
+              {julia
+                ? JULIA_PRESETS.map((p, i) => (
+                    <button
+                      key={p.label}
+                      onClick={() => setJuliaIdx(i)}
+                      className={`rounded-md px-2.5 py-1.5 font-mono text-xs transition ${
+                        i === juliaIdx
+                          ? "bg-[#C9A84C] text-[#1a1a2e]"
+                          : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))
+                : MANDEL_PRESETS.map(p => (
+                    <button
+                      key={p.label}
+                      onClick={() =>
+                        viewRef.current?.setState({
+                          centerX: p.centerX,
+                          centerY: p.centerY,
+                          scale: p.scale,
+                        })
+                      }
+                      className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-xs text-zinc-200 transition hover:bg-white/15"
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+            </div>
+
+            {/* Sliders */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="flex flex-col gap-1">
+                <span className={label}>Iterations · {maxIter}</span>
+                <input
+                  type="range"
+                  min={50}
+                  max={1500}
+                  step={10}
+                  value={maxIter}
+                  onChange={e => setMaxIter(Number(e.target.value))}
+                  className="accent-[#C9A84C]"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className={label}>Colour density</span>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={4}
+                  step={0.05}
+                  value={colorScale}
+                  onChange={e => setColorScale(Number(e.target.value))}
+                  className="accent-[#C9A84C]"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className={label}>Colour shift</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={colorShift}
+                  onChange={e => setColorShift(Number(e.target.value))}
+                  className="accent-[#C9A84C]"
+                />
+              </label>
+            </div>
+
+            {/* Palette + actions */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className={label}>Palette</span>
+                {PALETTES.map((p, i) => (
                   <button
-                    key={p.label}
-                    onClick={() => setJuliaIdx(i)}
-                    className={`rounded-md px-2.5 py-1.5 font-mono text-xs transition ${
-                      i === juliaIdx
+                    key={p}
+                    onClick={() => setPalette(i)}
+                    className={`rounded-md px-2 py-1 font-mono text-[11px] transition ${
+                      i === palette
                         ? "bg-[#C9A84C] text-[#1a1a2e]"
                         : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
                     }`}
                   >
-                    {p.label}
-                  </button>
-                ))
-              : MANDEL_PRESETS.map(p => (
-                  <button
-                    key={p.label}
-                    onClick={() =>
-                      viewRef.current?.setState({
-                        centerX: p.centerX,
-                        centerY: p.centerY,
-                        scale: p.scale,
-                      })
-                    }
-                    className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-xs text-zinc-200 transition hover:bg-white/15"
-                  >
-                    {p.label}
+                    {p}
                   </button>
                 ))}
-          </div>
-
-          {/* Sliders */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <label className="flex flex-col gap-1">
-              <span className={label}>Iterations · {maxIter}</span>
-              <input
-                type="range"
-                min={50}
-                max={1500}
-                step={10}
-                value={maxIter}
-                onChange={e => setMaxIter(Number(e.target.value))}
-                className="accent-[#C9A84C]"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={label}>Colour density</span>
-              <input
-                type="range"
-                min={0.2}
-                max={4}
-                step={0.05}
-                value={colorScale}
-                onChange={e => setColorScale(Number(e.target.value))}
-                className="accent-[#C9A84C]"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={label}>Colour shift</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={colorShift}
-                onChange={e => setColorShift(Number(e.target.value))}
-                className="accent-[#C9A84C]"
-              />
-            </label>
-          </div>
-
-          {/* Palette + actions */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className={label}>Palette</span>
-              {PALETTES.map((p, i) => (
                 <button
-                  key={p}
-                  onClick={() => setPalette(i)}
-                  className={`rounded-md px-2 py-1 font-mono text-[11px] transition ${
-                    i === palette
+                  onClick={() => setColorCycle(c => !c)}
+                  className={`ml-1 inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition ${
+                    colorCycle
                       ? "bg-[#C9A84C] text-[#1a1a2e]"
                       : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
                   }`}
+                  title="Slowly drift the colours as you explore"
                 >
-                  {p}
+                  {colorCycle ? (
+                    <Pause className="h-3.5 w-3.5" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  Drift
                 </button>
-              ))}
-              <button
-                onClick={() => setColorCycle(c => !c)}
-                className={`ml-1 inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition ${
-                  colorCycle
-                    ? "bg-[#C9A84C] text-[#1a1a2e]"
-                    : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
-                }`}
-                title="Slowly drift the colours as you explore"
-              >
-                {colorCycle ? (
-                  <Pause className="h-3.5 w-3.5" />
-                ) : (
-                  <Play className="h-3.5 w-3.5" />
-                )}
-                Drift
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setDeep(d => !d)}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition ${
-                  deep
-                    ? "bg-[#C9A84C] text-[#1a1a2e]"
-                    : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
-                }`}
-                title="Emulated double precision for extra-deep zooms (slower)"
-              >
-                <Microscope className="h-3.5 w-3.5" /> Deep
-                {deep ? " on" : ""}
-              </button>
-              <button onClick={zoomOut} className={pill} title="Zoom out">
-                <Minus className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={zoomIn} className={pill} title="Zoom in">
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={reset}
-                className={pill}
-                title="Reset view"
-              >
-                <RotateCcw className="mr-1 inline h-3.5 w-3.5" />
-                Reset
-              </button>
-              <div
-                className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 p-0.5"
-                title="Export resolution"
-              >
-                {RES_OPTIONS.map((opt, i) => (
-                  <button
-                    key={opt.label}
-                    onClick={() => setResIdx(i)}
-                    className={`rounded px-1.5 py-1 font-mono text-[10px] transition ${
-                      i === resIdx
-                        ? "bg-[#C9A84C] text-[#1a1a2e]"
-                        : "text-zinc-300 hover:bg-white/10"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
               </div>
-              <button
-                onClick={saveImage}
-                disabled={saving}
-                className="inline-flex items-center gap-1 rounded-md bg-[#C9A84C] px-2.5 py-1.5 font-mono text-xs font-medium text-[#1a1a2e] transition hover:brightness-110 disabled:opacity-60"
-                title={`Save ${RES_OPTIONS[resIdx].label} PNG`}
-              >
-                <Download className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
-              </button>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setDeep(d => !d)}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition ${
+                    deep
+                      ? "bg-[#C9A84C] text-[#1a1a2e]"
+                      : "border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15"
+                  }`}
+                  title="Emulated double precision for extra-deep zooms (slower)"
+                >
+                  <Microscope className="h-3.5 w-3.5" /> Deep
+                  {deep ? " on" : ""}
+                </button>
+                <button onClick={zoomOut} className={pill} title="Zoom out">
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={zoomIn} className={pill} title="Zoom in">
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={reset} className={pill} title="Reset view">
+                  <RotateCcw className="mr-1 inline h-3.5 w-3.5" />
+                  Reset
+                </button>
+                <div
+                  className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 p-0.5"
+                  title="Export resolution"
+                >
+                  {RES_OPTIONS.map((opt, i) => (
+                    <button
+                      key={opt.label}
+                      onClick={() => setResIdx(i)}
+                      className={`rounded px-1.5 py-1 font-mono text-[10px] transition ${
+                        i === resIdx
+                          ? "bg-[#C9A84C] text-[#1a1a2e]"
+                          : "text-zinc-300 hover:bg-white/10"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={saveImage}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#C9A84C] px-2.5 py-1.5 font-mono text-xs font-medium text-[#1a1a2e] transition hover:brightness-110 disabled:opacity-60"
+                  title={`Save ${RES_OPTIONS[resIdx].label} PNG`}
+                >
+                  <Download className="h-3.5 w-3.5" />{" "}
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
             </div>
+
+            <p className="text-center font-mono text-[10px] text-zinc-500">
+              <Sparkles className="mr-1 inline h-3 w-3 text-[#C9A84C]" />
+              Drag to pan · scroll, pinch or double-click to zoom toward the
+              cursor · F fullscreen · H hide UI
+            </p>
+
+            <p className="text-center font-mono text-[10px] text-zinc-600">
+              Made by Tim, for Tim ·{" "}
+              <a
+                href="https://github.com/TimGivney/TimGivney.github.io"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
+              >
+                <Github className="h-3 w-3" /> Open source on GitHub
+              </a>
+            </p>
           </div>
-
-          <p className="text-center font-mono text-[10px] text-zinc-500">
-            <Sparkles className="mr-1 inline h-3 w-3 text-[#C9A84C]" />
-            Drag to pan · scroll, pinch or double-click to zoom toward the cursor ·{" "}
-            F fullscreen · H hide UI
-          </p>
-
-          <p className="text-center font-mono text-[10px] text-zinc-600">
-            Made by Tim, for Tim ·{" "}
-            <a
-              href="https://github.com/TimGivney/TimGivney.github.io"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-zinc-400 underline-offset-2 transition hover:text-[#C9A84C] hover:underline"
-            >
-              <Github className="h-3 w-3" /> Open source on GitHub
-            </a>
-          </p>
         </div>
-      </div>
       )}
     </div>
   );

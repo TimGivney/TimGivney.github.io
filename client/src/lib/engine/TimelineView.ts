@@ -3,7 +3,13 @@
 // category. The selected engine is highlighted, and clicking any marker selects
 // it. Mirrors the canvas lifecycle of the /toxic ScaleView.
 
-import { CATEGORY_LABEL, ENGINES, engineById, type Engine, type EngineCategory } from "./engines";
+import {
+  CATEGORY_LABEL,
+  ENGINES,
+  engineById,
+  type Engine,
+  type EngineCategory,
+} from "./engines";
 
 const CATEGORY_COLOR: Record<EngineCategory, string> = {
   six: "#c9a84c",
@@ -149,7 +155,9 @@ export class TimelineView {
 
       // year above
       ctx.fillStyle = selected ? "#E7C766" : "rgba(180,190,210,0.7)";
-      ctx.font = selected ? "600 11px ui-monospace, monospace" : "10px ui-monospace, monospace";
+      ctx.font = selected
+        ? "600 11px ui-monospace, monospace"
+        : "10px ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.save();
       ctx.translate(x, axisY - 20);
@@ -175,7 +183,9 @@ export class TimelineView {
       ctx.rotate(Math.PI / 2);
       ctx.textAlign = "left";
       ctx.fillStyle = selected ? "#e8ecf3" : "rgba(200,208,222,0.7)";
-      ctx.font = selected ? "600 11px ui-monospace, monospace" : "10px ui-monospace, monospace";
+      ctx.font = selected
+        ? "600 11px ui-monospace, monospace"
+        : "10px ui-monospace, monospace";
       ctx.fillText(e.name, 0, 0);
       ctx.restore();
     }

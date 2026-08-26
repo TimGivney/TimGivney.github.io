@@ -15,7 +15,10 @@ import {
   TriangleAlert,
   Upload,
 } from "lucide-react";
-import { FoundationView, type ViewToggles } from "@/lib/foundation/FoundationView";
+import {
+  FoundationView,
+  type ViewToggles,
+} from "@/lib/foundation/FoundationView";
 import {
   analyseTerrain,
   DEFAULT_PARAMS,
@@ -72,7 +75,12 @@ export default function Foundation() {
   const [preset, setPreset] = useState<TerrainPreset>("sloped");
   const [slope, setSlope] = useState(2.4);
   const [roughness, setRoughness] = useState(0.6);
-  const [uploaded, setUploaded] = useState<{ dem: Dem; name: string; count: number; format: string } | null>(null);
+  const [uploaded, setUploaded] = useState<{
+    dem: Dem;
+    name: string;
+    count: number;
+    format: string;
+  } | null>(null);
 
   // design params (individually controlled)
   const [system, setSystem] = useState<FoundationSystem>("pier");
@@ -116,10 +124,22 @@ export default function Foundation() {
       system,
       diameters: SYSTEM_DIAMETERS[system],
     }),
-    [footprintW, footprintL, maxSpan, minHeight, maxHeight, clearance, imposedLoad, system]
+    [
+      footprintW,
+      footprintL,
+      maxSpan,
+      minHeight,
+      maxHeight,
+      clearance,
+      imposedLoad,
+      system,
+    ]
   );
 
-  const result = useMemo(() => (dem ? designFoundation(dem, params) : null), [dem, params]);
+  const result = useMemo(
+    () => (dem ? designFoundation(dem, params) : null),
+    [dem, params]
+  );
   const stats = useMemo(() => (dem ? analyseTerrain(dem) : null), [dem]);
 
   // create the view once the mount is ready
@@ -175,11 +195,18 @@ export default function Foundation() {
         const text = String(reader.result ?? "");
         const parsed = parsePointCloud(text, file.name);
         if (parsed.points.length < 3) {
-          setError(`Only ${parsed.points.length} points read from ${file.name}. Expected x y z per line (CSV/XYZ), or an OBJ/PLY mesh.`);
+          setError(
+            `Only ${parsed.points.length} points read from ${file.name}. Expected x y z per line (CSV/XYZ), or an OBJ/PLY mesh.`
+          );
           return;
         }
         const d = demFromPoints(parsed.points, 90);
-        setUploaded({ dem: d, name: file.name, count: parsed.points.length, format: parsed.format });
+        setUploaded({
+          dem: d,
+          name: file.name,
+          count: parsed.points.length,
+          format: parsed.format,
+        });
         setSource("upload");
         setError(null);
       } catch (e) {
@@ -201,12 +228,20 @@ export default function Foundation() {
 
   const exportCsv = useCallback(() => {
     if (!result) return;
-    download(`foundation-schedule-${Date.now()}.csv`, scheduleToCsv(result), "text/csv");
+    download(
+      `foundation-schedule-${Date.now()}.csv`,
+      scheduleToCsv(result),
+      "text/csv"
+    );
   }, [result]);
 
   const exportDxf = useCallback(() => {
     if (!result) return;
-    download(`foundation-plan-${Date.now()}.dxf`, scheduleToDxf(result), "application/dxf");
+    download(
+      `foundation-plan-${Date.now()}.dxf`,
+      scheduleToDxf(result),
+      "application/dxf"
+    );
   }, [result]);
 
   const reset = useCallback(() => viewRef.current?.resetView(), []);
@@ -260,7 +295,10 @@ export default function Foundation() {
           <div className="flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-950/70 px-3 py-2 backdrop-blur">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
             <p className="text-xs leading-relaxed text-rose-100">{error}</p>
-            <button onClick={() => setError(null)} className="ml-auto text-rose-300 hover:text-white">
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-rose-300 hover:text-white"
+            >
               ✕
             </button>
           </div>
@@ -290,7 +328,9 @@ export default function Foundation() {
           <button
             onClick={() => setAutoRotate(v => !v)}
             className={`inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 backdrop-blur transition ${
-              autoRotate ? "bg-[#C9A84C] text-[#1a1a2e]" : "bg-white/5 text-zinc-300 hover:bg-white/10"
+              autoRotate
+                ? "bg-[#C9A84C] text-[#1a1a2e]"
+                : "bg-white/5 text-zinc-300 hover:bg-white/10"
             }`}
             title="Auto-rotate"
           >
@@ -302,8 +342,16 @@ export default function Foundation() {
           <button onClick={savePNG} className={iconBtn} title="Save PNG">
             <Download className="h-4 w-4" />
           </button>
-          <button onClick={toggleFullscreen} className={iconBtn} title="Fullscreen (F)">
-            {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          <button
+            onClick={toggleFullscreen}
+            className={iconBtn}
+            title="Fullscreen (F)"
+          >
+            {fullscreen ? (
+              <Minimize className="h-4 w-4" />
+            ) : (
+              <Maximize className="h-4 w-4" />
+            )}
           </button>
         </div>
       </header>
@@ -327,7 +375,9 @@ export default function Foundation() {
                   if (s === "upload" && !uploaded) fileRef.current?.click();
                 }}
                 className={`h-6 flex-1 rounded font-mono text-[10px] transition ${
-                  source === s ? "bg-[#C9A84C] text-[#1a1a2e]" : "text-zinc-300 hover:bg-white/10"
+                  source === s
+                    ? "bg-[#C9A84C] text-[#1a1a2e]"
+                    : "text-zinc-300 hover:bg-white/10"
                 }`}
               >
                 {s === "synthetic" ? "Sample site" : "Upload scan"}
@@ -353,7 +403,8 @@ export default function Foundation() {
               </label>
               <label className="block">
                 <span className={label}>
-                  Fall <span className="text-zinc-600">({slope.toFixed(1)} m)</span>
+                  Fall{" "}
+                  <span className="text-zinc-600">({slope.toFixed(1)} m)</span>
                 </span>
                 <input
                   type="range"
@@ -367,7 +418,10 @@ export default function Foundation() {
               </label>
               <label className="block">
                 <span className={label}>
-                  Roughness <span className="text-zinc-600">({roughness.toFixed(1)} m)</span>
+                  Roughness{" "}
+                  <span className="text-zinc-600">
+                    ({roughness.toFixed(1)} m)
+                  </span>
                 </span>
                 <input
                   type="range"
@@ -471,7 +525,9 @@ export default function Foundation() {
                 key={k}
                 onClick={() => setToggles(t => ({ ...t, [k]: !t[k] }))}
                 className={`h-7 rounded-md border border-white/10 font-mono text-[10px] transition ${
-                  toggles[k as "terrain"] ? "bg-white/15 text-zinc-100" : "bg-black/30 text-zinc-500"
+                  toggles[k as "terrain"]
+                    ? "bg-white/15 text-zinc-100"
+                    : "bg-black/30 text-zinc-500"
                 }`}
               >
                 {lbl}
@@ -481,7 +537,9 @@ export default function Foundation() {
           <label className="block">
             <span className={label}>
               Vertical exaggeration{" "}
-              <span className="text-zinc-600">({toggles.exaggeration.toFixed(1)}×)</span>
+              <span className="text-zinc-600">
+                ({toggles.exaggeration.toFixed(1)}×)
+              </span>
             </span>
             <input
               type="range"
@@ -489,7 +547,12 @@ export default function Foundation() {
               max={4}
               step={0.5}
               value={toggles.exaggeration}
-              onChange={e => setToggles(t => ({ ...t, exaggeration: Number(e.target.value) }))}
+              onChange={e =>
+                setToggles(t => ({
+                  ...t,
+                  exaggeration: Number(e.target.value),
+                }))
+              }
               className="mt-1 w-full accent-[#C9A84C]"
             />
           </label>
@@ -500,7 +563,10 @@ export default function Foundation() {
       {stats && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-10 hidden -translate-x-1/2 lg:block">
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-3 py-1.5 backdrop-blur">
-            <Stat label="Max slope" value={`${stats.maxSlopeDeg.toFixed(1)}°`} />
+            <Stat
+              label="Max slope"
+              value={`${stats.maxSlopeDeg.toFixed(1)}°`}
+            />
             <Stat label="Mean" value={`${stats.meanSlopeDeg.toFixed(1)}°`} />
             <Stat label="Relief" value={`${stats.reliefZ.toFixed(2)} m`} />
             <Stat label="Aspect" value={`${Math.round(stats.aspectDeg)}°`} />
@@ -533,7 +599,10 @@ export default function Foundation() {
               {/* BOM summary */}
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 border-b border-white/10 p-3">
                 <Metric label="Piers" value={String(bom.pierCount)} />
-                <Metric label="Bays" value={`${result.nx - 1} × ${result.ny - 1}`} />
+                <Metric
+                  label="Bays"
+                  value={`${result.nx - 1} × ${result.ny - 1}`}
+                />
                 <Metric
                   label="Spacing"
                   value={`${bom.baySpacingX.toFixed(2)} × ${bom.baySpacingY.toFixed(2)} m`}
@@ -543,16 +612,31 @@ export default function Foundation() {
                   value={bom.spanOk ? "OK" : "OVER"}
                   warn={!bom.spanOk}
                 />
-                <Metric label="Support ∑" value={`${bom.totalSupportLength.toFixed(1)} m`} />
-                <Metric label="Concrete" value={`${bom.concreteVolume.toFixed(2)} m³`} />
-                <Metric label="Beams" value={`${bom.beamLength.toFixed(1)} m`} />
-                <Metric label="Height" value={`${(bom.minHeight * 1000) | 0}–${(bom.maxHeight * 1000) | 0} mm`} />
+                <Metric
+                  label="Support ∑"
+                  value={`${bom.totalSupportLength.toFixed(1)} m`}
+                />
+                <Metric
+                  label="Concrete"
+                  value={`${bom.concreteVolume.toFixed(2)} m³`}
+                />
+                <Metric
+                  label="Beams"
+                  value={`${bom.beamLength.toFixed(1)} m`}
+                />
+                <Metric
+                  label="Height"
+                  value={`${(bom.minHeight * 1000) | 0}–${(bom.maxHeight * 1000) | 0} mm`}
+                />
                 <Metric
                   label="Over-height"
                   value={String(bom.overHeightCount)}
                   warn={bom.overHeightCount > 0}
                 />
-                <Metric label="Est. cost" value={`$${Math.round(bom.estimatedCost).toLocaleString()}`} />
+                <Metric
+                  label="Est. cost"
+                  value={`$${Math.round(bom.estimatedCost).toLocaleString()}`}
+                />
               </div>
 
               {/* Schedule table */}
@@ -572,16 +656,26 @@ export default function Foundation() {
                       <tr
                         key={p.label}
                         className={`border-t border-white/5 ${
-                          p.aboveMax ? "text-rose-300" : p.belowMin ? "text-amber-300" : "text-zinc-300"
+                          p.aboveMax
+                            ? "text-rose-300"
+                            : p.belowMin
+                              ? "text-amber-300"
+                              : "text-zinc-300"
                         }`}
                       >
                         <td className="px-2 py-0.5 text-left">
                           {p.label}
                           <span className="ml-1 text-zinc-600">{p.grid}</span>
                         </td>
-                        <td className="px-1 py-0.5 text-right">{p.x.toFixed(1)}</td>
-                        <td className="px-1 py-0.5 text-right">{p.y.toFixed(1)}</td>
-                        <td className="px-1 py-0.5 text-right">{Math.round(p.height * 1000)}</td>
+                        <td className="px-1 py-0.5 text-right">
+                          {p.x.toFixed(1)}
+                        </td>
+                        <td className="px-1 py-0.5 text-right">
+                          {p.y.toFixed(1)}
+                        </td>
+                        <td className="px-1 py-0.5 text-right">
+                          {Math.round(p.height * 1000)}
+                        </td>
                         <td className="px-2 py-0.5 text-right">{p.diameter}</td>
                       </tr>
                     ))}
@@ -610,7 +704,8 @@ export default function Foundation() {
       )}
 
       <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 text-center font-mono text-[9px] leading-relaxed text-zinc-600">
-        Drag to orbit · scroll to zoom · right-drag to pan. Indicative layout only — subject to review by a licensed engineer.
+        Drag to orbit · scroll to zoom · right-drag to pan. Indicative layout
+        only — subject to review by a licensed engineer.
       </p>
     </div>
   );
@@ -619,17 +714,33 @@ export default function Foundation() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-1.5 text-center">
-      <div className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">{label}</div>
-      <div className="font-mono text-xs font-semibold text-zinc-100">{value}</div>
+      <div className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+        {label}
+      </div>
+      <div className="font-mono text-xs font-semibold text-zinc-100">
+        {value}
+      </div>
     </div>
   );
 }
 
-function Metric({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+function Metric({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+}) {
   return (
     <div>
-      <div className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">{label}</div>
-      <div className={`font-mono text-xs font-semibold ${warn ? "text-rose-300" : "text-zinc-100"}`}>
+      <div className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+        {label}
+      </div>
+      <div
+        className={`font-mono text-xs font-semibold ${warn ? "text-rose-300" : "text-zinc-100"}`}
+      >
         {value}
       </div>
     </div>

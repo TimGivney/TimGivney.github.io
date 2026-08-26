@@ -11,7 +11,10 @@ import type { Engine, EngineModelSpec } from "./engines";
 
 const DEG = Math.PI / 180;
 
-function mat(color: string, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) {
+function mat(
+  color: string,
+  opts: Partial<THREE.MeshStandardMaterialParameters> = {}
+) {
   return new THREE.MeshStandardMaterial({
     color: new THREE.Color(color),
     roughness: 0.42,
@@ -64,7 +67,10 @@ function boltRing(
   const g = new THREE.Group();
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2;
-    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(size, size, size * 1.1, 6), m);
+    const bolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(size, size, size * 1.1, 6),
+      m
+    );
     bolt.rotation.x = 90 * DEG;
     bolt.position.set(Math.cos(a) * radius, Math.sin(a) * radius, z);
     g.add(bolt);
@@ -84,7 +90,10 @@ function boltRow(
   const g = new THREE.Group();
   for (let i = 0; i < count; i++) {
     const x = (i - (count - 1) / 2) * (spanX / Math.max(1, count - 1));
-    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(size, size, size * 1.2, 6), m);
+    const bolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(size, size, size * 1.2, 6),
+      m
+    );
     bolt.position.set(x, y, z);
     g.add(bolt);
   }
@@ -121,10 +130,18 @@ function finnedCylinder(
 }
 
 // a spoked flywheel: rim disc + hub + spokes, axis along +X
-function flywheel(rad: number, thick: number, m: THREE.Material, hubMat: THREE.Material): THREE.Group {
+function flywheel(
+  rad: number,
+  thick: number,
+  m: THREE.Material,
+  hubMat: THREE.Material
+): THREE.Group {
   const g = new THREE.Group();
   // dished rim built from a lathe profile so it reads as a cast flywheel
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(rad * 0.86, thick * 0.9, 20, 72), m);
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(rad * 0.86, thick * 0.9, 20, 72),
+    m
+  );
   rim.rotation.y = 90 * DEG;
   g.add(rim);
   const web = cyl(rad * 0.9, rad * 0.9, thick * 0.4, m, 72);
@@ -142,7 +159,11 @@ function flywheel(rad: number, thick: number, m: THREE.Material, hubMat: THREE.M
 }
 
 // crank pulley + a small accessory, mounted on the +X end at engine centreline
-function frontAccessories(x: number, m: THREE.Material, accMat: THREE.Material): THREE.Group {
+function frontAccessories(
+  x: number,
+  m: THREE.Material,
+  accMat: THREE.Material
+): THREE.Group {
   const g = new THREE.Group();
   const pulley = cyl(0.36, 0.36, 0.16, m, 28);
   pulley.rotation.z = 90 * DEG;
@@ -168,7 +189,12 @@ function turboSnail(x: number, z: number, m: THREE.Material): THREE.Group {
 }
 
 // ---------------------------------------------------------------- inline
-function buildInline(n: number, spec: EngineModelSpec, c: string, c2: string): THREE.Group {
+function buildInline(
+  n: number,
+  spec: EngineModelSpec,
+  c: string,
+  c2: string
+): THREE.Group {
   const g = new THREE.Group();
   const blockMat = mat(c, { metalness: 0.55, roughness: 0.5 });
   const coverMat = mat(c2, { metalness: 0.4, roughness: 0.4 });
@@ -211,7 +237,13 @@ function buildInline(n: number, spec: EngineModelSpec, c: string, c2: string): T
 
   // intake manifold (+Z) and exhaust (-Z)
   const logZ = depth / 2 + 0.22;
-  const intakeLog = cyl(0.16, 0.16, blockW * 0.82, mat(shade(c2, 1.1), { metalness: 0.5 }), 18);
+  const intakeLog = cyl(
+    0.16,
+    0.16,
+    blockW * 0.82,
+    mat(shade(c2, 1.1), { metalness: 0.5 }),
+    18
+  );
   intakeLog.rotation.z = 90 * DEG;
   intakeLog.position.set(0, blockH * 0.18, logZ);
   g.add(intakeLog);
@@ -228,7 +260,10 @@ function buildInline(n: number, spec: EngineModelSpec, c: string, c2: string): T
     g.add(ir);
     if (spec.dohc) {
       // velocity stack
-      const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.22, 16), steel);
+      const stack = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.1, 0.22, 16),
+        steel
+      );
       stack.position.set(x, blockH * 0.55, logZ + 0.02);
       g.add(stack);
     }
@@ -240,12 +275,19 @@ function buildInline(n: number, spec: EngineModelSpec, c: string, c2: string): T
   }
 
   g.add(frontAccessories(blockW / 2 + 0.12, steel, dark));
-  if (spec.turbo) g.add(turboSnail(blockW / 2 - 0.1, -logZ - 0.15, mat("#9a9ea6")));
+  if (spec.turbo)
+    g.add(turboSnail(blockW / 2 - 0.1, -logZ - 0.15, mat("#9a9ea6")));
   return g;
 }
 
 // ---------------------------------------------------------------- vee
-function buildVee(n: number, angle: number, spec: EngineModelSpec, c: string, c2: string): THREE.Group {
+function buildVee(
+  n: number,
+  angle: number,
+  spec: EngineModelSpec,
+  c: string,
+  c2: string
+): THREE.Group {
   const g = new THREE.Group();
   const blockMat = mat(c, { metalness: 0.55, roughness: 0.5 });
   const coverMat = mat(c2, { metalness: 0.45, roughness: 0.4 });
@@ -289,7 +331,12 @@ function buildVee(n: number, angle: number, spec: EngineModelSpec, c: string, c2
   }
 
   // intake valley plenum sitting down in the vee
-  const plenum = box(blockW * 0.7, 0.26, depth * 0.4, mat(shade(c2, 1.1), { metalness: 0.5 }));
+  const plenum = box(
+    blockW * 0.7,
+    0.26,
+    depth * 0.4,
+    mat(shade(c2, 1.1), { metalness: 0.5 })
+  );
   plenum.position.y = 0.66;
   g.add(plenum);
   if (spec.dohc) {
@@ -376,7 +423,7 @@ function buildRadial(n: number, c: string, c2: string): THREE.Group {
   drum.rotation.x = 90 * DEG;
   g.add(drum);
   // crankcase cover bolt circle facing the viewer
-  g.add(boltRing(perRow, ring * 0.62, (twinRow ? 0.6 : 0.32), 0.03, steel));
+  g.add(boltRing(perRow, ring * 0.62, twinRow ? 0.6 : 0.32, 0.03, steel));
 
   for (let r = 0; r < rows; r++) {
     const z = twinRow ? (r - 0.5) * 0.5 : 0;
@@ -434,7 +481,10 @@ function buildTurbojet(c: string, c2: string): THREE.Group {
   g.add(casing);
   // banding rings
   for (const x of [-0.6, 0, 0.6]) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.04, 20, 72), dark);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.56, 0.04, 20, 72),
+      dark
+    );
     ring.rotation.y = 90 * DEG;
     ring.position.x = x;
     g.add(ring);
@@ -490,7 +540,12 @@ function buildStationary(twin: boolean, c: string, c2: string): THREE.Group {
   const hopper = box(0.78, 0.62, 0.86, iron2);
   hopper.position.set(-0.55, 0.42, 0);
   g.add(hopper);
-  const water = sbox(0.62, 0.06, 0.7, mat("#2a4a63", { metalness: 0.2, roughness: 0.3 }));
+  const water = sbox(
+    0.62,
+    0.06,
+    0.7,
+    mat("#2a4a63", { metalness: 0.2, roughness: 0.3 })
+  );
   water.position.set(-0.55, 0.7, 0);
   g.add(water);
   // cylinder head end cap + rocker gear (-X end)

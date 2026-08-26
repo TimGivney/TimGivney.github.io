@@ -320,8 +320,12 @@ export class Fractal3DView {
   private resizeObserver: ResizeObserver;
 
   private pointers = new Map<number, { x: number; y: number }>();
-  private dragStart: { x: number; y: number; yaw: number; pitch: number } | null =
-    null;
+  private dragStart: {
+    x: number;
+    y: number;
+    yaw: number;
+    pitch: number;
+  } | null = null;
   private pinchStartDist = 0;
   private pinchStartZoom = 0;
 
@@ -394,8 +398,14 @@ export class Fractal3DView {
 
   private resize() {
     const f = this.resFactor();
-    const w = Math.max(1, Math.floor(this.container.clientWidth * this.dpr * f));
-    const h = Math.max(1, Math.floor(this.container.clientHeight * this.dpr * f));
+    const w = Math.max(
+      1,
+      Math.floor(this.container.clientWidth * this.dpr * f)
+    );
+    const h = Math.max(
+      1,
+      Math.floor(this.container.clientHeight * this.dpr * f)
+    );
     if (this.canvas.width !== w || this.canvas.height !== h) {
       this.canvas.width = w;
       this.canvas.height = h;
@@ -431,7 +441,10 @@ export class Fractal3DView {
       };
     } else if (this.pointers.size === 2) {
       const pts = Array.from(this.pointers.values());
-      this.pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      this.pinchStartDist = Math.hypot(
+        pts[0].x - pts[1].x,
+        pts[0].y - pts[1].y
+      );
       this.pinchStartZoom = this.cam.dist;
       this.dragStart = null;
     }
@@ -447,7 +460,10 @@ export class Fractal3DView {
       if (this.pinchStartDist > 0) {
         this.cam.dist = Math.max(
           1.2,
-          Math.min(14, this.pinchStartZoom * (this.pinchStartDist / Math.max(dist, 1)))
+          Math.min(
+            14,
+            this.pinchStartZoom * (this.pinchStartDist / Math.max(dist, 1))
+          )
         );
         this.markMoving();
       }
@@ -482,7 +498,8 @@ export class Fractal3DView {
   }
 
   setParams(p: Partial<Fractal3DParams>) {
-    const qChanged = p.quality !== undefined && p.quality !== this.params.quality;
+    const qChanged =
+      p.quality !== undefined && p.quality !== this.params.quality;
     this.params = { ...this.params, ...p };
     if (qChanged) this.resize();
     this.dirty = true;
@@ -541,21 +558,35 @@ export class Fractal3DView {
     const gl = this.gl;
     gl.useProgram(this.program);
     const [px, py, pz] = this.camPos();
-    gl.uniform2f(this.uniforms.u_resolution, this.canvas.width, this.canvas.height);
+    gl.uniform2f(
+      this.uniforms.u_resolution,
+      this.canvas.width,
+      this.canvas.height
+    );
     gl.uniform3f(this.uniforms.u_camPos, px, py, pz);
     gl.uniform3f(this.uniforms.u_camTarget, 0, 0, 0);
     gl.uniform1f(this.uniforms.u_time, animTime);
 
     const typeIdx =
-      this.params.type === "mandelbulb" ? 0 : this.params.type === "mandelbox" ? 1 : 2;
+      this.params.type === "mandelbulb"
+        ? 0
+        : this.params.type === "mandelbox"
+          ? 1
+          : 2;
     gl.uniform1i(this.uniforms.u_type, typeIdx);
 
     // Optional animation: morph the defining parameter over time.
     let power = this.params.power;
     let boxScale = this.params.boxScale;
-    const juliaC = this.params.juliaC.slice() as [number, number, number, number];
+    const juliaC = this.params.juliaC.slice() as [
+      number,
+      number,
+      number,
+      number,
+    ];
     if (this.animate) {
-      if (typeIdx === 0) power = this.params.power + Math.sin(animTime * 0.3) * 1.5;
+      if (typeIdx === 0)
+        power = this.params.power + Math.sin(animTime * 0.3) * 1.5;
       else if (typeIdx === 1)
         boxScale = this.params.boxScale + Math.sin(animTime * 0.3) * 0.25;
       else {
@@ -565,9 +596,18 @@ export class Fractal3DView {
     }
 
     gl.uniform1f(this.uniforms.u_power, power);
-    gl.uniform1i(this.uniforms.u_iterations, Math.round(this.params.iterations));
+    gl.uniform1i(
+      this.uniforms.u_iterations,
+      Math.round(this.params.iterations)
+    );
     gl.uniform1f(this.uniforms.u_boxScale, boxScale);
-    gl.uniform4f(this.uniforms.u_juliaC, juliaC[0], juliaC[1], juliaC[2], juliaC[3]);
+    gl.uniform4f(
+      this.uniforms.u_juliaC,
+      juliaC[0],
+      juliaC[1],
+      juliaC[2],
+      juliaC[3]
+    );
     gl.uniform1i(this.uniforms.u_palette, this.params.palette);
     gl.uniform1f(this.uniforms.u_colorShift, this.params.colorShift);
     gl.uniform1f(this.uniforms.u_glow, this.params.glow);
