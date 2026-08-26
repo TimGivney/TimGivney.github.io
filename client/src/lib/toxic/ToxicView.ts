@@ -28,7 +28,12 @@ export class ToxicView {
   private autoRotate: boolean;
   private colorDrift = false;
   private hueShift = 0;
-  private baseColors: { mat: THREE.MeshStandardMaterial; h: number; s: number; l: number }[] = [];
+  private baseColors: {
+    mat: THREE.MeshStandardMaterial;
+    h: number;
+    s: number;
+    l: number;
+  }[] = [];
 
   private raf = 0;
   private disposed = false;

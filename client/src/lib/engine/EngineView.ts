@@ -29,7 +29,12 @@ export class EngineView {
   private autoRotate: boolean;
   private colorDrift = false;
   private hueShift = 0;
-  private baseColors: { mat: THREE.MeshStandardMaterial; h: number; s: number; l: number }[] = [];
+  private baseColors: {
+    mat: THREE.MeshStandardMaterial;
+    h: number;
+    s: number;
+    l: number;
+  }[] = [];
 
   private raf = 0;
   private disposed = false;
@@ -61,7 +66,10 @@ export class EngineView {
     this.scene.background = new THREE.Color(0x07070b);
     // image-based lighting so the metal actually reflects and reads as metal
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = pmrem.fromScene(
+      new RoomEnvironment(),
+      0.04
+    ).texture;
     this.scene.environmentIntensity = 0.55;
     pmrem.dispose();
 
