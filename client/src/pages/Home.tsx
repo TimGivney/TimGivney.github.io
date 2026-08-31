@@ -7,7 +7,6 @@ import HomeSkyWidget from "@/components/HomeSkyWidget";
 import HomeToxicWidget from "@/components/HomeToxicWidget";
 import HomeEngineWidget from "@/components/HomeEngineWidget";
 import HomeFoundationWidget from "@/components/HomeFoundationWidget";
-import HomeRedbackWidget from "@/components/HomeRedbackWidget";
 
 /**
  * Industrial Modernism Design - Single Page Scroll
@@ -105,7 +104,7 @@ export default function Home() {
         "How to Easily Control Addressable LEDs with an ESP32 or ESP8266",
       subtitle: "Technical Education & IoT",
       description:
-        "How to Easily Control Addressable LEDs with an ESP32 or ESP8266 | WLED Project. Comprehensive guide reaching 580k+ views, demonstrating custom pixel art and LED effects without coding.",
+        "How to Easily Control Addressable LEDs with an ESP32 or ESP8266 | WLED Project. Comprehensive guide and project built from scratch, attracting 600,000+ unique views and demonstrating custom pixel art, addressable LED control, and advanced lighting effects.",
       tags: ["ESP32", "IoT", "Electronics", "Education"],
       image: "/assets/wled-project_967547a3.jpg",
       link: "https://www.youtube.com/@timgivney",
@@ -1023,30 +1022,8 @@ export default function Home() {
             version of each.
           </p>
 
-          {/* Redback Webkeeper */}
-          <div className="grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
-            <div className="flex flex-col justify-center">
-              <h3
-                className="text-2xl font-semibold"
-                style={{ color: "#1B3F6B" }}
-              >
-                Redback Webkeeper
-              </h3>
-              <p className="mt-3 text-gray-700">
-                A living procedural spider web guarded by an Australian redback.
-                Tear holes anywhere in the silk and she will detect the damage,
-                rush across the web and spin each strand back into place.
-              </p>
-              <p className="mt-3 text-sm text-gray-500">
-                Keep breaking it and her patience runs out. Eventually she
-                abandons the web and leaves every new hole behind.
-              </p>
-            </div>
-            <HomeRedbackWidget />
-          </div>
-
           {/* Cube Studio */}
-          <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
+          <div className="grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
               <h3
                 className="text-2xl font-semibold"
