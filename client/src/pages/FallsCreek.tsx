@@ -7,6 +7,7 @@ import maplibregl, {
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CloudRain,
@@ -14,6 +15,7 @@ import {
   EyeOff,
   Gauge,
   Layers3,
+  MapPinned,
   Maximize,
   MountainSnow,
   Pause,
@@ -23,14 +25,11 @@ import {
   Thermometer,
   Wind,
 } from "lucide-react";
-
-const FALLS_CREEK = {
-  lat: -36.8702999,
-  lon: 147.2737331,
-  baseElevation: 1522,
-  summitElevation: 1773,
-  topElevation: 1873,
-};
+import {
+  SNOW_RESORTS,
+  findSnowResort,
+  type SnowResort,
+} from "@/lib/snowResorts";
 
 const HOURLY_FIELDS = [
   "temperature_2m",
@@ -151,14 +150,14 @@ const MAP_STYLE: StyleSpecification = {
   terrain: { source: "terrain", exaggeration: 1.8 },
 };
 
-function forecastUrl(elevation: number) {
+function forecastUrl(resort: SnowResort, elevation: number) {
   const params = new URLSearchParams({
-    latitude: String(FALLS_CREEK.lat),
-    longitude: String(FALLS_CREEK.lon),
+    latitude: String(resort.lat),
+    longitude: String(resort.lon),
     elevation: String(elevation),
     hourly: HOURLY_FIELDS,
     forecast_hours: "168",
-    timezone: "Australia/Melbourne",
+    timezone: "auto",
   });
   return `https://api.open-meteo.com/v1/forecast?${params}`;
 }
@@ -203,12 +202,15 @@ function alpha(value: number) {
 }
 
 function snowRamp(
+  resort: SnowResort,
   hour: ForecastHour,
   mode: SnowMode,
   accumulated: number,
   illustrativeCover: boolean
 ) {
   if (mode === "coverage") {
+    const lowerElevation = Math.max(0, resort.baseElevation - 450);
+    const upperElevation = Math.max(2200, resort.topElevation + 180);
     const baseAlpha =
       hour.baseDepth > 0.1
         ? alpha(0.18 + hour.baseDepth / 42)
@@ -225,15 +227,15 @@ function snowRamp(
       "interpolate",
       ["linear"],
       ["elevation"],
-      1200,
+      lowerElevation,
       "rgba(215,235,250,0)",
-      FALLS_CREEK.baseElevation - 100,
+      resort.baseElevation - 100,
       `rgba(190,219,239,${baseAlpha * 0.16})`,
-      FALLS_CREEK.baseElevation,
+      resort.baseElevation,
       `rgba(218,239,252,${baseAlpha * 0.74})`,
-      FALLS_CREEK.summitElevation,
+      resort.summitElevation,
       `rgba(248,253,255,${summitAlpha})`,
-      2200,
+      upperElevation,
       `rgba(255,255,255,${summitAlpha})`,
     ];
   }
@@ -252,7 +254,7 @@ function snowRamp(
     "rgba(170,205,230,0)",
     snowLine,
     `rgba(190,226,250,${strength * 0.32})`,
-    Math.max(snowLine + 1, FALLS_CREEK.summitElevation),
+    Math.max(snowLine + 1, resort.summitElevation),
     `rgba(242,250,255,${strength})`,
     2200,
     `rgba(255,255,255,${strength})`,
@@ -265,6 +267,10 @@ export default function FallsCreek() {
   const mapRef = useRef<MapLibreMap | null>(null);
   const playingTimerRef = useRef<number | null>(null);
 
+  const [resort, setResort] = useState(() =>
+    findSnowResort(new URLSearchParams(window.location.search).get("resort"))
+  );
+  const [resortPickerOpen, setResortPickerOpen] = useState(false);
   const [forecast, setForecast] = useState<ForecastHour[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState<SnowMode>("coverage");
@@ -305,22 +311,43 @@ export default function FallsCreek() {
   }, [mode, selected, snowSceneEnabled]);
 
   useEffect(() => {
-    document.title = "Falls Creek Snow Map — Tim Givney";
+    document.title = `${resort.name} Snow Map — Tim Givney`;
     return () => {
       document.title = "Tim Givney — Mechanical Engineer";
     };
+  }, [resort.name]);
+
+  useEffect(() => {
+    const syncResortFromUrl = () => {
+      setResort(
+        findSnowResort(
+          new URLSearchParams(window.location.search).get("resort")
+        )
+      );
+    };
+    window.addEventListener("popstate", syncResortFromUrl);
+    return () => window.removeEventListener("popstate", syncResortFromUrl);
   }, []);
+
+  useEffect(() => {
+    setPlaying(false);
+    setSelectedIndex(0);
+    setForecast([]);
+    setForecastError(null);
+    setMapReady(false);
+    setIs3D(true);
+  }, [resort.slug]);
 
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
-      fetch(forecastUrl(FALLS_CREEK.summitElevation), {
+      fetch(forecastUrl(resort, resort.summitElevation), {
         signal: controller.signal,
       }).then(response => {
         if (!response.ok) throw new Error("Summit forecast unavailable");
         return response.json() as Promise<ForecastResponse>;
       }),
-      fetch(forecastUrl(FALLS_CREEK.baseElevation), {
+      fetch(forecastUrl(resort, resort.baseElevation), {
         signal: controller.signal,
       }).then(response => {
         if (!response.ok) throw new Error("Base forecast unavailable");
@@ -358,15 +385,17 @@ export default function FallsCreek() {
         setForecastError("Open-Meteo forecast is temporarily unavailable.");
       });
     return () => controller.abort();
-  }, []);
+  }, [resort]);
 
   useEffect(() => {
     if (!mapNodeRef.current || mapRef.current) return;
+    const assetController = new AbortController();
+    let disposed = false;
     const map = new maplibregl.Map({
       container: mapNodeRef.current,
-      style: MAP_STYLE,
-      center: [FALLS_CREEK.lon, FALLS_CREEK.lat],
-      zoom: 13,
+      style: structuredClone(MAP_STYLE),
+      center: [resort.lon, resort.lat],
+      zoom: resort.zoom - 0.35,
       pitch: 52,
       bearing: 0,
       maxPitch: 85,
@@ -388,9 +417,14 @@ export default function FallsCreek() {
     map.on("load", async () => {
       try {
         const [lineResponse, structureResponse] = await Promise.all([
-          fetch("/falls-creek/resort-lines.geojson"),
-          fetch("/falls-creek/structures.geojson"),
+          fetch(`${resort.assetBase}/resort-lines.geojson`, {
+            signal: assetController.signal,
+          }),
+          fetch(`${resort.assetBase}/structures.geojson`, {
+            signal: assetController.signal,
+          }),
         ]);
+        if (disposed) return;
         if (!lineResponse.ok) throw new Error("Resort line data unavailable");
         const data = await lineResponse.json();
         map.addSource("resort-lines", { type: "geojson", data });
@@ -591,21 +625,24 @@ export default function FallsCreek() {
       } catch {
         // The terrain and forecast remain useful if optional OSM linework fails.
       }
+      if (disposed) return;
       setMapReady(true);
       map.easeTo({
         pitch: 76,
-        bearing: -28,
-        zoom: 13.35,
+        bearing: resort.bearing,
+        zoom: resort.zoom,
         duration: 1800,
         essential: true,
       });
     });
 
     return () => {
+      disposed = true;
+      assetController.abort();
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [resort]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -614,9 +651,9 @@ export default function FallsCreek() {
     map.setPaintProperty(
       "snow-forecast",
       "color-relief-color",
-      snowRamp(selected, mode, accumulated, snowSceneEnabled)
+      snowRamp(resort, selected, mode, accumulated, snowSceneEnabled)
     );
-  }, [selected, mode, accumulated, mapReady, snowSceneEnabled]);
+  }, [resort, selected, mode, accumulated, mapReady, snowSceneEnabled]);
 
   useEffect(() => {
     if (!playing || forecast.length === 0) return;
@@ -667,6 +704,26 @@ export default function FallsCreek() {
     window.setTimeout(() => mapRef.current?.resize(), 100);
   }, []);
 
+  const selectResort = useCallback(
+    (nextResort: SnowResort) => {
+      setResortPickerOpen(false);
+      if (nextResort.slug === resort.slug) return;
+      setPlaying(false);
+      setSelectedIndex(0);
+      setForecast([]);
+      setForecastError(null);
+      setMapReady(false);
+      setIs3D(true);
+      setResort(nextResort);
+      window.history.pushState(
+        null,
+        "",
+        `/snow?resort=${encodeURIComponent(nextResort.slug)}`
+      );
+    },
+    [resort.slug]
+  );
+
   const toggle3D = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -685,12 +742,12 @@ export default function FallsCreek() {
     }
     map.easeTo({
       pitch: next ? 76 : 0,
-      bearing: next ? -28 : 0,
-      zoom: next ? 13.35 : 13,
+      bearing: next ? resort.bearing : 0,
+      zoom: next ? resort.zoom : resort.zoom - 0.35,
       duration: 1200,
       essential: true,
     });
-  }, [is3D]);
+  }, [is3D, resort]);
 
   const graphPoints = useMemo(() => {
     if (!forecast.length) return "";
@@ -714,7 +771,7 @@ export default function FallsCreek() {
         <div
           ref={mapNodeRef}
           className="h-full w-full"
-          aria-label="Falls Creek 3D snow map"
+          aria-label={`${resort.name} 3D snow map`}
         />
       </div>
 
@@ -740,7 +797,7 @@ export default function FallsCreek() {
       {!uiHidden && (
         <>
           <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3 md:p-5">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/15 bg-[#07101b]/88 p-1.5 shadow-2xl backdrop-blur-xl">
+            <div className="pointer-events-auto flex max-w-[calc(100%-4.5rem)] items-center gap-2 rounded-xl border border-white/15 bg-[#07101b]/88 p-1.5 shadow-2xl backdrop-blur-xl sm:max-w-none">
               <Link
                 href="/"
                 className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 transition hover:bg-white/10 hover:text-white"
@@ -748,20 +805,34 @@ export default function FallsCreek() {
               >
                 <ArrowLeft size={17} />
               </Link>
-              <div className="border-l border-white/10 px-3 py-1">
-                <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-cyan-300">
-                  Victorian Alps · interactive 3D terrain
-                </p>
-                <h1 className="text-base font-semibold leading-tight md:text-lg">
-                  Falls Creek
-                </h1>
-              </div>
+              <button
+                onClick={() => setResortPickerOpen(value => !value)}
+                aria-expanded={resortPickerOpen}
+                aria-controls="resort-picker"
+                aria-label={`Choose snow resort. Current resort: ${resort.name}`}
+                className="flex min-w-0 items-center gap-3 border-l border-white/10 px-3 py-1 text-left transition hover:bg-white/5"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-mono text-[9px] uppercase tracking-[0.22em] text-cyan-300">
+                    {resort.region} · {resort.state} · interactive 3D terrain
+                  </span>
+                  <span className="block truncate text-base font-semibold leading-tight md:text-lg">
+                    {resort.name}
+                  </span>
+                </span>
+                <ChevronDown
+                  size={15}
+                  className={`shrink-0 text-slate-400 transition ${
+                    resortPickerOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
             </div>
 
             <div className="pointer-events-auto flex gap-2 pr-11 md:pr-12">
               <button
                 onClick={() => setAutoRotate(value => !value)}
-                className={`grid h-10 w-10 place-items-center rounded-xl border backdrop-blur-xl transition ${
+                className={`hidden h-10 w-10 place-items-center rounded-xl border backdrop-blur-xl transition sm:grid ${
                   autoRotate
                     ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100"
                     : "border-white/15 bg-[#07101b]/88 text-slate-300 hover:bg-white/10"
@@ -772,13 +843,16 @@ export default function FallsCreek() {
               </button>
               <button
                 onClick={toggleFullscreen}
-                className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-[#07101b]/88 text-slate-300 backdrop-blur-xl transition hover:bg-white/10 hover:text-white"
+                className="hidden h-10 w-10 place-items-center rounded-xl border border-white/15 bg-[#07101b]/88 text-slate-300 backdrop-blur-xl transition hover:bg-white/10 hover:text-white sm:grid"
                 title="Fullscreen"
               >
                 <Maximize size={16} />
               </button>
               <button
-                onClick={() => setUiHidden(true)}
+                onClick={() => {
+                  setResortPickerOpen(false);
+                  setUiHidden(true);
+                }}
                 className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-[#07101b]/88 text-slate-300 backdrop-blur-xl transition hover:bg-white/10 hover:text-white"
                 title="Hide interface"
               >
@@ -786,6 +860,14 @@ export default function FallsCreek() {
               </button>
             </div>
           </header>
+
+          {resortPickerOpen && (
+            <ResortPicker
+              selected={resort}
+              onSelect={selectResort}
+              onClose={() => setResortPickerOpen(false)}
+            />
+          )}
 
           <div className="absolute left-3 top-[76px] z-20 md:left-5 md:top-[88px]">
             <div className="flex rounded-xl border border-white/15 bg-[#07101b]/88 p-1 shadow-2xl backdrop-blur-xl">
@@ -996,9 +1078,9 @@ export default function FallsCreek() {
           </section>
 
           <div className="absolute bottom-[102px] right-3 z-10 max-w-[calc(100%-1.5rem)] rounded-lg bg-[#07101b]/78 px-2.5 py-1.5 text-right font-mono text-[7px] leading-relaxed text-slate-400 backdrop-blur md:bottom-[108px] md:right-5 md:text-[9px]">
-            Illustrative snow scene · forecast values unchanged · archived
-            satellite mosaic · Weather: Open-Meteo · imagery: Esri · DEM:
-            Mapterhorn · structures/trails: © OpenStreetMap contributors
+            {resort.kind} · illustrative snow scene · forecast values unchanged
+            · archived satellite mosaic · Weather: Open-Meteo · imagery: Esri ·
+            DEM: Mapterhorn · structures/trails: © OpenStreetMap contributors
           </div>
         </>
       )}
@@ -1013,6 +1095,111 @@ export default function FallsCreek() {
         </button>
       )}
     </div>
+  );
+}
+
+const STATE_NAMES = {
+  NSW: "New South Wales",
+  VIC: "Victoria",
+  TAS: "Tasmania",
+  ACT: "Australian Capital Territory",
+} as const;
+
+function ResortPicker({
+  selected,
+  onSelect,
+  onClose,
+}: {
+  selected: SnowResort;
+  onSelect: (resort: SnowResort) => void;
+  onClose: () => void;
+}) {
+  return (
+    <aside
+      id="resort-picker"
+      className="pointer-events-auto absolute left-3 top-[72px] z-30 max-h-[calc(100dvh-9rem)] w-[min(46rem,calc(100%-1.5rem))] overflow-y-auto rounded-2xl border border-white/15 bg-[#07101b]/96 p-4 shadow-2xl backdrop-blur-2xl md:left-5 md:top-[84px] md:p-5"
+    >
+      <div className="mb-4 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+        <div className="flex gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/15 text-cyan-200">
+            <MapPinned size={18} />
+          </span>
+          <div>
+            <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-cyan-300">
+              Australian snow explorer
+            </p>
+            <h2 className="mt-0.5 text-lg font-semibold">
+              Choose one of {SNOW_RESORTS.length} alpine areas
+            </h2>
+            <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-400">
+              Lift-served, cross-country, snow-play and historic public alpine
+              areas across four states and territories.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded-lg border border-white/10 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-400 transition hover:bg-white/10 hover:text-white"
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {(Object.keys(STATE_NAMES) as Array<keyof typeof STATE_NAMES>).map(
+          state => {
+            const resorts = SNOW_RESORTS.filter(
+              resort => resort.state === state
+            );
+            return (
+              <section key={state}>
+                <h3 className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+                  {STATE_NAMES[state]}
+                </h3>
+                <div className="space-y-1">
+                  {resorts.map(resort => (
+                    <button
+                      key={resort.slug}
+                      onClick={() => onSelect(resort)}
+                      aria-current={
+                        selected.slug === resort.slug ? "location" : undefined
+                      }
+                      className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition ${
+                        selected.slug === resort.slug
+                          ? "border-cyan-300/45 bg-cyan-300/15 text-white"
+                          : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <span>
+                        <span className="block text-sm font-medium">
+                          {resort.name}
+                        </span>
+                        <span className="block font-mono text-[8px] uppercase tracking-[0.12em] text-slate-500">
+                          {resort.kind}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-mono text-[9px] text-slate-500">
+                        {resort.summitElevation} m
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          }
+        )}
+      </div>
+
+      <div className="mt-4 border-t border-white/10 pt-4">
+        <p className="text-sm font-medium text-slate-100">{selected.name}</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-400">
+          {selected.description}
+        </p>
+        <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-cyan-300/75">
+          Base {selected.baseElevation} m · summit {selected.summitElevation} m
+        </p>
+      </div>
+    </aside>
   );
 }
 
