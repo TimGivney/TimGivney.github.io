@@ -1091,25 +1091,25 @@ export default function Home() {
             <HomeFractal3DWidget />
           </div>
 
-          {/* Falls Creek Snow Map */}
+          {/* Australian Snow Resorts */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
               <h3
                 className="text-2xl font-semibold"
                 style={{ color: "#1B3F6B" }}
               >
-                Falls Creek Snow Map
+                Australian Snow Resorts
               </h3>
               <p className="mt-3 text-gray-700">
-                A live 3D alpine forecast for Falls Creek. The real mountain
-                terrain, ski runs and lift network sit beneath an
-                elevation-aware snow layer driven by the next 168 hours of
-                summit and village weather.
+                Explore 16 Australian ski resorts and snowfields in the same
+                live 3D detail as Falls Creek. Each mountain has its own
+                terrain, mapped trails, buildings, lift infrastructure where
+                present and an elevation-aware 168-hour forecast.
               </p>
               <p className="mt-3 text-sm text-gray-500">
-                Scrub hour by hour, animate the forecast, compare existing
-                modelled coverage with fresh and accumulated snow, and inspect
-                freezing level, snow line, rain and summit wind.
+                Switch between Victoria, New South Wales, Tasmania and the ACT,
+                then scrub hour by hour through ground coverage, fresh snowfall,
+                freezing level, rain and summit wind.
               </p>
             </div>
             <HomeFallsCreekWidget />
