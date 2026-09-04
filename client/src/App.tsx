@@ -98,6 +98,17 @@ function Router() {
           <Foundation />
         </Suspense>
       </Route>
+      <Route path={"/snow"}>
+        <Suspense
+          fallback={
+            <div className="flex h-[100dvh] w-full items-center justify-center bg-[#0a111a] font-mono text-sm text-slate-400">
+              Loading Australian snow resorts…
+            </div>
+          }
+        >
+          <FallsCreek />
+        </Suspense>
+      </Route>
       <Route path={"/falls-creek"}>
         <Suspense
           fallback={
