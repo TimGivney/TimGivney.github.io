@@ -297,7 +297,7 @@ export default function HomeFallsCreekWidget() {
       <div className="relative aspect-[1200/794] overflow-hidden bg-[#07111e]">
         <img
           src="/assets/falls-creek-3d-preview.webp"
-          alt="Rendered Australian alpine terrain with illustrative snow cover"
+          alt="Rendered alpine terrain with illustrative snow cover"
           loading="lazy"
           className="absolute inset-0 h-full w-full object-cover"
         />
@@ -357,7 +357,7 @@ export default function HomeFallsCreekWidget() {
           <div className="flex items-end justify-between gap-3 text-white">
             <span>
               <span className="flex items-center gap-1 font-mono text-[8px] uppercase tracking-[0.16em] text-slate-400">
-                <MapPinned size={10} /> {selected.region} · {selected.state}
+                <MapPinned size={10} /> {selected.region} · {selected.country}
               </span>
               <span className="mt-0.5 block text-sm font-semibold">
                 {selected.baseElevation}–{selected.summitElevation} m
@@ -375,7 +375,7 @@ export default function HomeFallsCreekWidget() {
 
       <div className="flex items-center justify-between gap-3 border-t border-slate-700 px-4 py-3">
         <p className="text-xs text-slate-400">
-          16 Australian alpine areas · 168-hour forecasts
+          50 Powder runs · 16 Australian areas · 168-hour forecasts
         </p>
         <Link
           href="/snow"
