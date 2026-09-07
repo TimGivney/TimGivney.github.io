@@ -152,8 +152,8 @@ export default function HomeCubeWidget() {
       </div>
 
       <p className="mt-2 text-xs text-gray-400">
-        Drag to rotate · scramble, then solve. Full 2×2–5×5 solver in Cube
-        Studio.
+        Drag to rotate · scramble, then solve. In Cube Studio, paint the colours
+        from a real 3×3 and follow its solution step by step.
       </p>
     </div>
   );
