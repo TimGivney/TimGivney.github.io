@@ -1032,13 +1032,14 @@ export default function Home() {
                 Cube Studio
               </h3>
               <p className="mt-3 text-gray-700">
-                An interactive 3D Rubik&apos;s cube. Scramble it, then watch the
-                solver unwind it move by move — every turn animated in real time
-                with Three.js. Drag to rotate the cube in your hands.
+                An interactive 3D Rubik&apos;s Cube studio for both virtual and
+                real-world puzzles. Paint every colour from the scrambled 3×3
+                cube in front of you, validate the physical state, then follow
+                the highlighted solution one move at a time.
               </p>
               <p className="mt-3 text-sm text-gray-500">
-                Try the live 5×5 preview, or open the full studio for the
-                complete 2×2–5×5 simulator and solver.
+                Try the live 5×5 preview, or open the full studio for 2×2–5×5
+                simulation and physical 2×2/3×3 colour entry.
               </p>
             </div>
             <HomeCubeWidget />
@@ -1101,10 +1102,9 @@ export default function Home() {
                 Australian Snow Resorts
               </h3>
               <p className="mt-3 text-gray-700">
-                Explore 16 Australian ski resorts and snowfields in the same
-                live 3D detail as Falls Creek. Each mountain has its own
-                terrain, mapped trails, buildings, lift infrastructure where
-                present and an elevation-aware 168-hour forecast.
+                A live 3D atlas of 16 Australian ski resorts and snowfields.
+                Explore each mountain&apos;s terrain, mapped trails, buildings,
+                lift infrastructure and elevation-aware 168-hour forecast.
               </p>
               <p className="mt-3 text-sm text-gray-500">
                 Switch between Victoria, New South Wales, Tasmania and the ACT,
