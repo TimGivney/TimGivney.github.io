@@ -21,13 +21,17 @@ import {
   Pause,
   Play,
   RotateCw,
+  Search,
   Snowflake,
   Thermometer,
   Wind,
 } from "lucide-react";
 import {
+  AUSTRALIAN_SNOW_RESORTS,
+  POWDER_RESORTS,
   SNOW_RESORTS,
   findSnowResort,
+  type ResortContinent,
   type SnowResort,
 } from "@/lib/snowResorts";
 
@@ -210,7 +214,13 @@ function snowRamp(
 ) {
   if (mode === "coverage") {
     const lowerElevation = Math.max(0, resort.baseElevation - 450);
-    const upperElevation = Math.max(2200, resort.topElevation + 180);
+    const baseApproach = Math.max(
+      lowerElevation + 1,
+      resort.baseElevation - 100
+    );
+    const baseStop = Math.max(baseApproach + 1, resort.baseElevation);
+    const summitStop = Math.max(baseStop + 1, resort.summitElevation);
+    const upperElevation = Math.max(summitStop + 1, resort.topElevation + 180);
     const baseAlpha =
       hour.baseDepth > 0.1
         ? alpha(0.18 + hour.baseDepth / 42)
@@ -229,11 +239,11 @@ function snowRamp(
       ["elevation"],
       lowerElevation,
       "rgba(215,235,250,0)",
-      resort.baseElevation - 100,
+      baseApproach,
       `rgba(190,219,239,${baseAlpha * 0.16})`,
-      resort.baseElevation,
+      baseStop,
       `rgba(218,239,252,${baseAlpha * 0.74})`,
-      resort.summitElevation,
+      summitStop,
       `rgba(248,253,255,${summitAlpha})`,
       upperElevation,
       `rgba(255,255,255,${summitAlpha})`,
@@ -242,8 +252,14 @@ function snowRamp(
 
   const amount = mode === "hourly" ? hour.snowfall : accumulated;
   const strength = alpha(0.1 + amount / (mode === "hourly" ? 2.5 : 18));
-  const snowLine = Math.max(900, Math.min(2100, hour.snowLine));
-  const lower = Math.max(700, snowLine - 220);
+  const snowLine = Math.max(
+    resort.baseElevation - 500,
+    Math.min(resort.topElevation + 500, hour.snowLine)
+  );
+  const lower = Math.max(1, snowLine - 220);
+  const snowStart = Math.max(lower + 1, snowLine);
+  const summitStop = Math.max(snowStart + 1, resort.summitElevation);
+  const upperStop = Math.max(summitStop + 1, resort.topElevation + 300);
   return [
     "interpolate",
     ["linear"],
@@ -252,11 +268,11 @@ function snowRamp(
     "rgba(170,205,230,0)",
     lower,
     "rgba(170,205,230,0)",
-    snowLine,
+    snowStart,
     `rgba(190,226,250,${strength * 0.32})`,
-    Math.max(snowLine + 1, resort.summitElevation),
+    summitStop,
     `rgba(242,250,255,${strength})`,
-    2200,
+    upperStop,
     `rgba(255,255,255,${strength})`,
   ];
 }
@@ -550,6 +566,34 @@ export default function FallsCreek() {
           },
         });
         map.addLayer({
+          id: "powder-run",
+          type: "line",
+          source: "resort-lines",
+          filter: ["==", ["get", "featured"], true],
+          paint: {
+            "line-color": "#ffd166",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 11, 2.5, 15, 6],
+            "line-opacity": 0.96,
+          },
+        });
+        map.addLayer({
+          id: "powder-run-label",
+          type: "symbol",
+          source: "resort-lines",
+          filter: ["==", ["get", "featured"], true],
+          layout: {
+            "symbol-placement": "line-center",
+            "text-field": ["concat", "Powder · ", ["get", "name"]],
+            "text-size": 11,
+            "text-font": ["Open Sans Regular"],
+          },
+          paint: {
+            "text-color": "#fff3c4",
+            "text-halo-color": "rgba(5,10,16,0.96)",
+            "text-halo-width": 1.8,
+          },
+        });
+        map.addLayer({
           id: "lifts-shadow",
           type: "line",
           source: "resort-lines",
@@ -751,8 +795,8 @@ export default function FallsCreek() {
 
   const graphPoints = useMemo(() => {
     if (!forecast.length) return "";
-    const min = 700;
-    const max = 3000;
+    const min = Math.max(0, resort.baseElevation - 500);
+    const max = Math.max(min + 1000, resort.topElevation + 500);
     return forecast
       .map((hour, index) => {
         const x = (index / Math.max(1, forecast.length - 1)) * 1000;
@@ -760,7 +804,7 @@ export default function FallsCreek() {
         return `${x},${Math.max(8, Math.min(118, y))}`;
       })
       .join(" ");
-  }, [forecast]);
+  }, [forecast, resort.baseElevation, resort.topElevation]);
 
   return (
     <div
@@ -814,11 +858,16 @@ export default function FallsCreek() {
               >
                 <span className="min-w-0">
                   <span className="block truncate font-mono text-[9px] uppercase tracking-[0.22em] text-cyan-300">
-                    {resort.region} · {resort.state} · interactive 3D terrain
+                    {resort.region} · {resort.country} · interactive 3D terrain
                   </span>
                   <span className="block truncate text-base font-semibold leading-tight md:text-lg">
                     {resort.name}
                   </span>
+                  {resort.featuredRun && (
+                    <span className="block truncate font-mono text-[8px] uppercase tracking-[0.15em] text-cyan-200/80">
+                      Powder run · {resort.featuredRun}
+                    </span>
+                  )}
                 </span>
                 <ChevronDown
                   size={15}
@@ -1078,6 +1127,7 @@ export default function FallsCreek() {
           </section>
 
           <div className="absolute bottom-[102px] right-3 z-10 max-w-[calc(100%-1.5rem)] rounded-lg bg-[#07101b]/78 px-2.5 py-1.5 text-right font-mono text-[7px] leading-relaxed text-slate-400 backdrop-blur md:bottom-[108px] md:right-5 md:text-[9px]">
+            {resort.featuredRun ? `Powder run: ${resort.featuredRun} · ` : ""}
             {resort.kind} · illustrative snow scene · forecast values unchanged
             · archived satellite mosaic · Weather: Open-Meteo · imagery: Esri ·
             DEM: Mapterhorn · structures/trails: © OpenStreetMap contributors
@@ -1105,6 +1155,16 @@ const STATE_NAMES = {
   ACT: "Australian Capital Territory",
 } as const;
 
+const CONTINENTS: readonly ResortContinent[] = [
+  "North America",
+  "Europe",
+  "Asia",
+  "South America",
+  "Oceania",
+];
+
+type ResortCollection = "powder" | "australia";
+
 function ResortPicker({
   selected,
   onSelect,
@@ -1114,10 +1174,45 @@ function ResortPicker({
   onSelect: (resort: SnowResort) => void;
   onClose: () => void;
 }) {
+  const [collection, setCollection] = useState<ResortCollection>(
+    selected.powderEntry ? "powder" : "australia"
+  );
+  const [query, setQuery] = useState("");
+  const collectionResorts =
+    collection === "powder" ? POWDER_RESORTS : AUSTRALIAN_SNOW_RESORTS;
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredResorts = collectionResorts.filter(resort =>
+    [
+      resort.name,
+      resort.featuredRun,
+      resort.country,
+      resort.region,
+      resort.kind,
+    ]
+      .filter(Boolean)
+      .some(value => value?.toLocaleLowerCase().includes(normalizedQuery))
+  );
+  const groups =
+    collection === "powder"
+      ? CONTINENTS.map(continent => ({
+          key: continent,
+          label: continent,
+          resorts: filteredResorts.filter(
+            resort => resort.continent === continent
+          ),
+        }))
+      : (Object.keys(STATE_NAMES) as Array<keyof typeof STATE_NAMES>).map(
+          state => ({
+            key: state,
+            label: STATE_NAMES[state],
+            resorts: filteredResorts.filter(resort => resort.state === state),
+          })
+        );
+
   return (
     <aside
       id="resort-picker"
-      className="pointer-events-auto absolute left-3 top-[72px] z-30 max-h-[calc(100dvh-9rem)] w-[min(46rem,calc(100%-1.5rem))] overflow-y-auto rounded-2xl border border-white/15 bg-[#07101b]/96 p-4 shadow-2xl backdrop-blur-2xl md:left-5 md:top-[84px] md:p-5"
+      className="pointer-events-auto absolute left-3 top-[72px] z-30 max-h-[calc(100dvh-9rem)] w-[min(58rem,calc(100%-1.5rem))] overflow-y-auto rounded-2xl border border-white/15 bg-[#07101b]/96 p-4 shadow-2xl backdrop-blur-2xl md:left-5 md:top-[84px] md:p-5"
     >
       <div className="mb-4 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex gap-3">
@@ -1126,14 +1221,15 @@ function ResortPicker({
           </span>
           <div>
             <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-cyan-300">
-              Australian snow explorer
+              World snow explorer
             </p>
             <h2 className="mt-0.5 text-lg font-semibold">
-              Choose one of {SNOW_RESORTS.length} alpine areas
+              {POWDER_RESORTS.length} great runs · {SNOW_RESORTS.length} unique
+              alpine locations
             </h2>
-            <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-400">
-              Lift-served, cross-country, snow-play and historic public alpine
-              areas across four states and territories.
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-400">
+              Explore the original Powder book&apos;s 50 featured runs alongside
+              every Australian public ski area already mapped here.
             </p>
           </div>
         </div>
@@ -1145,58 +1241,102 @@ function ResortPicker({
         </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {(Object.keys(STATE_NAMES) as Array<keyof typeof STATE_NAMES>).map(
-          state => {
-            const resorts = SNOW_RESORTS.filter(
-              resort => resort.state === state
-            );
-            return (
-              <section key={state}>
-                <h3 className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
-                  {STATE_NAMES[state]}
-                </h3>
-                <div className="space-y-1">
-                  {resorts.map(resort => (
-                    <button
-                      key={resort.slug}
-                      onClick={() => onSelect(resort)}
-                      aria-current={
-                        selected.slug === resort.slug ? "location" : undefined
-                      }
-                      className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition ${
-                        selected.slug === resort.slug
-                          ? "border-cyan-300/45 bg-cyan-300/15 text-white"
-                          : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      <span>
-                        <span className="block text-sm font-medium">
-                          {resort.name}
-                        </span>
-                        <span className="block font-mono text-[8px] uppercase tracking-[0.12em] text-slate-500">
-                          {resort.kind}
-                        </span>
-                      </span>
-                      <span className="shrink-0 font-mono text-[9px] text-slate-500">
-                        {resort.summitElevation} m
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            );
-          }
-        )}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex rounded-xl border border-white/10 bg-white/[0.04] p-1">
+          {(
+            [
+              ["powder", `Powder · ${POWDER_RESORTS.length}`],
+              ["australia", `Australia · ${AUSTRALIAN_SNOW_RESORTS.length}`],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setCollection(value)}
+              className={`rounded-lg px-3 py-2 font-mono text-[9px] uppercase tracking-[0.12em] transition ${
+                collection === value
+                  ? "bg-white text-slate-950"
+                  : "text-slate-400 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-slate-400 focus-within:border-cyan-300/45 focus-within:text-cyan-200 sm:w-72">
+          <Search size={14} />
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Search run, resort or country"
+            className="min-w-0 flex-1 bg-transparent py-2.5 text-xs text-white outline-none placeholder:text-slate-600"
+          />
+        </label>
       </div>
 
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {groups
+          .filter(group => group.resorts.length > 0)
+          .map(group => (
+            <section key={group.key}>
+              <h3 className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+                {group.label} · {group.resorts.length}
+              </h3>
+              <div className="space-y-1">
+                {group.resorts.map(resort => (
+                  <button
+                    key={resort.slug}
+                    onClick={() => onSelect(resort)}
+                    aria-current={
+                      selected.slug === resort.slug ? "location" : undefined
+                    }
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition ${
+                      selected.slug === resort.slug
+                        ? "border-cyan-300/45 bg-cyan-300/15 text-white"
+                        : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">
+                        {resort.name}
+                      </span>
+                      <span className="block truncate font-mono text-[8px] uppercase tracking-[0.1em] text-slate-500">
+                        {collection === "powder" && resort.featuredRun
+                          ? resort.featuredRun
+                          : resort.kind}
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-mono text-[9px] text-slate-500">
+                      {resort.summitElevation} m
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+      </div>
+
+      {filteredResorts.length === 0 && (
+        <p className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-400">
+          No run or resort matches “{query}”.
+        </p>
+      )}
+
       <div className="mt-4 border-t border-white/10 pt-4">
-        <p className="text-sm font-medium text-slate-100">{selected.name}</p>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="text-sm font-medium text-slate-100">{selected.name}</p>
+          {selected.featuredRun && (
+            <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-cyan-300">
+              Powder run · {selected.featuredRun}
+            </p>
+          )}
+        </div>
         <p className="mt-1 text-xs leading-relaxed text-slate-400">
           {selected.description}
         </p>
         <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-cyan-300/75">
-          Base {selected.baseElevation} m · summit {selected.summitElevation} m
+          {selected.region} · {selected.country} · base {selected.baseElevation}{" "}
+          m · ski top {selected.summitElevation} m
         </p>
       </div>
     </aside>

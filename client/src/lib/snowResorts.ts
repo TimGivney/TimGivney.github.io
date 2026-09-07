@@ -1,17 +1,33 @@
+import { POWDER_SNOW_RESORTS } from "@/lib/powderSnowResorts";
+
 export type ResortState = "ACT" | "NSW" | "TAS" | "VIC";
+export type ResortContinent =
+  | "Asia"
+  | "Europe"
+  | "North America"
+  | "Oceania"
+  | "South America";
 export type ResortKind =
   | "Alpine resort"
+  | "Backcountry zone"
   | "Cross-country resort"
+  | "Expedition descent"
+  | "Historic ski area"
+  | "Ski area"
   | "Snow-play resort"
-  | "Historic ski area";
+  | "Volcanic ski area";
 
 export interface SnowResort {
   slug: string;
   name: string;
-  state: ResortState;
+  state?: ResortState;
+  country: string;
+  continent: ResortContinent;
   region: string;
   kind: ResortKind;
   description: string;
+  featuredRun?: string;
+  powderEntry?: boolean;
   lat: number;
   lon: number;
   baseElevation: number;
@@ -22,7 +38,11 @@ export interface SnowResort {
   assetBase: string;
 }
 
-export const SNOW_RESORTS: readonly SnowResort[] = [
+type AustralianSnowResort = Omit<SnowResort, "continent" | "country"> & {
+  state: ResortState;
+};
+
+const AUSTRALIAN_RESORTS = [
   {
     slug: "falls-creek",
     name: "Falls Creek",
@@ -56,6 +76,8 @@ export const SNOW_RESORTS: readonly SnowResort[] = [
     zoom: 12.75,
     bearing: 28,
     assetBase: "/ski-resorts/mount-hotham",
+    featuredRun: "Mary's Slide",
+    powderEntry: true,
   },
   {
     slug: "mount-buller",
@@ -295,9 +317,26 @@ export const SNOW_RESORTS: readonly SnowResort[] = [
     bearing: -28,
     assetBase: "/ski-resorts/mount-mawson",
   },
-] as const;
+] as const satisfies readonly AustralianSnowResort[];
 
-export const DEFAULT_RESORT = SNOW_RESORTS[0];
+export const AUSTRALIAN_SNOW_RESORTS: readonly SnowResort[] =
+  AUSTRALIAN_RESORTS.map(resort => ({
+    ...resort,
+    country: "Australia",
+    continent: "Oceania",
+  }));
+
+export const SNOW_RESORTS: readonly SnowResort[] = [
+  ...AUSTRALIAN_SNOW_RESORTS,
+  ...POWDER_SNOW_RESORTS,
+];
+
+export const POWDER_RESORTS: readonly SnowResort[] = [
+  ...POWDER_SNOW_RESORTS.slice(0, 48),
+  ...AUSTRALIAN_SNOW_RESORTS.filter(resort => resort.slug === "mount-hotham"),
+  ...POWDER_SNOW_RESORTS.slice(48),
+];
+export const DEFAULT_RESORT = AUSTRALIAN_SNOW_RESORTS[0];
 
 export function findSnowResort(slug: string | null) {
   return SNOW_RESORTS.find(resort => resort.slug === slug) ?? DEFAULT_RESORT;
