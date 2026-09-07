@@ -42,7 +42,7 @@ const HOME_MAP_STYLE: StyleSpecification = {
     {
       id: "background",
       type: "background",
-      paint: { "background-color": "#07111e" },
+      paint: { "background-color": "rgba(7, 17, 30, 0)" },
     },
     {
       id: "satellite",
@@ -295,15 +295,18 @@ export default function HomeFallsCreekWidget() {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-700 bg-[#09131f] shadow-inner">
       <div className="relative aspect-[1200/794] overflow-hidden bg-[#07111e]">
-        <div ref={mapNodeRef} className="absolute inset-0" />
-        {!mapReady && (
-          <img
-            src="/assets/falls-creek-3d-preview.webp"
-            alt="Australian alpine terrain preview"
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
+        <img
+          src="/assets/falls-creek-3d-preview.webp"
+          alt="Rendered Australian alpine terrain with illustrative snow cover"
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div
+          ref={mapNodeRef}
+          className={`absolute inset-0 transition-opacity duration-700 ${
+            mapReady ? "opacity-100" : "opacity-0"
+          }`}
+        />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#06101c]/15 via-transparent to-[#06101c]/90" />
 
         <div className="absolute left-3 top-3 flex items-center gap-2 rounded-lg border border-white/15 bg-[#07101b]/85 px-2.5 py-2 text-white shadow-lg backdrop-blur-md">
