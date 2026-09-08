@@ -1092,24 +1092,25 @@ export default function Home() {
             <HomeFractal3DWidget />
           </div>
 
-          {/* Australian Snow Resorts */}
+          {/* World Snow Explorer */}
           <div className="mt-6 grid items-stretch gap-6 rounded-2xl bg-white p-6 shadow-md ring-1 ring-gray-100 md:grid-cols-2">
             <div className="flex flex-col justify-center">
               <h3
                 className="text-2xl font-semibold"
                 style={{ color: "#1B3F6B" }}
               >
-                Australian Snow Resorts
+                World Snow Explorer
               </h3>
               <p className="mt-3 text-gray-700">
-                A live 3D atlas of 16 Australian ski resorts and snowfields.
-                Explore each mountain&apos;s terrain, mapped trails, buildings,
-                lift infrastructure and elevation-aware 168-hour forecast.
+                A live 3D atlas pairing every Australian ski area with the 50
+                great runs from the original edition of <em>Powder</em>. Explore
+                terrain, mapped trails, buildings, lift infrastructure and
+                elevation-aware 168-hour forecasts around the world.
               </p>
               <p className="mt-3 text-sm text-gray-500">
-                Switch between Victoria, New South Wales, Tasmania and the ACT,
-                then scrub hour by hour through ground coverage, fresh snowfall,
-                freezing level, rain and summit wind.
+                Search by run, resort or country, then scrub hour by hour
+                through ground coverage, fresh snowfall, freezing level, rain
+                and summit wind.
               </p>
             </div>
             <HomeFallsCreekWidget />
