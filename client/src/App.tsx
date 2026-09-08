@@ -102,7 +102,7 @@ function Router() {
         <Suspense
           fallback={
             <div className="flex h-[100dvh] w-full items-center justify-center bg-[#0a111a] font-mono text-sm text-slate-400">
-              Loading Australian snow resorts…
+              Loading world snow explorer…
             </div>
           }
         >
