@@ -87,6 +87,96 @@ interface ForecastHour {
 
 type SnowMode = "coverage" | "hourly" | "accum";
 
+type ResortProperties = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
+type Position = [number, number];
+
+interface ResortFeature<Geometry> {
+  type: "Feature";
+  id?: string | number;
+  properties: ResortProperties;
+  geometry: Geometry;
+}
+
+interface ResortFeatureCollection<Geometry> {
+  type: "FeatureCollection";
+  features: Array<ResortFeature<Geometry>>;
+}
+
+interface ResortLineGeometry {
+  type: "LineString";
+  coordinates: Position[];
+}
+
+interface ResortPolygonGeometry {
+  type: "Polygon";
+  coordinates: Position[][];
+}
+
+interface ResortPointGeometry {
+  type: "Point";
+  coordinates: Position;
+}
+
+function getFallbackMarkerPoints(
+  structures: ResortFeatureCollection<ResortPolygonGeometry>,
+  hasFeaturedLine: boolean
+): ResortFeatureCollection<ResortPointGeometry> {
+  if (hasFeaturedLine) {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  const markers = structures.features.filter(
+    feature =>
+      feature.properties?.kind === "marker" &&
+      feature.properties.markerType === "featured-run"
+  );
+  const fallbackMarkers = markers.length
+    ? markers
+    : structures.features
+        .filter(
+          feature =>
+            feature.properties?.kind === "marker" &&
+            feature.properties.markerType === "summit"
+        )
+        .slice(0, 1);
+
+  return {
+    type: "FeatureCollection",
+    features: fallbackMarkers.flatMap(feature => {
+      const ring = feature.geometry.coordinates[0];
+      if (!ring?.length) return [];
+      const [longitude, latitude] = ring.reduce<[number, number]>(
+        (total, coordinate) => [
+          total[0] + coordinate[0],
+          total[1] + coordinate[1],
+        ],
+        [0, 0]
+      );
+      return [
+        {
+          type: "Feature" as const,
+          id: feature.id,
+          properties: feature.properties,
+          geometry: {
+            type: "Point" as const,
+            coordinates: [longitude / ring.length, latitude / ring.length],
+          },
+        },
+      ];
+    }),
+  };
+}
+
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase();
+}
+
 const MAP_STYLE: StyleSpecification = {
   version: 8,
   glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
@@ -442,15 +532,65 @@ export default function FallsCreek() {
         ]);
         if (disposed) return;
         if (!lineResponse.ok) throw new Error("Resort line data unavailable");
-        const data = await lineResponse.json();
+        const data =
+          (await lineResponse.json()) as ResortFeatureCollection<ResortLineGeometry>;
         map.addSource("resort-lines", { type: "geojson", data });
 
         if (structureResponse.ok) {
-          const structures = await structureResponse.json();
+          const structures =
+            (await structureResponse.json()) as ResortFeatureCollection<ResortPolygonGeometry>;
           map.addSource("resort-structures", {
             type: "geojson",
             data: structures,
           });
+          const fallbackMarkerPoints = getFallbackMarkerPoints(
+            structures,
+            data.features.some(feature => feature.properties?.featured === true)
+          );
+          if (fallbackMarkerPoints.features.length) {
+            map.addSource("fallback-marker-points", {
+              type: "geojson",
+              data: fallbackMarkerPoints,
+            });
+            map.addLayer({
+              id: "fallback-marker-point",
+              type: "circle",
+              source: "fallback-marker-points",
+              paint: {
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  9,
+                  5,
+                  14,
+                  8,
+                ],
+                "circle-color": "#ffd166",
+                "circle-stroke-color": "rgba(5,10,16,0.96)",
+                "circle-stroke-width": 2,
+              },
+            });
+            map.addLayer({
+              id: "fallback-marker-label",
+              type: "symbol",
+              source: "fallback-marker-points",
+              layout: {
+                "text-field": ["get", "name"],
+                "text-size": 12,
+                "text-font": ["Open Sans Regular"],
+                "text-offset": [0, -1.4],
+                "text-anchor": "bottom",
+                "text-allow-overlap": true,
+                "text-ignore-placement": true,
+              },
+              paint: {
+                "text-color": "#fff3c4",
+                "text-halo-color": "rgba(5,10,16,0.96)",
+                "text-halo-width": 2,
+              },
+            });
+          }
           map.addLayer({
             id: "buildings-3d",
             type: "fill-extrusion",
@@ -647,9 +787,10 @@ export default function FallsCreek() {
           const popup = document.createElement("div");
           const name = document.createElement("strong");
           const detail = document.createElement("div");
+          popup.style.color = "#07101b";
           name.textContent = feature.properties?.name ?? kind;
           detail.textContent = kind;
-          detail.style.opacity = "0.65";
+          detail.style.color = "#526071";
           popup.append(name, detail);
           new maplibregl.Popup({ closeButton: false, offset: 12 })
             .setLngLat(event.lngLat)
@@ -878,10 +1019,10 @@ export default function FallsCreek() {
               </button>
             </div>
 
-            <div className="pointer-events-auto flex gap-2 pr-11 md:pr-12">
+            <div className="pointer-events-none flex gap-2 pr-11 md:pr-12">
               <button
                 onClick={() => setAutoRotate(value => !value)}
-                className={`hidden h-10 w-10 place-items-center rounded-xl border backdrop-blur-xl transition sm:grid ${
+                className={`pointer-events-auto hidden h-10 w-10 place-items-center rounded-xl border backdrop-blur-xl transition sm:grid ${
                   autoRotate
                     ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100"
                     : "border-white/15 bg-[#07101b]/88 text-slate-300 hover:bg-white/10"
@@ -892,7 +1033,7 @@ export default function FallsCreek() {
               </button>
               <button
                 onClick={toggleFullscreen}
-                className="hidden h-10 w-10 place-items-center rounded-xl border border-white/15 bg-[#07101b]/88 text-slate-300 backdrop-blur-xl transition hover:bg-white/10 hover:text-white sm:grid"
+                className="pointer-events-auto hidden h-10 w-10 place-items-center rounded-xl border border-white/15 bg-[#07101b]/88 text-slate-300 backdrop-blur-xl transition hover:bg-white/10 hover:text-white sm:grid"
                 title="Fullscreen"
               >
                 <Maximize size={16} />
@@ -902,7 +1043,7 @@ export default function FallsCreek() {
                   setResortPickerOpen(false);
                   setUiHidden(true);
                 }}
-                className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-[#07101b]/88 text-slate-300 backdrop-blur-xl transition hover:bg-white/10 hover:text-white"
+                className="pointer-events-auto grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-[#07101b]/88 text-slate-300 backdrop-blur-xl transition hover:bg-white/10 hover:text-white"
                 title="Hide interface"
               >
                 <EyeOff size={16} />
@@ -1180,7 +1321,7 @@ function ResortPicker({
   const [query, setQuery] = useState("");
   const collectionResorts =
     collection === "powder" ? POWDER_RESORTS : AUSTRALIAN_SNOW_RESORTS;
-  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const normalizedQuery = normalizeSearchValue(query.trim());
   const filteredResorts = collectionResorts.filter(resort =>
     [
       resort.name,
@@ -1190,7 +1331,9 @@ function ResortPicker({
       resort.kind,
     ]
       .filter(Boolean)
-      .some(value => value?.toLocaleLowerCase().includes(normalizedQuery))
+      .some(value =>
+        value ? normalizeSearchValue(value).includes(normalizedQuery) : false
+      )
   );
   const groups =
     collection === "powder"
