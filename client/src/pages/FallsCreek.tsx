@@ -579,8 +579,8 @@ export default function FallsCreek() {
                 "text-field": ["get", "name"],
                 "text-size": 12,
                 "text-font": ["Open Sans Regular"],
-                "text-offset": [0, 1.4],
-                "text-anchor": "top",
+                "text-offset": [0, -1.4],
+                "text-anchor": "bottom",
                 "text-allow-overlap": true,
                 "text-ignore-placement": true,
               },
@@ -787,9 +787,10 @@ export default function FallsCreek() {
           const popup = document.createElement("div");
           const name = document.createElement("strong");
           const detail = document.createElement("div");
+          popup.style.color = "#07101b";
           name.textContent = feature.properties?.name ?? kind;
           detail.textContent = kind;
-          detail.style.opacity = "0.65";
+          detail.style.color = "#526071";
           popup.append(name, detail);
           new maplibregl.Popup({ closeButton: false, offset: 12 })
             .setLngLat(event.lngLat)
