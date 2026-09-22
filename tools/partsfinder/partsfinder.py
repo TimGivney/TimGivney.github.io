@@ -33,6 +33,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 import openpyxl
 
 PORT = int(os.environ.get("PARTSFINDER_PORT", "8765"))
+MAX_UPLOAD = 200 * 2**20
 if getattr(sys, "frozen", False):
     BASE = Path(sys.executable).resolve().parent
 else:
@@ -212,9 +213,9 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     cols, prices = map_columns(header)
     body = rows[hdr + 1:]
     oem_vals = [clean(r[cols["oem"]]) for r in body if "oem" in cols and len(r) > cols["oem"]]
-    oem = guess_oem(sheet, file_name, oem_vals)
     # only trust per-row OEM values that occur repeatedly; stray part numbers in the OEM column fall back to the sheet OEM
     trusted_oems = {v for v in set(oem_vals) if v and oem_vals.count(v) >= 3}
+    oem = guess_oem(sheet, file_name, [v for v in oem_vals if v in trusted_oems])
     recs = []
     for i, row in enumerate(body, start=hdr + first_data_row):
         row = list(row) + [None] * (len(header) + 2)
@@ -228,7 +229,7 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
                 pl.append({"label": p["label"], "value": v, "currency": p["currency"], "date": p["date"]})
         g = lambda f: clean(row[cols[f]]) if f in cols else None  # noqa: E731
         rec = {
-            "oem": (g("oem") if g("oem") in trusted_oems else None) or oem,
+            "oem": g("oem") if g("oem") in trusted_oems else None,
             "part": part, "key": part_key(part),
             "desc": g("desc"), "qty": g("qty"), "assembly": g("assembly"),
             "pump": g("pump"), "common": g("common"), "location": g("location"),
@@ -366,56 +367,65 @@ def commit_import(pid: str, choices: dict, con: sqlite3.Connection) -> tuple[lis
     done = []
     ts = now()
     with LOCK:
-        for s in pv["sheets"]:
-            if not s.get("usable"):
-                continue
-            ch = choices.get(s["sheet"], {})
-            if not ch.get("import", True):
-                continue
-            oem = ch.get("oem") or s["oem"]
-            dataset = ch.get("dataset") or s["dataset"]
-            cur = con.execute(
-                "INSERT INTO imports(file,sheet,oem,dataset,imported_at,rows,new_parts,existing_parts,price_changes,raw_path,columns) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                (path.name, s["sheet"], oem, dataset, ts, s["rows"], s["new_parts"], s["existing_parts"],
-                 len(s["price_changes"]), str(raw_dest.relative_to(DATA)), json.dumps(s["columns"])))
-            iid = cur.lastrowid
-            for r in s["_records"]:
-                ro = r["oem"] or oem
-                c2 = con.execute(
-                    "INSERT INTO records(import_id,oem,part,key,desc,qty,assembly,pump,pump_key,common,location,src_row,raw) "
-                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (iid, ro, r["part"], r["key"], r["desc"], r["qty"], r["assembly"], r["pump"],
-                     pump_key(r["pump"]) if r["pump"] else None, r["common"], r["location"], r["row"],
-                     json.dumps(r["raw"], default=str)))
-                rid = c2.lastrowid
-                con.executemany("INSERT INTO common_pumps VALUES(?,?,?)",
-                                [(rid, p, pump_key(p)) for p in r["commonPumps"]])
-                con.executemany(
-                    "INSERT INTO prices(record_id,import_id,key,oem,label,value,currency,date,imported_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                    [(rid, iid, r["key"], ro, p["label"], p["value"], p["currency"], p["date"], ts) for p in r["prices"]])
-            # issues
-            iss = []
-            for d in s["duplicates"]:
-                iss.append(("duplicate_part", d["variants"][0], "Variants: " + " | ".join(d["variants"])))
-            for p in s["unmatched_pumps"]:
-                iss.append(("unknown_pump", p, f"New pump model in {s['sheet']} — not seen before"))
-            for grp in s["similar_pumps"]:
-                iss.append(("similar_pumps", grp[0], "May be the same model: " + " | ".join(grp)))
-            for ch_ in s["price_changes"]:
-                iss.append(("price_change", ch_["part"],
-                            f"{ch_['label']} {ch_['currency'] or ''}: {ch_['old']} ({ch_['old_date']}) → {ch_['new']}"))
-            if s["missing_desc"]:
-                iss.append(("missing_description", s["sheet"], f"{s['missing_desc']} rows have no description"))
-            for kind, subj, det in iss:
-                exists = con.execute("SELECT 1 FROM issues WHERE kind=? AND subject=? AND detail=? LIMIT 1",
-                                     (kind, subj, det)).fetchone()
-                if not exists:
-                    con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(?,?,?,?,?)",
-                                (iid, kind, subj, det, ts))
-            done.append({"sheet": s["sheet"], "oem": oem, "rows": s["rows"], "import_id": iid})
-        con.commit()
+        try:
+            _commit_sheets(pv, choices, con, path, raw_dest, ts, done)
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
     return done, path
+
+
+def _commit_sheets(pv: dict, choices: dict, con: sqlite3.Connection, path: Path, raw_dest: Path, ts: str, done: list) -> None:
+    for s in pv["sheets"]:
+        if not s.get("usable"):
+            continue
+        ch = choices.get(s["sheet"], {})
+        if not ch.get("import", True):
+            continue
+        oem = ch.get("oem") or s["oem"]
+        override = bool(ch.get("oem")) and ch["oem"] != s["oem"]
+        dataset = ch.get("dataset") or s["dataset"]
+        cur = con.execute(
+            "INSERT INTO imports(file,sheet,oem,dataset,imported_at,rows,new_parts,existing_parts,price_changes,raw_path,columns) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (path.name, s["sheet"], oem, dataset, ts, s["rows"], s["new_parts"], s["existing_parts"],
+             len(s["price_changes"]), str(raw_dest.relative_to(DATA)), json.dumps(s["columns"])))
+        iid = cur.lastrowid
+        for r in s["_records"]:
+            ro = oem if override else (r["oem"] or oem)
+            c2 = con.execute(
+                "INSERT INTO records(import_id,oem,part,key,desc,qty,assembly,pump,pump_key,common,location,src_row,raw) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (iid, ro, r["part"], r["key"], r["desc"], r["qty"], r["assembly"], r["pump"],
+                 pump_key(r["pump"]) if r["pump"] else None, r["common"], r["location"], r["row"],
+                 json.dumps(r["raw"], default=str)))
+            rid = c2.lastrowid
+            con.executemany("INSERT INTO common_pumps VALUES(?,?,?)",
+                            [(rid, p, pump_key(p)) for p in r["commonPumps"]])
+            con.executemany(
+                "INSERT INTO prices(record_id,import_id,key,oem,label,value,currency,date,imported_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                [(rid, iid, r["key"], ro, p["label"], p["value"], p["currency"], p["date"], ts) for p in r["prices"]])
+        # issues
+        iss = []
+        for d in s["duplicates"]:
+            iss.append(("duplicate_part", d["variants"][0], "Variants: " + " | ".join(d["variants"])))
+        for p in s["unmatched_pumps"]:
+            iss.append(("unknown_pump", p, f"New pump model in {s['sheet']} — not seen before"))
+        for grp in s["similar_pumps"]:
+            iss.append(("similar_pumps", grp[0], "May be the same model: " + " | ".join(grp)))
+        for ch_ in s["price_changes"]:
+            iss.append(("price_change", ch_["part"],
+                        f"{ch_['label']} {ch_['currency'] or ''}: {ch_['old']} ({ch_['old_date']}) → {ch_['new']}"))
+        if s["missing_desc"]:
+            iss.append(("missing_description", s["sheet"], f"{s['missing_desc']} rows have no description"))
+        for kind, subj, det in iss:
+            exists = con.execute("SELECT 1 FROM issues WHERE kind=? AND subject=? AND detail=? LIMIT 1",
+                                 (kind, subj, det)).fetchone()
+            if not exists:
+                con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(?,?,?,?,?)",
+                            (iid, kind, subj, det, ts))
+        done.append({"sheet": s["sheet"], "oem": oem, "rows": s["rows"], "import_id": iid})
 
 
 # --------------------------------------------------------------------------- #
@@ -505,17 +515,18 @@ def q_part(con, key: str) -> dict:
 def q_pump(con, pump: str) -> dict:
     pk = pump_key(pump)
     direct = rec_dicts(con.execute("SELECT * FROM records WHERE pump_key=? ORDER BY assembly, part", (pk,)))
-    via = []
-    if not direct:
-        via = rec_dicts(con.execute(
-            "SELECT r.* FROM records r JOIN common_pumps cp ON cp.record_id=r.id WHERE cp.pump_key=? ORDER BY r.assembly, r.part", (pk,)))
-    rows = direct or via
+    via = rec_dicts(con.execute(
+        "SELECT r.* FROM records r JOIN common_pumps cp ON cp.record_id=r.id WHERE cp.pump_key=? ORDER BY r.assembly, r.part", (pk,)))
+    direct_ids = {r["id"] for r in direct}
+    rows = direct + [r for r in via if r["id"] not in direct_ids]
     names = sorted({r["pump"] for r in direct}) or [pump]
     common = sorted({c[0] for c in con.execute(
         "SELECT DISTINCT cp.pump FROM common_pumps cp JOIN records r ON r.id=cp.record_id WHERE r.pump_key=? AND cp.pump_key<>?", (pk, pk))})
     # parts unique to this pump (appear on no other pump)
     unique = [r for r in rows if con.execute(
-        "SELECT 1 FROM records WHERE key=? AND pump_key IS NOT NULL AND pump_key<>? LIMIT 1", (r["key"], pk)).fetchone() is None]
+        "SELECT 1 FROM records WHERE key=? AND pump_key IS NOT NULL AND pump_key<>? LIMIT 1", (r["key"], pk)).fetchone() is None
+        and con.execute("SELECT 1 FROM records r JOIN common_pumps cp ON cp.record_id=r.id WHERE r.key=? AND cp.pump_key<>? LIMIT 1",
+                        (r["key"], pk)).fetchone() is None]
     seen, parts = set(), []
     for r in rows:
         if r["key"] not in seen:
@@ -761,6 +772,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if p == "/api/upload":
                 length = int(self.headers.get("Content-Length") or 0)
+                if length > MAX_UPLOAD:
+                    return self.send_json({"error": f"file too large (limit {MAX_UPLOAD // 2**20} MB)"}, 413)
                 raw = (f"Content-Type: {self.headers['Content-Type']}\r\n\r\n").encode() + self.rfile.read(length)
                 msg = BytesParser(policy=HTTP).parsebytes(raw)
                 item = next((part for part in msg.iter_parts() if part.get_filename()), None)
