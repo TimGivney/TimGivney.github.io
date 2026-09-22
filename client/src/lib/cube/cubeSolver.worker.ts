@@ -1,9 +1,10 @@
 import Cube from "cubejs";
-import { validateCubieState } from "./physicalSolver";
+import { validateCubieState, type CubieState } from "./physicalSolver";
 
 interface SolveRequest {
   id: number;
-  facelets: string;
+  facelets?: string;
+  cubies?: CubieState;
 }
 
 let initialized = false;
@@ -16,7 +17,11 @@ self.onmessage = (event: MessageEvent<SolveRequest>) => {
       Cube.initSolver();
       initialized = true;
     }
-    const cube = Cube.fromString(facelets);
+    if (!facelets && !event.data.cubies)
+      throw new Error("The cube state could not be read.");
+    const cube = facelets
+      ? Cube.fromString(facelets)
+      : new Cube(event.data.cubies);
     const problem = validateCubieState(cube.toJSON());
     if (problem) throw new Error(problem);
     const algorithm = cube.solve();

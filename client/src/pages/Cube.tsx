@@ -31,7 +31,7 @@ import {
   parseCubeAlgorithm,
   validatePhysicalState,
 } from "@/lib/cube/physicalSolver";
-import { solveFacelets } from "@/lib/cube/solverClient";
+import { solveCubies, solveFacelets } from "@/lib/cube/solverClient";
 
 const SIZES = [2, 3, 4, 5] as const;
 const CUBE_COLORS = [
@@ -107,10 +107,11 @@ export default function Cube() {
         const counts = countStickerColors(state);
         const entered = counts.reduce((sum, count) => sum + count, 0);
         setColorCounts(counts);
+        const totalStickers = 6 * n * n;
         setStatus(
-          entered === 54
+          entered === totalStickers
             ? "All stickers entered · ready to validate"
-            : `${54 - entered} stickers left`
+            : `${totalStickers - entered} stickers left`
         );
       },
     });
@@ -277,11 +278,11 @@ export default function Cube() {
       reset();
       return;
     }
-    if (n !== 3) {
-      setStatus("Choose 3×3 to enter a physical cube");
+    if (n !== 2 && n !== 3) {
+      setStatus("Physical entry is ready for 2×2 and 3×3 cubes");
       return;
     }
-    const entry = createPhysicalEntryCube();
+    const entry = createPhysicalEntryCube(n);
     view.setState(entry);
     historyRef.current = [];
     setMoveCount(0);
@@ -292,14 +293,18 @@ export default function Cube() {
     setSolutionIndex(-1);
     setPhysicalSolution([]);
     setPhysicalStep(0);
-    setStatus("48 stickers left · white top, green front");
+    setStatus(
+      n === 2
+        ? "24 stickers left · anchor the white-green-red corner"
+        : "48 stickers left · white top, green front"
+    );
   }, [busy, n, painting, reset, solving]);
 
   const solvePhysical = useCallback(async () => {
     const view = viewRef.current;
     if (!view || busy || !painting) return;
     const validation = validatePhysicalState(view.state);
-    if (!validation.valid || !validation.facelets) {
+    if (!validation.valid || (!validation.facelets && !validation.cubies)) {
       setStatus(validation.message);
       return;
     }
@@ -307,14 +312,15 @@ export default function Cube() {
     setBusy(true);
     setStatus("Checking pieces…");
     try {
-      const algorithm = await solveFacelets(validation.facelets, () =>
-        setStatus("Preparing the solver…")
-      );
-      const moves = parseCubeAlgorithm(algorithm);
+      const onInitializing = () => setStatus("Preparing the solver…");
+      const algorithm = validation.facelets
+        ? await solveFacelets(validation.facelets, onInitializing)
+        : await solveCubies(validation.cubies!, onInitializing);
+      const moves = parseCubeAlgorithm(algorithm, n);
       setPainting(false);
       setPhysicalSolution(moves);
       setPhysicalStep(0);
-      setSolutionLabels(moves.map(move => solutionLabel(move, 3)));
+      setSolutionLabels(moves.map(move => solutionLabel(move, n)));
       setSolutionIndex(moves.length > 0 ? 0 : -1);
       setStatus(
         moves.length > 0
@@ -328,7 +334,7 @@ export default function Cube() {
     } finally {
       setBusy(false);
     }
-  }, [busy, painting]);
+  }, [busy, n, painting]);
 
   const stepPhysical = useCallback(
     async (direction: 1 | -1) => {
@@ -482,7 +488,7 @@ export default function Cube() {
         >
           {status} ·{" "}
           {painting
-            ? `${colorCounts.reduce((sum, count) => sum + count, 0)}/54 stickers`
+            ? `${colorCounts.reduce((sum, count) => sum + count, 0)}/${6 * n * n} stickers`
             : physicalSolution.length > 0
               ? `${physicalStep}/${physicalSolution.length} complete`
               : `${moveCount} moves`}
@@ -604,7 +610,8 @@ export default function Cube() {
                   onClick={solvePhysical}
                   disabled={
                     busy ||
-                    colorCounts.reduce((sum, count) => sum + count, 0) !== 54
+                    colorCounts.reduce((sum, count) => sum + count, 0) !==
+                      6 * n * n
                   }
                   className="inline-flex items-center gap-1.5 rounded-md bg-[#C9A84C] px-4 py-2 text-sm font-semibold text-[#1a1a2e] shadow-lg shadow-[#C9A84C]/20 transition hover:bg-[#d8ba63] disabled:opacity-40"
                 >
@@ -639,11 +646,11 @@ export default function Cube() {
               <>
                 <button
                   onClick={togglePainting}
-                  disabled={busy || solving || n !== 3}
+                  disabled={busy || solving || (n !== 2 && n !== 3)}
                   title={
-                    n === 3
+                    n === 2 || n === 3
                       ? "Enter every sticker from a physical cube"
-                      : "Choose 3×3 first"
+                      : "Physical entry for 4×4 and 5×5 still needs a full reduction solver"
                   }
                   className="inline-flex items-center gap-1.5 rounded-md border border-[#C9A84C]/35 bg-[#C9A84C]/10 px-3.5 py-2 text-sm font-medium text-[#e7cf85] transition hover:bg-[#C9A84C]/20 disabled:opacity-40"
                 >
@@ -723,10 +730,14 @@ export default function Cube() {
 
           <p className="text-center text-[11px] text-zinc-500">
             {painting
-              ? "Hold your cube with white on top and green facing you · paint every grey sticker · drag the background to inspect hidden faces"
+              ? n === 2
+                ? "Put the white-green-red corner at top-front-right with each sticker facing its matching direction · paint all 24 stickers · drag the background to inspect hidden faces"
+                : "Hold your cube with white on top and green facing you · paint every grey sticker · drag the background to inspect hidden faces"
               : physicalSolution.length > 0
                 ? "Perform the highlighted move on your physical cube, then press Next step · prime (′) means anticlockwise"
-                : "Drag the background to orbit · drag a face to turn it · scroll to zoom · keys U D L R F B"}
+                : n > 3
+                  ? "Demo turns still work · physical 4×4/5×5 solving needs centre reduction, edge pairing, and parity support"
+                  : "Drag the background to orbit · drag a face to turn it · scroll to zoom · keys U D L R F B"}
           </p>
 
           <p className="text-center text-[11px] text-zinc-600">
