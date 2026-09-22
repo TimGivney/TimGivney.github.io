@@ -724,7 +724,7 @@ function partRow(r){return `<li><button class="row" onclick="nav('#/part/${encod
 function searchBox(){return `<div class="search">🔎 <input id="q" placeholder="Search part number, pump, OEM or description… (or: common BA150 BA200)" value="${esc(q)}" autofocus></div>
 <div class="meta">OEM: <button class="${oemFilter?'':'on'}" onclick="setOem('')">All</button>${stats.oems.map(o=>`<button class="${oemFilter===o?'on':''}" onclick="setOem('${esc(o)}')">· ${esc(o)}</button>`).join('')}
 <span class="right">${stats.rows?.toLocaleString()} rows · ${stats.parts?.toLocaleString()} parts · ${stats.pumps} pumps</span></div>`}
-function setOem(o){oemFilter=o;render()}
+function setOem(o){oemFilter=o;if(o&&q.trim().length<2){nav('#/oem/'+encodeURIComponent(o));return}if(location.hash!=='#/'&&!location.hash.startsWith('#/q/'))location.hash='#/';else render()}
 async function loadStats(){stats=await api('/stats');$('#issuecount').textContent=stats.issues?`(${stats.issues})`:''}
 let t;function bindSearch(){const i=$('#q');if(!i)return;i.focus();i.setSelectionRange(i.value.length,i.value.length);i.oninput=()=>{q=i.value;clearTimeout(t);t=setTimeout(doSearch,180);if(location.hash!=='#/'&&!location.hash.startsWith('#/q/'))location.hash='#/'}}
 let seq=0;
