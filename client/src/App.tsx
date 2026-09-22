@@ -16,6 +16,7 @@ const AusEngine = lazy(() => import("./pages/AusEngine"));
 const Foundation = lazy(() => import("./pages/Foundation"));
 const FallsCreek = lazy(() => import("./pages/FallsCreek"));
 const Redback = lazy(() => import("./pages/Redback"));
+const Parts = lazy(() => import("./pages/Parts"));
 
 function Router() {
   return (
@@ -129,6 +130,17 @@ function Router() {
           }
         >
           <Redback />
+        </Suspense>
+      </Route>
+      <Route path={"/parts"}>
+        <Suspense
+          fallback={
+            <div className="flex h-[100dvh] w-full items-center justify-center bg-[#0a0c11] font-mono text-sm text-zinc-400">
+              Loading Parts Finder…
+            </div>
+          }
+        >
+          <Parts />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
