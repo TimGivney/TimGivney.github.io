@@ -1,0 +1,32 @@
+name: Build PartsFinder.exe
+
+on:
+  push:
+    paths:
+      - "tools/partsfinder/**"
+      - "data/parts/raw/**"
+      - ".github/workflows/partsfinder-exe.yml"
+  pull_request:
+    paths:
+      - "tools/partsfinder/**"
+      - ".github/workflows/partsfinder-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyinstaller openpyxl
+      - run: pyinstaller --onefile --name PartsFinder --clean --add-data "tools/partsfinder/logo.png;." --add-data "data/parts/raw/*.xlsx;seed" tools/partsfinder/partsfinder.py
+      - run: |
+          Copy-Item tools/partsfinder/README.md dist/README.md
+          Compress-Archive -Path dist/PartsFinder.exe, dist/README.md -DestinationPath PartsFinder-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PartsFinder-windows
+          path: PartsFinder-windows.zip
+          retention-days: 90
