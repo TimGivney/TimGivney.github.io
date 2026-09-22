@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "tools/partsfinder/**"
+      - "data/parts/raw/**"
       - ".github/workflows/partsfinder-exe.yml"
   pull_request:
     paths:
@@ -20,7 +21,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pyinstaller openpyxl
-      - run: pyinstaller --onefile --name PartsFinder --clean tools/partsfinder/partsfinder.py
+      - run: pyinstaller --onefile --name PartsFinder --clean --add-data "tools/partsfinder/logo.png;." --add-data "data/parts/raw/*.xlsx;seed" tools/partsfinder/partsfinder.py
       - run: |
           Copy-Item tools/partsfinder/README.md dist/README.md
           Compress-Archive -Path dist/PartsFinder.exe, dist/README.md -DestinationPath PartsFinder-windows.zip
