@@ -71,8 +71,7 @@ export default function Home() {
       description:
         "Advanced air compressor system with precision engineering and thermal optimization. Developed through iterative testing and FEA analysis to deliver high-performance industrial compression.",
       tags: ["Air Compressor", "Thermal Analysis", "Manufacturing", "FEA"],
-      image:
-        "/assets/AP-AP37-CFM-2C440-Air-Compressor-Crankcase-Cut-In-Half-Checking-Porisity-First-Samples_Jun2025_3_d9586f9d.jpg",
+      image: "/assets/ap-ap37-37cfm-air-compressor-view-1.webp",
       link: "https://partsbender.com/product/ap-air-compressor-37-cfm-coming-soon/",
     },
     {
@@ -186,8 +185,8 @@ export default function Home() {
       alt: "Nature photography",
     },
     {
-      image: "/assets/interests-image-7_b0c377b2.jpg",
-      alt: "Wildlife",
+      image: "/assets/gang-gang-cockatoo.avif",
+      alt: "Gang-gang cockatoo",
     },
     {
       image: "/assets/parrot-photo_093f39bc.webp",
