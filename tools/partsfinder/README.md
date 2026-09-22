@@ -10,13 +10,22 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
    e.g. `C:\PartsFinder\`.
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
-3. First run only: the exe loads the bundled `Cleaned Pump Data.xlsx` and `Parts_Rev4.xlsx`
-   (takes ~30 s; the console shows progress), so it opens with data already in it.
+3. First run only: the exe loads the **Master** sheets of the bundled `Parts_Rev4.xlsx`
+   (`Godwin/Sykes/BBA/Pioneer/Cornell Master`, `50CFM_Pioneer`, `50CFM Cornell`, `Atlas Copco`;
+   the unclean per-OEM tabs, planning tabs and `Cleaned Pump Data.xlsx` are not loaded — import
+   them yourself from DATA if you want them). Takes ~20 s; the console shows progress.
+   Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, and common
+   values like `BA_100_150_180_200_300` or `CD100M_150M_200M` expand to every pump listed.
 4. To add more spreadsheets: **DATA** → drop the file on the page (or copy into `PartsFinder\inbox\`
    and click **Scan inbox folder**), check the preview for each sheet (OEM guess, column mapping,
    new / existing / price changes / duplicates / new pumps), untick anything you don't want, then
    **Import**. Imports only ever *add* — nothing already in the database is removed or overwritten,
    and old prices stay as history.
+5. To start over with a brand-new sheet: **DATA** → **Flush ALL data…** (type `FLUSH` to confirm)
+   empties the database; the raw copies in `PartsFinder\raw\` are kept. Then drop the new file.
+6. **BROWSE**: pick a company → pump model → (optional) variant → parts list. A part used by more
+   than one company shows a "Shared across N companies" table on its page with each company's
+   pumps, assembly and prices side by side.
 
 Windows SmartScreen may warn because the exe is unsigned: _More info → Run anyway_.
 
