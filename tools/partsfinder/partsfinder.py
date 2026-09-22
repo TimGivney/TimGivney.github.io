@@ -42,6 +42,11 @@ DATA = BASE / "PartsFinder"
 RAW = DATA / "raw"
 INBOX = DATA / "inbox"
 DB = DATA / "partsfinder.db"
+# bundled read-only resources (logo, seed workbooks); PyInstaller unpacks them to sys._MEIPASS
+RES = Path(getattr(sys, "_MEIPASS", BASE))
+LOGO = RES / "logo.png"
+SEED = RES / "seed" if getattr(sys, "frozen", False) else BASE.parent.parent / "data" / "parts" / "raw"
+SKIP_SHEETS = {"plan", "priority", "category", "combined data", "combined data phase 1", "oem price comparison"}
 
 # --------------------------------------------------------------------------- #
 # Header understanding
@@ -192,11 +197,10 @@ def read_sheets(path: Path) -> list[tuple[str, list[list]]]:
         with open(path, newline="", encoding="utf-8-sig", errors="replace") as f:
             return [(path.stem, [list(r) for r in csv.reader(f)])]
     wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    out = []
-    for ws in wb.worksheets:
-        rows = [list(r) for r in ws.iter_rows(values_only=True)]
-        out.append((ws.title, rows))
-    return out
+    try:
+        return [(ws.title, [list(r) for r in ws.iter_rows(values_only=True)]) for ws in wb.worksheets]
+    finally:
+        wb.close()
 
 
 def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
@@ -569,55 +573,60 @@ def q_common(con, a: str, b: str) -> dict:
 HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PartsBender Parts Finder</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{--bg:#0a0c11;--panel:#0d1017;--line:#27272a;--txt:#e4e4e7;--dim:#71717a;--gold:#fbbf24;--gold2:#fcd34d}
+:root,[data-theme=light]{--bg:#ffffff;--panel:#f6f7fb;--line:#e3e6ee;--txt:#111827;--dim:#6b7280;--acc:#0a3ad6;--acc2:#0a3ad6;--field:#ffffff;--edge:#cfd5e3;--hover:#f1f3f9;--btntxt:#fff}
+[data-theme=dark]{--bg:#0b0d12;--panel:#10131a;--line:#262a33;--txt:#e5e7eb;--dim:#8b93a3;--acc:#5b8cff;--acc2:#8fb0ff;--field:#171a22;--edge:#3a3f4b;--hover:#171a22;--btntxt:#fff}
+header img{height:30px;display:block}[data-theme=dark] header img{filter:brightness(0) invert(1)}.theme{background:none;border:1px solid var(--edge);color:var(--dim);border-radius:6px;padding:3px 8px;cursor:pointer;font:11px ui-monospace,Consolas,monospace}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,Segoe UI,sans-serif}
-a{color:var(--gold2);text-decoration:none}a:hover{text-decoration:underline}
+a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 header{border-bottom:1px solid var(--line);background:var(--panel)}
 .wrap{max-width:980px;margin:0 auto;padding:0 16px}
 header .wrap{display:flex;align-items:center;gap:20px;height:48px}
-.brand{font-family:ui-monospace,Consolas,monospace;letter-spacing:.25em;color:var(--gold);font-weight:600;font-size:13px;cursor:pointer}
+.brand{font-family:ui-monospace,Consolas,monospace;letter-spacing:.25em;color:var(--acc);font-weight:600;font-size:13px;cursor:pointer}
 nav{margin-left:auto;display:flex;gap:16px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
-nav a{color:var(--dim)}nav a.on{color:var(--gold2)}
+nav a{color:var(--dim)}nav a.on{color:var(--acc2)}
 main{padding:24px 0}
-.search{display:flex;align-items:center;gap:8px;border:1px solid #3f3f46;background:#18181b;border-radius:8px;padding:8px 12px}
-.search:focus-within{border-color:var(--gold)}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--edge);background:var(--field);border-radius:8px;padding:8px 12px}
+.search:focus-within{border-color:var(--acc)}
 .search input{flex:1;background:none;border:0;outline:0;color:var(--txt);font:16px ui-monospace,Consolas,monospace}
 .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font:11px ui-monospace,Consolas,monospace;color:var(--dim)}
-.meta button{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;padding:0}.meta button.on{color:var(--gold2)}
+.meta button{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;padding:0}.meta button.on{color:var(--acc2)}
 .meta .right{margin-left:auto}
 section{border-top:1px solid var(--line);padding-top:14px;margin-top:20px}
-h3{margin:0 0 8px;font:11px ui-monospace,Consolas,monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
-h2{font:26px ui-monospace,Consolas,monospace;color:var(--gold2);margin:0}
+h3{margin:0 0 8px;font:11px ui-monospace,Consolas,monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--acc)}
+h2{font:26px ui-monospace,Consolas,monospace;color:var(--acc2);margin:0}
 .sub{font-size:18px;margin:2px 0 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{border:1px solid #3f3f46;background:#18181b;color:var(--txt);border-radius:4px;padding:4px 8px;font:12px ui-monospace,Consolas,monospace;cursor:pointer}
-.chip:hover,.chip.on{border-color:var(--gold);color:var(--gold2)}
+.chip{border:1px solid var(--edge);background:var(--field);color:var(--txt);border-radius:4px;padding:4px 8px;font:12px ui-monospace,Consolas,monospace;cursor:pointer}
+.chip:hover,.chip.on{border-color:var(--acc);color:var(--acc2)}
 ul.list{list-style:none;margin:0;padding:0}ul.list li{border-top:1px solid var(--line)}
 ul.list li:first-child{border-top:0}
 .row{display:flex;flex-wrap:wrap;gap:0 16px;align-items:baseline;width:100%;text-align:left;background:none;border:0;color:inherit;padding:7px 4px;cursor:pointer;font:inherit}
-.row:hover{background:#18181b}.row .pn{font:14px ui-monospace,Consolas,monospace;color:var(--gold2);min-width:130px}
+.row:hover{background:var(--hover)}.row .pn{font:14px ui-monospace,Consolas,monospace;color:var(--acc2);min-width:130px}
 .row .r{margin-left:auto;font:12px ui-monospace,Consolas,monospace;color:var(--dim)}
 table{width:100%;border-collapse:collapse;font:13px ui-monospace,Consolas,monospace}
 th{text-align:left;color:var(--dim);font-size:11px;font-weight:normal;padding:4px 6px}td{padding:5px 6px;border-top:1px solid var(--line)}
-td.g{color:var(--gold2)}
+td.g{color:var(--acc2)}
 .dim{color:var(--dim)}.small{font:11px ui-monospace,Consolas,monospace;color:var(--dim)}
-.drop{border:2px dashed #3f3f46;border-radius:10px;padding:36px;text-align:center;color:var(--dim);cursor:pointer}
-.drop.over{border-color:var(--gold);color:var(--gold2)}
-.btn{background:var(--gold);color:#111;border:0;border-radius:6px;padding:8px 16px;font:600 13px system-ui;cursor:pointer}
-.btn.sec{background:#27272a;color:var(--txt)}
+.drop{border:2px dashed var(--edge);border-radius:10px;padding:36px;text-align:center;color:var(--dim);cursor:pointer}
+.drop.over{border-color:var(--acc);color:var(--acc2)}
+.btn{background:var(--acc);color:var(--btntxt);border:0;border-radius:6px;padding:8px 16px;font:600 13px system-ui;cursor:pointer}
+.btn.sec{background:var(--hover);color:var(--txt)}
 .card{border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:12px;background:var(--panel)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
-.stat{background:#18181b;border-radius:6px;padding:8px 10px}.stat b{display:block;font:20px ui-monospace,Consolas,monospace;color:var(--gold2)}
+.stat{background:var(--field);border-radius:6px;padding:8px 10px}.stat b{display:block;font:20px ui-monospace,Consolas,monospace;color:var(--acc2)}
 .stat span{font-size:11px;color:var(--dim)}
-select,input[type=text]{background:#18181b;color:var(--txt);border:1px solid #3f3f46;border-radius:4px;padding:4px 6px;font:13px ui-monospace,Consolas,monospace}
-.warn{color:#fbbf24}.ok{color:#4ade80}.err{color:#f87171}
+select,input[type=text]{background:var(--field);color:var(--txt);border:1px solid var(--edge);border-radius:4px;padding:4px 6px;font:13px ui-monospace,Consolas,monospace}
+.warn{color:#b45309}.ok{color:#4ade80}.err{color:#f87171}
 details summary{cursor:pointer;color:var(--dim);font-size:12px}
-.toast{position:fixed;bottom:16px;right:16px;background:#18181b;border:1px solid var(--gold);padding:10px 14px;border-radius:6px}
+.toast{position:fixed;bottom:16px;right:16px;background:var(--field);border:1px solid var(--acc);padding:10px 14px;border-radius:6px}
 </style></head><body>
-<header><div class="wrap"><span class="brand" onclick="nav('#/')">PARTSBENDER PARTS FINDER</span>
-<nav><a href="#/" id="n-search">SEARCH</a><a href="#/data" id="n-data">DATA</a><a href="#/review" id="n-review">REVIEW <span id="issuecount"></span></a></nav></div></header>
+<header><div class="wrap"><a href="#/"><img src="/logo.png" alt="PartsBender"></a><span class="brand" onclick="nav('#/')">PARTS FINDER</span>
+<nav><a href="#/" id="n-search">SEARCH</a><a href="#/data" id="n-data">DATA</a><a href="#/review" id="n-review">REVIEW <span id="issuecount"></span></a><button class="theme" id="theme" onclick="toggleTheme()"></button></nav></div></header>
 <main><div class="wrap" id="app"></div></main>
 <script>
+const setTheme=t=>{document.documentElement.dataset.theme=t;localStorage.pfTheme=t;document.getElementById('theme').textContent=t==='dark'?'LIGHT':'DARK'};
+const toggleTheme=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+setTheme(localStorage.pfTheme||'light');
 const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=(p,o)=>fetch('/api'+p,o).then(r=>r.json());
 let stats={oems:[]},oemFilter='',q='';
@@ -730,10 +739,18 @@ class Handler(BaseHTTPRequestHandler):
         p = u.path
         con = self.server.con  # type: ignore[attr-defined]
         try:
-            if p == "/" or not p.startswith("/api/"):
+            if p == "/" or (not p.startswith("/api/") and p != "/logo.png"):
                 data = HTML.encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if p == "/logo.png" and LOGO.exists():
+                data = LOGO.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
@@ -788,7 +805,10 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/import":
                 done, src = commit_import(body["preview_id"], body.get("choices", {}), con)
                 if src.parent.resolve() == INBOX.resolve() and src.exists():
-                    src.unlink()
+                    try:
+                        src.unlink()
+                    except OSError:
+                        pass  # still open elsewhere (e.g. Excel); a copy is already in raw/
                 return self.send_json({"done": done})
             m = re.match(r"^/api/issues/(\d+)/resolve$", p)
             if m:
@@ -800,11 +820,25 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": f"{type(e).__name__}: {e}"}, 500)
 
 
+def seed_if_empty(con: sqlite3.Connection) -> None:
+    """First run: load the workbooks bundled with the program so it starts with data."""
+    if con.execute("SELECT 1 FROM imports LIMIT 1").fetchone() or not SEED.is_dir():
+        return
+    for f in sorted(SEED.iterdir()):
+        if f.suffix.lower() not in (".xlsx", ".xlsm", ".csv"):
+            continue
+        print(f"  loading bundled {f.name} ...")
+        pv = preview_file(f, con)
+        choices = {s["sheet"]: {"import": s["sheet"].lower() not in SKIP_SHEETS} for s in pv["sheets"]}
+        commit_import(pv["preview_id"], choices, con)
+
+
 def main():
     DATA.mkdir(exist_ok=True)
     RAW.mkdir(exist_ok=True)
     INBOX.mkdir(exist_ok=True)
     con = db()
+    seed_if_empty(con)
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     srv.con = con  # type: ignore[attr-defined]
     url = f"http://localhost:{PORT}/"

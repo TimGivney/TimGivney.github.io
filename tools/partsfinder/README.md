@@ -10,12 +10,17 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
    e.g. `C:\PartsFinder\`.
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
-3. First time: go to **DATA**, drop `Cleaned Pump Data.xlsx` and `Parts_Rev4.xlsx` on the page
-   (or copy them into `PartsFinder\inbox\` and click **Scan inbox folder**). Check the preview for
-   each sheet (OEM guess, column mapping, new / existing / price changes / duplicates / new pumps),
-   untick anything you don't want (e.g. `Combined Data`, `Plan`), then **Import**.
+3. First run only: the exe loads the bundled `Cleaned Pump Data.xlsx` and `Parts_Rev4.xlsx`
+   (takes ~30 s; the console shows progress), so it opens with data already in it.
+4. To add more spreadsheets: **DATA** → drop the file on the page (or copy into `PartsFinder\inbox\`
+   and click **Scan inbox folder**), check the preview for each sheet (OEM guess, column mapping,
+   new / existing / price changes / duplicates / new pumps), untick anything you don't want, then
+   **Import**. Imports only ever *add* — nothing already in the database is removed or overwritten,
+   and old prices stay as history.
 
 Windows SmartScreen may warn because the exe is unsigned: _More info → Run anyway_.
+
+**LIGHT / DARK** button (top right) switches the theme; the choice is remembered in the browser.
 
 ## Where your data lives
 
