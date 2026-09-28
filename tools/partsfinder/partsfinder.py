@@ -317,6 +317,12 @@ CREATE TABLE IF NOT EXISTS prices (
 CREATE TABLE IF NOT EXISTS issues (
   id INTEGER PRIMARY KEY, import_id INTEGER, kind TEXT, subject TEXT, detail TEXT,
   status TEXT DEFAULT 'open', created_at TEXT);
+CREATE TABLE IF NOT EXISTS edits (
+  id INTEGER PRIMARY KEY, record_id INTEGER, part TEXT, field TEXT, old TEXT, new TEXT,
+  edited_at TEXT, undone INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS notes (
+  id INTEGER PRIMARY KEY, kind TEXT, subject TEXT, title TEXT, text TEXT, created_at TEXT, updated_at TEXT);
+CREATE INDEX IF NOT EXISTS ix_notes ON notes(kind, subject);
 CREATE INDEX IF NOT EXISTS ix_rec_key ON records(key);
 CREATE INDEX IF NOT EXISTS ix_rec_pump ON records(pump_key);
 CREATE INDEX IF NOT EXISTS ix_rec_oem ON records(oem);
@@ -569,7 +575,8 @@ def q_part(con, key: str) -> dict:
     assemblies = sorted({r["assembly"] for r in rows if r["assembly"]})
     common = sorted({p for p, k in listed if k == "common"})
     prices = rec_dicts(con.execute(
-        "SELECT p.oem, p.label, p.value, p.currency, p.date, p.imported_at, i.file, i.sheet FROM prices p JOIN imports i ON i.id=p.import_id "
+        "SELECT MIN(p.id) id, p.record_id, p.oem, p.label, p.value, p.currency, p.date, p.imported_at, i.file, i.sheet FROM prices p "
+        "JOIN imports i ON i.id=p.import_id "
         "WHERE p.key=? GROUP BY p.oem, p.label, p.currency, p.value, p.date, i.file, i.sheet ORDER BY p.oem, p.label, p.imported_at", (key,)))
     related = []
     if pumps:
@@ -606,7 +613,8 @@ def q_part(con, key: str) -> dict:
             "pumps": pumps, "assemblies": assemblies, "common": common,
             "common_raw": sorted({r["common"] for r in rows if r["common"]}),
             "pb": sorted({r["pb"] for r in rows if r["pb"]}), "gnum": sorted({r["gnum"] for r in rows if r["gnum"]}),
-            "prices": prices, "related": related, "alternates": alts, "rows": rows}
+            "prices": prices, "related": related, "alternates": alts, "rows": rows,
+            "notes": q_notes(con, "part", key)}
 
 
 def q_pump(con, pump: str) -> dict:
@@ -656,7 +664,7 @@ def q_pump(con, pump: str) -> dict:
     return {"pump": model if len(names) > 1 else names[0], "names": names, "variants": variants, "via_common": len(via),
             "also_on": also_on,
             "oems": sorted({r["oem"] for r in rows if r["oem"]}), "direct": bool(direct),
-            "common": common, "parts": parts, "unique_keys": sorted(ukeys)}
+            "common": common, "parts": parts, "unique_keys": sorted(ukeys), "notes": q_notes(con, "pump", pk)}
 
 
 def q_oem(con, oem: str) -> dict:
@@ -667,7 +675,8 @@ def q_oem(con, oem: str) -> dict:
             "rows": con.execute("SELECT COUNT(*) FROM records WHERE oem=?", (oem,)).fetchone()[0],
             "parts": con.execute("SELECT COUNT(DISTINCT key) FROM records WHERE oem=?", (oem,)).fetchone()[0],
             "models": models, "assemblies": asm,
-            "imports": rec_dicts(con.execute("SELECT * FROM imports WHERE oem=? ORDER BY id DESC", (oem,)))}
+            "imports": rec_dicts(con.execute("SELECT * FROM imports WHERE oem=? ORDER BY id DESC", (oem,))),
+            "notes": q_notes(con, "oem", oem)}
 
 
 def q_browse(con) -> list[dict]:
@@ -697,10 +706,247 @@ def q_browse(con) -> list[dict]:
     return sorted(out.values(), key=lambda o: o["oem"].lower())
 
 
-def flush_all(con: sqlite3.Connection) -> None:
-    """Empty the database (raw/ copies are kept on disk)."""
+# --------------------------------------------------------------------------- #
+# Manual edits, notes
+# --------------------------------------------------------------------------- #
+
+EDITABLE = ("oem", "part", "desc", "qty", "assembly", "pump", "common", "location", "pb", "gnum")
+FIELD_LABELS = {"oem": "Company", "part": "OEM Part Number", "desc": "Description", "qty": "Quantity",
+                "assembly": "Assembly", "pump": "Pump", "common": "Common with", "location": "Location",
+                "pb": "PB Number", "gnum": "G-Number"}
+
+
+def _derive(con: sqlite3.Connection, rid: int) -> None:
+    """Recompute key / pump_key / model / common_pumps for one record after its text fields changed."""
+    r = con.execute("SELECT part, pump, common FROM records WHERE id=?", (rid,)).fetchone()
+    multi = multi_pumps(r["pump"])
+    model, variant = (None, None) if multi else split_pump(r["pump"])
+    con.execute("UPDATE records SET key=?, pump_key=?, model=?, model_key=?, variant=? WHERE id=?",
+                (part_key(r["part"] or ""), pump_key(r["pump"]) if r["pump"] else None, model,
+                 pump_key(model) if model else None, variant, rid))
+    con.execute("UPDATE prices SET key=? WHERE record_id=?", (part_key(r["part"] or ""), rid))
+    con.execute("DELETE FROM common_pumps WHERE record_id=?", (rid,))
+    mk = {pump_key(p) for p in multi}
+    con.executemany("INSERT INTO common_pumps VALUES(?,?,?,'pump')", [(rid, p, pump_key(p)) for p in multi])
+    con.executemany("INSERT INTO common_pumps VALUES(?,?,?,'common')",
+                    [(rid, p, pump_key(p)) for p in sorted(set(split_common(r["common"]))) if pump_key(p) not in mk])
+
+
+def _log(con, rid: int | None, part: str | None, field: str, old, new) -> int:
+    cur = con.execute("INSERT INTO edits(record_id,part,field,old,new,edited_at) VALUES(?,?,?,?,?,?)",
+                      (rid, part, field, old, new, now()))
+    return cur.lastrowid
+
+
+def edit_field(con: sqlite3.Connection, rid: int, field: str, value, log: bool = True) -> dict:
+    if field not in EDITABLE:
+        raise ValueError(f"field '{field}' cannot be edited")
+    value = str(value).strip() if value is not None and str(value).strip() != "" else None
     with LOCK:
-        for t in ("prices", "common_pumps", "records", "issues", "imports"):
+        r = con.execute("SELECT * FROM records WHERE id=?", (rid,)).fetchone()
+        if not r:
+            raise ValueError("row no longer exists")
+        if field == "part" and not value:
+            raise ValueError("a part number is required")
+        old = r[field]
+        if old == value:
+            return {"ok": True, "key": r["key"], "unchanged": True}
+        con.execute(f"UPDATE records SET {field}=? WHERE id=?", (value, rid))
+        if field == "oem":
+            con.execute("UPDATE prices SET oem=? WHERE record_id=?", (value, rid))
+        _derive(con, rid)
+        eid = _log(con, rid, r["part"], field, old, value) if log else None
+        key = con.execute("SELECT key FROM records WHERE id=?", (rid,)).fetchone()[0]
+        con.commit()
+    return {"ok": True, "key": key, "edit_id": eid}
+
+
+def manual_import_id(con: sqlite3.Connection) -> int:
+    row = con.execute("SELECT id FROM imports WHERE file='Manual entries' LIMIT 1").fetchone()
+    if row:
+        return row[0]
+    cur = con.execute("INSERT INTO imports(file,sheet,oem,dataset,imported_at,rows,new_parts,existing_parts,price_changes,raw_path,columns) "
+                      "VALUES('Manual entries','typed in the app',NULL,'parts',?,0,0,0,0,'',?)", (now(), json.dumps({})))
+    return cur.lastrowid
+
+
+def add_record(con: sqlite3.Connection, fields: dict) -> dict:
+    part = str(fields.get("part") or "").strip()
+    if not part:
+        raise ValueError("a part number is required")
+    vals = {f: (str(fields.get(f)).strip() or None) if fields.get(f) is not None else None for f in EDITABLE}
+    vals["part"] = part
+    with LOCK:
+        iid = manual_import_id(con)
+        cur = con.execute(
+            "INSERT INTO records(import_id,oem,part,key,desc,qty,assembly,pump,common,location,src_row,raw,pb,gnum) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,NULL,?,?,?)",
+            (iid, vals["oem"], part, part_key(part), vals["desc"], vals["qty"], vals["assembly"], vals["pump"],
+             vals["common"], vals["location"], json.dumps({"manual": True}), vals["pb"], vals["gnum"]))
+        rid = cur.lastrowid
+        _derive(con, rid)
+        con.execute("UPDATE imports SET rows=rows+1 WHERE id=?", (iid,))
+        _log(con, rid, part, "_added", None, json.dumps(vals))
+        con.commit()
+    return {"ok": True, "id": rid, "key": part_key(part)}
+
+
+def delete_record(con: sqlite3.Connection, rid: int) -> dict:
+    with LOCK:
+        r = con.execute("SELECT * FROM records WHERE id=?", (rid,)).fetchone()
+        if not r:
+            raise ValueError("row no longer exists")
+        snap = {"record": dict(r),
+                "prices": rec_dicts(con.execute("SELECT * FROM prices WHERE record_id=?", (rid,)))}
+        con.execute("DELETE FROM prices WHERE record_id=?", (rid,))
+        con.execute("DELETE FROM common_pumps WHERE record_id=?", (rid,))
+        con.execute("DELETE FROM records WHERE id=?", (rid,))
+        _log(con, rid, r["part"], "_deleted", json.dumps(snap, default=str), None)
+        con.commit()
+    return {"ok": True, "key": r["key"]}
+
+
+def _restore_record(con: sqlite3.Connection, snap: dict) -> None:
+    rec = snap["record"]
+    cols = ",".join(rec)
+    con.execute(f"INSERT OR REPLACE INTO records({cols}) VALUES({','.join('?' * len(rec))})", list(rec.values()))
+    for p in snap["prices"]:
+        con.execute(f"INSERT OR REPLACE INTO prices({','.join(p)}) VALUES({','.join('?' * len(p))})", list(p.values()))
+    _derive(con, rec["id"])
+
+
+def add_price(con: sqlite3.Connection, rid: int, label: str, value, currency: str | None, date: str | None) -> dict:
+    try:
+        v = float(str(value).replace(",", "").replace("$", ""))
+    except ValueError as e:
+        raise ValueError("price must be a number") from e
+    with LOCK:
+        r = con.execute("SELECT key, oem, part, import_id FROM records WHERE id=?", (rid,)).fetchone()
+        if not r:
+            raise ValueError("row no longer exists")
+        cur = con.execute(
+            "INSERT INTO prices(record_id,import_id,key,oem,label,value,currency,date,imported_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (rid, r["import_id"], r["key"], r["oem"], label.strip() or "Price (typed in)", v, (currency or "").upper() or None,
+             date or None, now()))
+        _log(con, rid, r["part"], "_price_added", None, json.dumps({"id": cur.lastrowid, "label": label, "value": v,
+                                                                       "currency": currency, "date": date}))
+        con.commit()
+    return {"ok": True}
+
+
+def delete_price(con: sqlite3.Connection, pid: int) -> dict:
+    with LOCK:
+        p = con.execute("SELECT * FROM prices WHERE id=?", (pid,)).fetchone()
+        if not p:
+            raise ValueError("price no longer exists")
+        part = con.execute("SELECT part FROM records WHERE id=?", (p["record_id"],)).fetchone()
+        con.execute("DELETE FROM prices WHERE id=?", (pid,))
+        _log(con, p["record_id"], part[0] if part else None, "_price_deleted", json.dumps(dict(p), default=str), None)
+        con.commit()
+    return {"ok": True}
+
+
+def rename_pump(con: sqlite3.Connection, old: str, new: str) -> dict:
+    """Rename a pump everywhere it appears (pump cells and Common lists), logged as one edit per row."""
+    new = new.strip()
+    if not new:
+        raise ValueError("new name is required")
+    ok, nk = pump_key(old), pump_key(new)
+    n = 0
+    with LOCK:
+        ids = {r[0] for r in con.execute(
+            "SELECT id FROM records WHERE pump_key=? OR model_key=? OR id IN (SELECT record_id FROM common_pumps WHERE pump_key=?)",
+            (ok, ok, ok))}
+        for rid in ids:
+            r = con.execute("SELECT part, pump, common, model, model_key FROM records WHERE id=?", (rid,)).fetchone()
+            if r["pump"] and pump_key(r["pump"]) == ok:
+                con.execute("UPDATE records SET pump=? WHERE id=?", (new, rid))
+                _log(con, rid, r["part"], "pump", r["pump"], new)
+            elif r["pump"] and r["model_key"] == ok and r["model"] and r["model"] in r["pump"]:
+                np_ = r["pump"].replace(r["model"], new, 1)
+                con.execute("UPDATE records SET pump=? WHERE id=?", (np_, rid))
+                _log(con, rid, r["part"], "pump", r["pump"], np_)
+            elif r["pump"] and ok in {pump_key(p) for p in multi_pumps(r["pump"])}:
+                np_ = "_".join(new if pump_key(p) == ok else p for p in multi_pumps(r["pump"]))
+                con.execute("UPDATE records SET pump=? WHERE id=?", (np_, rid))
+                _log(con, rid, r["part"], "pump", r["pump"], np_)
+            if r["common"] and ok in {pump_key(p) for p in split_common(r["common"])}:
+                nc = ", ".join(new if pump_key(p) == ok else p for p in split_common(r["common"]))
+                con.execute("UPDATE records SET common=? WHERE id=?", (nc, rid))
+                _log(con, rid, r["part"], "common", r["common"], nc)
+            _derive(con, rid)
+            n += 1
+        con.commit()
+    return {"ok": True, "rows": n, "pump": new, "key": nk}
+
+
+def undo_edit(con: sqlite3.Connection, eid: int) -> dict:
+    e = con.execute("SELECT * FROM edits WHERE id=?", (eid,)).fetchone()
+    if not e:
+        raise ValueError("edit not found")
+    if e["undone"]:
+        return {"ok": True, "already": True}
+    f = e["field"]
+    with LOCK:
+        if f in EDITABLE:
+            con.execute(f"UPDATE records SET {f}=? WHERE id=?", (e["old"], e["record_id"]))
+            if f == "oem":
+                con.execute("UPDATE prices SET oem=? WHERE record_id=?", (e["old"], e["record_id"]))
+            if con.execute("SELECT 1 FROM records WHERE id=?", (e["record_id"],)).fetchone():
+                _derive(con, e["record_id"])
+        elif f == "_added":
+            con.execute("DELETE FROM prices WHERE record_id=?", (e["record_id"],))
+            con.execute("DELETE FROM common_pumps WHERE record_id=?", (e["record_id"],))
+            con.execute("DELETE FROM records WHERE id=?", (e["record_id"],))
+        elif f == "_deleted":
+            _restore_record(con, json.loads(e["old"]))
+        elif f == "_price_added":
+            con.execute("DELETE FROM prices WHERE id=?", (json.loads(e["new"])["id"],))
+        elif f == "_price_deleted":
+            p = json.loads(e["old"])
+            con.execute(f"INSERT OR REPLACE INTO prices({','.join(p)}) VALUES({','.join('?' * len(p))})", list(p.values()))
+        con.execute("UPDATE edits SET undone=1 WHERE id=?", (eid,))
+        con.commit()
+    return {"ok": True}
+
+
+def q_edits(con, limit: int = 300) -> list[dict]:
+    out = rec_dicts(con.execute("SELECT * FROM edits ORDER BY id DESC LIMIT ?", (limit,)))
+    for e in out:
+        e["label"] = FIELD_LABELS.get(e["field"], {"_added": "Row added", "_deleted": "Row deleted",
+                                                    "_price_added": "Price added", "_price_deleted": "Price deleted"}.get(e["field"], e["field"]))
+    return out
+
+
+def save_note(con: sqlite3.Connection, body: dict) -> dict:
+    text = str(body.get("text") or "").strip()
+    kind, subject = body.get("kind"), body.get("subject")
+    if kind not in ("part", "pump", "oem", "general") or (kind != "general" and not subject):
+        raise ValueError("note needs a kind and subject")
+    if not text:
+        raise ValueError("note is empty")
+    ts = now()
+    with LOCK:
+        if body.get("id"):
+            con.execute("UPDATE notes SET text=?, updated_at=? WHERE id=?", (text, ts, body["id"]))
+            nid = body["id"]
+        else:
+            nid = con.execute("INSERT INTO notes(kind,subject,title,text,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                              (kind, subject or "", body.get("title") or subject or "", text, ts, ts)).lastrowid
+        con.commit()
+    return {"ok": True, "id": nid}
+
+
+def q_notes(con, kind: str | None, subject: str | None) -> list[dict]:
+    if kind and subject is not None:
+        return rec_dicts(con.execute("SELECT * FROM notes WHERE kind=? AND subject=? ORDER BY id DESC", (kind, subject)))
+    return rec_dicts(con.execute("SELECT * FROM notes ORDER BY updated_at DESC, id DESC LIMIT 500"))
+
+
+def flush_all(con: sqlite3.Connection) -> None:
+    """Empty the database (raw/ copies and your notes are kept)."""
+    with LOCK:
+        for t in ("prices", "common_pumps", "records", "issues", "imports", "edits"):
             con.execute(f"DELETE FROM {t}")
         con.commit()
         con.execute("VACUUM")
@@ -748,8 +994,22 @@ main{padding:24px 0}
 .meta button{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;padding:0}.meta button.on{color:var(--acc2)}
 .meta .right{margin-left:auto}
 section{border-top:1px solid var(--line);padding-top:14px;margin-top:20px}
-h3{margin:0 0 8px;font:11px ui-monospace,Consolas,monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--acc)}
-h2{font:26px ui-monospace,Consolas,monospace;color:var(--acc2);margin:0}
+h3{margin:0 0 8px;font:13px ui-monospace,Consolas,monospace;letter-spacing:.15em;text-transform:uppercase;color:var(--acc);font-weight:600}
+h2{font:26px ui-monospace,Consolas,monospace;color:var(--acc2);margin:0}h2 .lbl{color:var(--dim);font-size:15px;letter-spacing:.1em;text-transform:uppercase;display:block;font-weight:normal}
+.facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin-top:12px;font:14px ui-monospace,Consolas,monospace;align-items:baseline}
+.facts .fl{color:var(--dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}.facts .fl:after{content:' —'}.facts .fv{color:var(--txt)}.facts .fv b{color:var(--acc2);font-weight:600}
+.ed{width:100%;box-sizing:border-box;background:transparent;border:1px solid transparent;border-radius:3px;padding:3px 4px;color:var(--txt);font:13px ui-monospace,Consolas,monospace}
+.ed:hover{border-color:var(--edge)}.ed:focus{border-color:var(--acc);background:var(--field);outline:0}.ed.dirty{border-color:#f59e0b}
+table.edt{width:auto;min-width:100%}table.edt th{white-space:nowrap}table.edt td{padding:2px 3px}table.edt td.act{white-space:nowrap}
+.ed{min-width:110px}.ed[data-f=desc],.ed[data-f=common]{min-width:240px}.ed[data-f=qty]{min-width:50px}.ed[data-f=part],.ed[data-f=pump],.ed[data-f=assembly]{min-width:150px}
+.x{background:none;border:0;color:var(--dim);cursor:pointer;font-size:12px;padding:2px 4px}.x:hover{color:#f87171}
+.note{border-left:3px solid var(--acc);padding:6px 10px;margin:8px 0;background:var(--field);border-radius:0 6px 6px 0;white-space:pre-wrap}.note .nm{font:11px ui-monospace,Consolas,monospace;color:var(--dim);margin-top:4px;display:flex;gap:10px}
+.note .nm button{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
+textarea{width:100%;box-sizing:border-box;background:var(--field);color:var(--txt);border:1px solid var(--edge);border-radius:6px;padding:8px;font:13px system-ui;min-height:60px}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.toast a{color:var(--acc2);margin-left:10px;cursor:pointer;text-decoration:underline}
+kbd{border:1px solid var(--edge);border-radius:3px;padding:0 4px;font:11px ui-monospace,Consolas,monospace}
+@media print{header,aside,.search,.meta,.tools,.x,.chip.act,textarea,.note form,.btn{display:none!important}body.hist main{margin-left:0}main{padding:0}.ed{border:0}section{break-inside:avoid}}
 .sub{font-size:18px;margin:2px 0 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--edge);background:var(--field);color:var(--txt);border-radius:4px;padding:4px 8px;font:12px ui-monospace,Consolas,monospace;cursor:pointer}
@@ -832,20 +1092,23 @@ async function doSearch(){const out=$('#results');if(!out)return;const s=q.trim(
  let h='';if(d.oems.length)h+=`<section><h3>OEMs</h3><div class="chips">${d.oems.map(o=>chip(o,'#/oem/'+encodeURIComponent(o))).join('')}</div></section>`;
  if(d.pumps.length)h+=`<section><h3>Pumps</h3><div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div></section>`;
  if(sharedOnly)d.parts=d.parts.filter(r=>(r.oems||'').includes(','));
- h+=`<section><h3>Parts · ${d.parts.length}${d.parts.length>=300?'+':''} <button class="chip ${sharedOnly?'on':''}" style="margin-left:8px" onclick="sharedOnly=!sharedOnly;doSearch()">shared by 2+ companies</button></h3><ul class="list">${d.parts.map(partRow).join('')||'<li class="dim">No parts match.</li>'}</ul></section>`;put(h)}
+ lastList=d.parts;h+=`<section><h3>Parts · ${d.parts.length}${d.parts.length>=300?'+':''} <button class="chip ${sharedOnly?'on':''}" style="margin-left:8px" onclick="sharedOnly=!sharedOnly;doSearch()">shared by 2+ companies</button> <button class="chip act" onclick="csv(lastList,PCOLS,'search_${esc(s)}')">⬇ CSV</button></h3><ul class="list">${d.parts.map(partRow).join('')||'<li class="dim">No parts match.</li>'}</ul></section>`;put(h)}
 let sharedOnly=false;
 function sec(t,b){return `<section><h3>${t}</h3>${b}</section>`}
 const NS='<span class="dim">Not specified in imported source.</span>';
-async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key));if(!d.found)return `<p class="dim">Part not found.</p>`;
- let h=`<div><h2>${esc(d.part)}</h2><p class="sub">${esc(d.oems.join(' / '))} — ${esc(d.descs.join(' · ')||'No description')}</p>${d.pb.length||d.gnum.length?`<div class="ids">${d.pb.length?`<span><span class="dim">PB number</span> <b>${esc(d.pb.join(', '))}</b></span>`:''}${d.gnum.length?`<span><span class="dim">G-number</span> <b>${esc(d.gnum.join(', '))}</b></span>`:''}</div>`:''}${d.variants.length>1?`<p class="small">Part-number variants in source: ${esc(d.variants.join(', '))}</p>`:''}</div>`;
+const fact=(l,v,b)=>`<span class="fl">${l}</span><span class="fv">${v?(b?`<b>${v}</b>`:v):'<span class="dim">Not specified in imported source</span>'}</span>`;
+async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key));if(!d.found)return `<p class="dim">Part not found.</p>`;lastList=d.rows;
+ const qtys=[...new Set(d.rows.filter(r=>r.qty).map(r=>r.qty))],locs=[...new Set(d.rows.filter(r=>r.location).map(r=>r.location))];
+ let h=`<div><h2><span class="lbl">OEM Part Number</span>${esc(d.part)}</h2><p class="sub">${esc(d.descs.join(' · ')||'No description')}</p>
+ <div class="facts">${fact('OEM Part Number',esc(d.part),1)}${fact('Company',d.oems.map(o=>chip(o,'#/oem/'+encodeURIComponent(o))).join(' '))}${fact('Description',esc(d.descs.join(' · ')))}${fact('PB Number',esc(d.pb.join(', ')),1)}${fact('G-Number',esc(d.gnum.join(', ')),1)}${fact('Used on pumps',d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' '))}${fact('Assembly',esc(d.assemblies.join(', ')))}${fact('Quantity per pump',esc(qtys.join(' / ')))}${fact('Location',esc(locs.join(', ')))}${d.variants.length>1?fact('Part number written as',esc(d.variants.join(', '))):''}</div>${tools('part_'+d.part)}</div>`;
  if(d.shared)h+=sec(`Shared across ${d.by_oem.length} companies`,`<table><tr><th>Company</th><th>Pumps</th><th>Assembly</th><th>Description</th><th>Prices</th></tr>${d.by_oem.map(o=>`<tr><td class="g">${chip(o.oem,'#/oem/'+encodeURIComponent(o.oem))}</td><td>${o.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' ')||'<span class="dim">—</span>'}</td><td>${esc(o.assemblies.join(', ')||'—')}</td><td>${esc(o.descs.join(' · ')||'—')}</td><td>${o.prices.length?o.prices.map(p=>`<div><span class="g">${money(p)}</span> <span class="dim">${esc(p.label)}${p.date?' · '+esc(p.date):''}</span></div>`).join(''):'<span class="dim">none</span>'}</td></tr>`).join('')}</table>`);
- h+=sec('Used on',d.pumps.length?`<div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div>`:'<span class="dim">Pump compatibility: Not specified in imported source.</span>');
- h+=sec('Assembly',d.assemblies.length?esc(d.assemblies.join(', ')):NS);
- h+=sec('Common with',d.common.length?`<div class="chips">${d.common.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div><p class="small">source value: ${esc(d.common_raw.join(' | '))}</p>`:NS);
- h+=sec('Pricing found',d.prices.length?`<table><tr><th>Company</th><th>Source</th><th>Price</th><th>Price date</th><th>Imported</th><th>File</th></tr>${d.prices.map(p=>`<tr><td>${esc(p.oem||'')}</td><td>${esc(p.label)}</td><td class="g">${money(p)}</td><td class="dim">${esc(p.date||'—')}</td><td class="dim">${esc(p.imported_at)}</td><td class="dim">${esc(p.file)} › ${esc(p.sheet)}</td></tr>`).join('')}</table>`:'<span class="dim">No pricing in imported source.</span>');
+ h+=sec('Used on pumps',d.pumps.length?`<div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div>`:'<span class="dim">Pump compatibility: Not specified in imported source.</span>');
+ h+=sec('Common with (also fits these pumps)',d.common.length?`<div class="chips">${d.common.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div><p class="small">Source value: ${esc(d.common_raw.join(' | '))}</p>`:NS);
+ h+=sec(`Pricing found · ${d.prices.length} <button class="chip act" style="margin-left:8px" onclick="addPrice(${d.rows[0].id})">+ Add a price</button>`,d.prices.length?`<table><tr><th>Company</th><th>Price type</th><th>Price</th><th>Price date</th><th>Imported</th><th>Source file</th><th></th></tr>${d.prices.map(p=>`<tr><td>${esc(p.oem||'')}</td><td>${esc(p.label)}</td><td class="g">${money(p)}</td><td class="dim">${esc(p.date||'—')}</td><td class="dim">${esc(p.imported_at)}</td><td class="dim">${esc(p.file)} › ${esc(p.sheet)}</td><td><button class="x" title="Remove this price" onclick="delPrice(${p.id})">✕</button></td></tr>`).join('')}</table>`:'<span class="dim">No pricing in imported source.</span>');
  if(d.alternates.length)h+=sec('Same description, different part number (check — not confirmed alternates)',`<div class="chips">${d.alternates.map(a=>chip(a.part,'#/part/'+encodeURIComponent(a.key))).join('')}</div>`);
  if(d.related.length)h+=sec('Related parts (same pump & assembly)',`<div class="chips">${d.related.map(x=>chip(x.part+(x.desc?' — '+x.desc:''),'#/part/'+encodeURIComponent(x.key))).join('')}</div>`);
- h+=sec('Source rows',`<ul class="small" style="margin:0;padding-left:16px">${d.rows.map(r=>`<li>${esc(r.file)} › ${esc(r.sheet)} · row ${r.src_row}${r.pump?' · '+esc(r.pump):''}${r.qty?' · qty '+esc(r.qty):''}${r.location?' · loc '+esc(r.location):''} · imported ${esc(r.imported_at)} <details style="display:inline"><summary style="display:inline">raw</summary><code>${esc(JSON.stringify(r.raw))}</code></details></li>`).join('')}</ul>`);
+ h+=notesBlock('part',d.key,d.part,d.notes);
+ h+=sec(`Source rows · ${d.rows.length} <span class="dim">· click any cell to edit — every change is logged and can be undone (DATA › Edit history)</span>`,`<div style="overflow:auto"><table class="edt"><tr>${FIELDS.map(f=>`<th>${f[1]}</th>`).join('')}<th>Source</th><th></th></tr>${d.rows.map(r=>`<tr>${FIELDS.map(f=>edCell(r,f[0])).join('')}<td class="dim" style="white-space:nowrap">${esc(r.file)} › ${esc(r.sheet)}${r.src_row?' · row '+r.src_row:''}<br>imported ${esc(r.imported_at)} <details style="display:inline"><summary style="display:inline">raw</summary><code>${esc(JSON.stringify(r.raw))}</code></details></td><td class="act"><button class="x" title="Delete this row" onclick="delRow(${r.id})">✕</button></td></tr>`).join('')}</table></div><div class="tools"><button class="chip act" onclick='showAddRow(${JSON.stringify({part:d.part,oem:d.oems[0]||'',desc:d.descs[0]||''})})'>+ Add another row for this part</button></div><div id="addrow"></div>`);
  return h}
 // pump page filters: Common-with and Assembly chips narrow the parts list in place (page/URL unchanged)
 let pumpD=null,pumpCur='',asmFilter='',cwFilter='';
@@ -857,12 +1120,14 @@ function pumpBody(d){const asms={};d.parts.forEach(r=>{const a=r.assembly||'Unsp
  h+=sec(`Assembly breakdown <span class="dim">· click to keep only that assembly</span>`,`<div class="chips">${fchip(`All · ${d.parts.length}`,"setPF('asm','')",!asmFilter)}${Object.keys(asms).sort().map(a=>fchip(`${a} · ${asms[a]}`,`setPF('asm',${JSON.stringify(a)})`,asmFilter===a)).join('')}</div>`);
  const list=d.parts.filter(r=>(!asmFilter||(r.assembly||'Unspecified')===asmFilter)&&(!cwFilter||(r.common_with||[]).includes(cwFilter)));
  const on=[cwFilter&&`common with <b>${esc(cwFilter)}</b>`,asmFilter&&`assembly <b>${esc(asmFilter)}</b>`].filter(Boolean);
- h+=sec(`Parts found · ${list.length}${on.length?` <span class="dim">of ${d.parts.length}</span>`:''} <span class="dim">(${uk.size} unique to this pump ★)</span>`,`${on.length?`<p class="filt">Showing parts on ${esc(d.pump)} that are ${on.join(' and ')} — <a href="javascript:void(0)" onclick="asmFilter='';cwFilter='';setPF('asm','')">clear filters</a></p>`:''}<ul class="list">${list.map(r=>partRow({...r,part:(uk.has(r.key)?'★ ':'')+r.part})).join('')||'<li class="dim">No parts match these filters.</li>'}</ul>`);
+ lastList=list;h+=sec(`Parts found · ${list.length}${on.length?` <span class="dim">of ${d.parts.length}</span>`:''} <span class="dim">(${uk.size} unique to this pump ★)</span> <button class="chip act" style="margin-left:8px" onclick="csv(lastList,PCOLS,'pump_${esc(d.pump)}')">⬇ CSV</button>`,`${on.length?`<p class="filt">Showing parts on ${esc(d.pump)} that are ${on.join(' and ')} — <a href="javascript:void(0)" onclick="asmFilter='';cwFilter='';setPF('asm','')">clear filters</a></p>`:''}<ul class="list">${list.map(r=>partRow({...r,part:(uk.has(r.key)?'★ ':'')+r.part})).join('')||'<li class="dim">No parts match these filters.</li>'}</ul>`);
  return h}
 async function viewPump(p){const d=await api('/pump/'+encodeURIComponent(p));if(p!==pumpCur){asmFilter='';cwFilter='';pumpCur=p}pumpD=d;
- let h=`<div><h2>${esc(d.pump)}</h2><p class="sub">${esc(d.oems.join(' / ')||'—')}</p>${d.direct?'':`<p class="small">No rows list this pump directly; showing the ${d.via_common} parts whose “Common” field names it${d.also_on.length?' (listed on: '+d.also_on.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' ')+')':''}.</p>`}${d.variants.length?`<p class="small">Variants: ${d.variants.map((v,i)=>chip(v,'#/pump/'+encodeURIComponent(d.names[i]||v))).join(' ')}</p>`:''}${d.names.length>1&&!d.variants.length?`<p class="small">Name variants: ${esc(d.names.join(' | '))}</p>`:''}</div>`;
+ let h=`<div><h2><span class="lbl">Pump</span>${esc(d.pump)}</h2><div class="facts">${fact('Pump model',esc(d.pump),1)}${fact('Company',d.oems.map(o=>chip(o,'#/oem/'+encodeURIComponent(o))).join(' '))}${fact('Parts listed',d.parts.length)}</div><div class="tools"><button class="chip act" onclick='renamePump(${JSON.stringify(d.pump)})'>✎ Rename this pump</button><button class="chip act" onclick="showAddRow({pump:${esc(JSON.stringify(d.pump))},oem:${esc(JSON.stringify(d.oems[0]||''))}})">+ Add a part to this pump</button><button class="chip act" onclick="print()">🖨 Print</button></div><div id="addrow"></div>${d.direct?'':`<p class="small">No rows list this pump directly; showing the ${d.via_common} parts whose “Common” field names it${d.also_on.length?' (listed on: '+d.also_on.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' ')+')':''}.</p>`}${d.variants.length?`<p class="small">Variants: ${d.variants.map((v,i)=>chip(v,'#/pump/'+encodeURIComponent(d.names[i]||v))).join(' ')}</p>`:''}${d.names.length>1&&!d.variants.length?`<p class="small">Name variants: ${esc(d.names.join(' | '))}</p>`:''}</div>`;
+ h+=notesBlock('pump',pumpKey(d.pump),d.pump,d.notes);
  h+=`<div id="pumpbody">${pumpBody(d)}</div>`;
  return h}
+const pumpKey=p=>String(p).toLowerCase().replace(/[^a-z0-9]/g,'');
 let browse=null;
 async function viewBrowse(oem,model){browse=browse||await api('/browse');
  let h=`<h2 style="font-size:20px">BROWSE</h2><p class="dim">Pick a company, then a pump model.</p>`;
@@ -874,7 +1139,8 @@ async function viewBrowse(oem,model){browse=browse||await api('/browse');
  if(m.variants.length&&(m.variants.length>1||m.variants[0].variant))h+=sec('Variants',`<div class="chips">${m.variants.map(v=>chip(`${v.variant||v.pump} · ${v.parts}`,'#/pump/'+encodeURIComponent(v.pump))).join('')}</div><p class="small">Click a variant for just that build, or see all parts for the model below.</p>`);
  h+=`<div style="margin-top:20px">${await viewPump(model)}</div>`;return h}
 async function viewOem(o){const d=await api('/oem/'+encodeURIComponent(o));
- let h=`<div><h2>${esc(d.oem.toUpperCase())}</h2><p class="sub">${d.rows.toLocaleString()} rows · ${d.parts.toLocaleString()} distinct part numbers</p></div>`;
+ let h=`<div><h2><span class="lbl">Company</span>${esc(d.oem.toUpperCase())}</h2><p class="sub">${d.rows.toLocaleString()} rows · ${d.parts.toLocaleString()} distinct part numbers</p><div class="tools"><button class="chip act" onclick='showAddRow(${JSON.stringify({oem:d.oem})})'>+ Add a part for this company</button></div><div id="addrow"></div></div>`;
+ h+=notesBlock('oem',d.oem,d.oem,d.notes);
  const cm=d.models.filter(m=>m.common),dm=d.models.filter(m=>!m.common);
  const mchip=m=>chip(`${m.model} · ${m.parts}`,'#/pump/'+encodeURIComponent(m.model));
  const vars=dm.filter(m=>m.variants.length&&(m.variants.length>1||m.variants[0].variant));
@@ -882,11 +1148,15 @@ async function viewOem(o){const d=await api('/oem/'+encodeURIComponent(o));
  h+=sec(`Assemblies · ${d.assemblies.length}`,d.assemblies.length?esc(d.assemblies.slice(0,80).join(' · ')):NS);
  h+=sec('Imports',`<table><tr><th>Date</th><th>File</th><th>Sheet</th><th>Rows</th></tr>${d.imports.map(i=>`<tr><td class="dim">${esc(i.imported_at)}</td><td>${esc(i.file)}</td><td>${esc(i.sheet)}</td><td class="g">${i.rows}</td></tr>`).join('')}</table>`);
  return h}
-async function viewData(){const d=await api('/imports');
+async function viewData(){const d=await api('/imports');const ed=await api('/edits');const nt=await api('/notes');
  let h=`<h2 style="font-size:20px">DATA</h2><p class="dim">Raw uploads are kept untouched in <code>PartsFinder/raw/</code>. Drop files here or into <code>PartsFinder/inbox/</code> and click Scan inbox.</p>
  <div class="drop" id="drop" onclick="$('#file').click()">Drop Excel / CSV here, or click to choose<input type="file" id="file" multiple accept=".xlsx,.xlsm,.csv" style="display:none"></div>
  <p><button class="btn sec" onclick="scanInbox()">Scan inbox folder</button> <button class="btn sec" style="color:#f87171" onclick="flushAll()">Flush ALL data…</button> <span class="small">${esc(d.inbox.length)} file(s) waiting: ${esc(d.inbox.join(', '))}</span></p><div id="preview"></div>`;
  h+=sec('Import history',d.imports.length?`<table><tr><th>Date</th><th>File</th><th>Sheet</th><th>OEM</th><th>Type</th><th>Rows</th><th>New</th><th>Existing</th><th>Price Δ</th><th>Raw copy</th></tr>${d.imports.map(i=>`<tr><td class="dim">${esc(i.imported_at)}</td><td>${esc(i.file)}</td><td>${esc(i.sheet)}</td><td>${esc(i.oem||'?')}</td><td class="dim">${esc(i.dataset)}</td><td class="g">${i.rows}</td><td>${i.new_parts}</td><td>${i.existing_parts}</td><td>${i.price_changes}</td><td class="dim">${esc(i.raw_path)}</td></tr>`).join('')}</table>`:'<span class="dim">Nothing imported yet.</span>');
+ const val=v=>v==null?'<span class="dim">(blank)</span>':v.length>60?`<span title="${esc(v)}">${esc(v.slice(0,60))}…</span>`:esc(v);
+ h+=sec(`Edit history · ${ed.length} <span class="dim">· changes made in the app; imported source rows are never rewritten</span>`,ed.length?`<table><tr><th>When</th><th>Part</th><th>What changed</th><th>From</th><th>To</th><th></th></tr>${ed.map(e=>`<tr style="${e.undone?'opacity:.45':''}"><td class="dim">${esc(e.edited_at)}</td><td class="g">${e.part?chip(e.part,'#/part/'+encodeURIComponent(e.part.toLowerCase().replace(/[^a-z0-9]/g,''))):''}</td><td>${esc(e.label)}</td><td>${val(e.old)}</td><td>${val(e.new)}</td><td>${e.undone?'<span class="dim">undone</span>':`<button class="chip" onclick="undo(${e.id})">undo</button>`}</td></tr>`).join('')}</table>`:'<span class="dim">No edits yet. Click any cell in a part\'s Source rows table to change it.</span>');
+ h+=sec(`All notes · ${nt.length}`,nt.length?`<table><tr><th>Updated</th><th>About</th><th>Note</th></tr>${nt.map(n=>`<tr><td class="dim">${esc(n.updated_at)}</td><td>${n.kind==='part'?chip(n.title,'#/part/'+encodeURIComponent(n.subject)):n.kind==='pump'?chip(n.title,'#/pump/'+encodeURIComponent(n.title)):n.kind==='oem'?chip(n.title,'#/oem/'+encodeURIComponent(n.subject)):esc(n.title)}</td><td style="white-space:pre-wrap">${esc(n.text)}</td></tr>`).join('')}</table>`:'<span class="dim">No notes yet — add them on any part, pump or company page.</span>');
+ h+=`<p class="small" style="margin-top:20px">Keyboard: <kbd>/</kbd> jump to search · <kbd>Esc</kbd> clear search · <kbd>Enter</kbd> save a cell you are editing · <kbd>Esc</kbd> cancel the edit</p>`;
  setTimeout(()=>{const dz=$('#drop'),f=$('#file');if(!dz)return;dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');upload(e.dataTransfer.files)};f.onchange=()=>upload(f.files)},0);
  return h}
 async function flushAll(){if(!confirm('Delete EVERYTHING in the database (all imports, parts, prices, review items)?\nRaw spreadsheet copies in PartsFinder/raw/ are kept.'))return;
@@ -917,13 +1187,40 @@ async function viewReview(){const d=await api('/issues');const kinds={};d.forEac
  h+=`<table><tr><th>Kind</th><th>Subject</th><th>Detail</th><th>Found</th><th></th></tr>${d.map(i=>`<tr><td class="dim">${esc(label[i.kind]||i.kind)}</td><td class="g">${esc(i.subject)}</td><td>${esc(i.detail)}</td><td class="dim">${esc(i.created_at)}</td><td><button class="chip" onclick="resolve(${i.id})">resolve</button></td></tr>`).join('')}</table>`;
  return h}
 async function resolve(id){await api('/issues/'+id+'/resolve',{method:'POST'});await loadStats();render()}
-function toast(m,err){const t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3500)}
+function toast(m,err,undoId){const t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=m;if(undoId){const a=document.createElement('a');a.textContent='Undo';a.onclick=()=>{undo(undoId);t.remove()};t.appendChild(a)}document.body.appendChild(t);setTimeout(()=>t.remove(),undoId?8000:3500)}
+async function post(p,body){const d=await api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});if(d.error){toast(d.error,true);throw new Error(d.error)}return d}
+async function undo(id){await post('/edits/'+id+'/undo');toast('Undone');browse=null;await loadStats();render()}
+// ---- editing ----
+const FIELDS=[['oem','Company'],['part','OEM Part Number'],['desc','Description'],['qty','Qty'],['assembly','Assembly'],['pump','Pump'],['common','Common with'],['location','Location'],['pb','PB Number'],['gnum','G-Number']];
+function edCell(r,f){return `<td><input class="ed" value="${esc(r[f]??'')}" data-rid="${r.id}" data-f="${f}" data-o="${esc(r[f]??'')}" title="Click to edit — Enter or click away to save, Esc to cancel" oninput="this.classList.toggle('dirty',this.value!==this.dataset.o)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value=this.dataset.o;this.classList.remove('dirty');this.blur()}" onblur="saveCell(this)"></td>`}
+async function saveCell(el){if(el.value===el.dataset.o)return;const f=el.dataset.f;try{const d=await post('/edit',{record_id:+el.dataset.rid,field:f,value:el.value});el.dataset.o=el.value;el.classList.remove('dirty');
+ toast(`Saved ${FIELDS.find(x=>x[0]===f)[1]}`,false,d.edit_id);browse=null;await loadStats();if(location.hash.startsWith('#/part/')&&d.key!==decodeURIComponent(location.hash.slice(7)))nav('#/part/'+encodeURIComponent(d.key));else render()}catch(e){el.focus()}}
+async function delRow(id){if(!confirm('Delete this source row? (It stays in the edit history and can be undone.)'))return;const d=await post('/record/'+id+'/delete');toast('Row deleted',false,d.edit_id);browse=null;await loadStats();render()}
+function addRowForm(pre){const id='nr'+Date.now();return `<div class="card" id="${id}"><h3>Add a row (typed in manually)</h3><table class="edt"><tr>${FIELDS.map(([f,l])=>`<th>${l}</th>`).join('')}</tr><tr>${FIELDS.map(([f])=>`<td><input class="ed" style="border-color:var(--edge)" data-f="${f}" value="${esc(pre[f]||'')}"></td>`).join('')}</tr></table><p><button class="btn" onclick="addRow('${id}')">SAVE ROW</button> <button class="btn sec" onclick="$('#${id}').remove()">Cancel</button></p></div>`}
+async function addRow(id){const b={};$('#'+id).querySelectorAll('input').forEach(i=>b[i.dataset.f]=i.value);const d=await post('/record',b);toast('Row added');browse=null;await loadStats();if(location.hash.startsWith('#/part/'))nav('#/part/'+encodeURIComponent(d.key));else render()}
+function showAddRow(pre){const a=$('#addrow');if(a){a.innerHTML=addRowForm(pre||{});a.querySelector('input').focus()}}
+async function delPrice(id){if(!confirm('Remove this price?'))return;const d=await post('/price/'+id+'/delete');toast('Price removed',false,d.edit_id);render()}
+async function addPrice(rid){const value=prompt('Price (number only):');if(value==null||!value.trim())return;const label=prompt('What price is this? (e.g. List Price AUD, Cost USD, Quote)','List Price')||'Price';const currency=prompt('Currency (AUD / USD / EUR…):','AUD')||'';const date=prompt('Price date (optional, e.g. Sep 2026):','')||'';await post('/price',{record_id:rid,label,value,currency,date});toast('Price added');render()}
+async function renamePump(old){const nw=prompt(`Rename pump “${old}” everywhere it appears (pump cells and Common lists):`,old);if(!nw||nw===old)return;const d=await post('/rename_pump',{old,new:nw});toast(`Renamed on ${d.rows} row(s) — see DATA › Edit history to undo`);browse=null;await loadStats();nav('#/pump/'+encodeURIComponent(d.pump))}
+// ---- notes ----
+function notesBlock(kind,subject,title,notes){const s=JSON.stringify(subject),k=JSON.stringify(kind),t=JSON.stringify(title);
+ return sec(`Notes · ${notes.length}`,`${notes.map(n=>`<div class="note">${esc(n.text)}<div class="nm"><span>${esc(n.updated_at)}${n.updated_at!==n.created_at?' (edited)':''}</span><button onclick='editNote(${n.id},${JSON.stringify(n.text)})'>edit</button><button onclick="delNote(${n.id})">delete</button></div></div>`).join('')}
+ <form onsubmit='return addNote(event,${k},${s},${t})'><textarea name="t" placeholder="Add a note about this ${kind==='oem'?'company':kind}… (e.g. supersedes X, call Dave for stock, watch the o-ring size)"></textarea><p style="margin:6px 0 0"><button class="btn">ADD NOTE</button></p></form>`)}
+async function addNote(ev,kind,subject,title){ev.preventDefault();const ta=ev.target.t;if(!ta.value.trim())return false;await post('/note',{kind,subject,title,text:ta.value});toast('Note saved');render();return false}
+async function editNote(id,old){const t=prompt('Edit note:',old);if(t==null||t===old)return;await post('/note',{id,kind:'general',text:t});toast('Note updated');render()}
+async function delNote(id){if(!confirm('Delete this note?'))return;await post('/note/'+id+'/delete');toast('Note deleted');render()}
+// ---- export / print / keyboard ----
+function csv(rows,cols,name){const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};const s=[cols.map(c=>q(c[1])).join(',')].concat(rows.map(r=>cols.map(c=>q(typeof c[0]==='function'?c[0](r):r[c[0]])).join(','))).join('\r\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+s],{type:'text/csv'}));a.download=name.replace(/[^\w.-]+/g,'_')+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+let lastList=[];const PCOLS=[['part','OEM Part Number'],['desc','Description'],['oem','Company'],['pump','Pump'],['assembly','Assembly'],['qty','Qty'],['common','Common with'],['location','Location'],['pb','PB Number'],['gnum','G-Number']];
+function tools(name){return `<div class="tools"><button class="chip act" onclick="csv(lastList,PCOLS,'${esc(name)}')">⬇ Export list to CSV (Excel)</button><button class="chip act" onclick="print()">🖨 Print</button></div>`}
+document.addEventListener('keydown',e=>{if(e.target.matches('input,textarea'))return;if(e.key==='/'){e.preventDefault();const i=$('#q');if(i)i.focus();else{q='';nav('#/')}}if(e.key==='Escape'&&$('#q')){q='';render()}});
 async function render(){const h=location.hash||'#/';const app=$('#app');['search','browse','data','review'].forEach(n=>$('#n-'+n).classList.toggle('on',h.startsWith('#/'+n)||(n==='search'&&!/^#\/(browse|data|review)/.test(h))));
  const parts=h.slice(2).split('/');const kind=parts[0]||'';const arg=decodeURIComponent(parts.slice(1).join('/'));
  if(kind==='data'){app.innerHTML=await viewData();drawHist();return}if(kind==='browse'){const bo=parts[1]?decodeURIComponent(parts[1]):'',bm=parts[2]?decodeURIComponent(parts[2]):'';app.innerHTML=await viewBrowse(bo,bm);window.scrollTo(0,0);if(bm)addHist(h,'BROWSE',bo+' › '+bm);else drawHist();return}if(kind==='review'){app.innerHTML=await viewReview();drawHist();return}
  let body='';if(kind==='part')body=await viewPart(arg);else if(kind==='pump')body=await viewPump(arg);else if(kind==='oem')body=await viewOem(arg);
  app.innerHTML=searchBox()+(body?`<div style="margin-top:20px">${body}</div>`:'<div id="results" style="margin-top:20px"></div>');bindSearch();if(!body)doSearch();window.scrollTo(0,0);
- if(body){const t=$('#app h2')?.textContent;const sub=kind==='part'?$('#app .sub')?.textContent.split(' — ')[1]||'':'';addHist(h,{part:'PART',pump:'PUMP',oem:'COMPANY'}[kind]||kind,t?t+(sub?' — '+sub.slice(0,40):''):'')}else drawHist()}
+ if(body){const t=$('#app h2')?.lastChild?.textContent;const sub=kind==='part'?$('#app .sub')?.textContent||'':'';addHist(h,{part:'PART',pump:'PUMP',oem:'COMPANY'}[kind]||kind,t?t+(sub?' — '+sub.slice(0,40):''):'')}else drawHist()}
 window.onhashchange=render;loadStats().then(render);
 </script></body></html>"""
 
@@ -989,6 +1286,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(preview_file(f, con))
             if p == "/api/issues":
                 return self.send_json(rec_dicts(con.execute("SELECT * FROM issues WHERE status='open' ORDER BY kind, subject")))
+            if p == "/api/edits":
+                return self.send_json(q_edits(con))
+            if p == "/api/notes":
+                return self.send_json(q_notes(con, qs.get("kind"), qs.get("subject")))
             self.send_json({"error": "not found"}, 404)
         except Exception as e:  # noqa: BLE001
             self.send_json({"error": f"{type(e).__name__}: {e}"}, 500)
@@ -1031,7 +1332,34 @@ class Handler(BaseHTTPRequestHandler):
                 con.execute("UPDATE issues SET status='resolved' WHERE id=?", (m.group(1),))
                 con.commit()
                 return self.send_json({"ok": True})
+            if p == "/api/edit":
+                return self.send_json(edit_field(con, int(body["record_id"]), body["field"], body.get("value")))
+            if p == "/api/record":
+                return self.send_json(add_record(con, body))
+            m = re.match(r"^/api/record/(\d+)/delete$", p)
+            if m:
+                return self.send_json(delete_record(con, int(m.group(1))))
+            if p == "/api/price":
+                return self.send_json(add_price(con, int(body["record_id"]), body.get("label") or "", body.get("value"),
+                                                body.get("currency"), body.get("date")))
+            m = re.match(r"^/api/price/(\d+)/delete$", p)
+            if m:
+                return self.send_json(delete_price(con, int(m.group(1))))
+            if p == "/api/rename_pump":
+                return self.send_json(rename_pump(con, body["old"], body["new"]))
+            m = re.match(r"^/api/edits/(\d+)/undo$", p)
+            if m:
+                return self.send_json(undo_edit(con, int(m.group(1))))
+            if p == "/api/note":
+                return self.send_json(save_note(con, body))
+            m = re.match(r"^/api/note/(\d+)/delete$", p)
+            if m:
+                con.execute("DELETE FROM notes WHERE id=?", (m.group(1),))
+                con.commit()
+                return self.send_json({"ok": True})
             self.send_json({"error": "not found"}, 404)
+        except (ValueError, KeyError) as e:
+            self.send_json({"error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
             self.send_json({"error": f"{type(e).__name__}: {e}"}, 500)
 
