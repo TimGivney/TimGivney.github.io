@@ -11,11 +11,14 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
 3. First run only: the exe loads the **Master** sheets of the bundled `Parts_Rev4.xlsx`
-   (`Godwin/Sykes/BBA/Pioneer/Cornell Master`, `50CFM_Pioneer`, `50CFM Cornell`, `Atlas Copco`;
-   the unclean per-OEM tabs, planning tabs and `Cleaned Pump Data.xlsx` are not loaded — import
-   them yourself from DATA if you want them). Takes ~20 s; the console shows progress.
-   Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, and common
-   values like `BA_100_150_180_200_300` or `CD100M_150M_200M` expand to every pump listed.
+   (`Godwin/Sykes/BBA/Pioneer Master`, `50CFM_Pioneer`; the unclean per-OEM tabs, planning tabs,
+   `Cleaned Pump Data.xlsx` and — until they are reformatted — `Cornell Master`, `50CFM Cornell`
+   and `Atlas Copco` are not loaded; import them yourself from DATA if you want them).
+   Takes ~20 s; the console shows progress.
+   Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, a pump cell
+   like `PP66S12_PP66S14_PP88S12` becomes three separate pumps, and common values like
+   `BA_100_150_180_200_300` or `CD100M_150M_200M` expand to every pump listed — each of those
+   pumps gets its own entry under the company's Pump types.
 4. To add more spreadsheets: **DATA** → drop the file on the page (or copy into `PartsFinder\inbox\`
    and click **Scan inbox folder**), check the preview for each sheet (OEM guess, column mapping,
    new / existing / price changes / duplicates / new pumps), untick anything you don't want, then
@@ -30,6 +33,11 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
 Windows SmartScreen may warn because the exe is unsigned: _More info → Run anyway_.
 
 **LIGHT / DARK** button (top right) switches the theme; the choice is remembered in the browser.
+**HISTORY** toggles a sidebar of recently viewed pages — ☆ star one to pin it at the top.
+Clicking the logo goes home and clears the search box.
+
+On a pump page, the **Common with** chips keep only the parts shared with that pump and the
+**Assembly breakdown** chips keep only that assembly — both filter in place without leaving the page.
 
 ## Where your data lives
 
@@ -52,13 +60,14 @@ Original spreadsheets are never modified. Every imported row keeps its file, she
 - `where is 3911650100SP`, `show me everything for CP150i`.
 
 A part page shows: used-on pumps, assembly, common-with pumps (parsed from `BA100_180_200`),
-every price ever imported (never overwritten), related parts in the same assembly, and the
+PartsBender (PB) and G-numbers when the sheet has them, every price ever imported (never overwritten), related parts in the same assembly, and the
 source rows. Missing data is shown as _Not specified in imported source_ – nothing is invented.
 
 ## Importing more spreadsheets
 
 Any `.xlsx` / `.xlsm` / `.csv`. The program finds the header row, maps columns by name
-(Part Number / Description / Qty / Assembly / Pump Type / Common / Location / OEM, plus any
+(Part Number / Description / Qty / Assembly / Pump Type / Common / Location / OEM / PB Number /
+G-Number, plus any
 cost / list / dealer price columns with their currency and year), and guesses the OEM from the
 sheet name or OEM column. You can correct the OEM and dataset type in the preview before importing.
 Import history is listed on the DATA page; anomalies (possible duplicate part numbers, new pump

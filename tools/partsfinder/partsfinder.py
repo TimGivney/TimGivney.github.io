@@ -47,13 +47,16 @@ RES = Path(getattr(sys, "_MEIPASS", BASE))
 LOGO = RES / "logo.png"
 SEED = RES / "seed" if getattr(sys, "frozen", False) else BASE.parent.parent / "data" / "parts" / "raw"
 SKIP_SHEETS = {"plan", "priority", "category", "combined data", "combined data phase 1", "oem price comparison"}
+# datasets that still need reformatting in the workbook; kept in raw/ but not pre-loaded
+SEED_HOLD = {"cornell master", "50cfm cornell", "atlas copco"}
 
 
 def seed_sheet_wanted(file_name: str, sheets: list[str], sheet: str) -> bool:
     """Only master data is pre-loaded: '* Master' sheets where a workbook has them, plus sheets that have
-    no master counterpart (50CFM, Atlas Copco); the unclean per-OEM sheets and planning tabs are skipped."""
+    no master counterpart (50CFM_Pioneer); the unclean per-OEM sheets, planning tabs and the sheets in
+    SEED_HOLD (Cornell / Atlas Copco, awaiting reformatting) are skipped."""
     s = sheet.lower()
-    if s in SKIP_SHEETS:
+    if s in SKIP_SHEETS or s in SEED_HOLD:
         return False
     has_masters = any(x.lower().endswith("master") for x in sheets)
     if not has_masters:
@@ -74,6 +77,8 @@ FIELD_PATTERNS = {
     "common": [r"^common$", r"^commonality$"],
     "location": [r"^location\s*#?$", r"^item$", r"^partsbender\s*#$", r"^pos(ition)?$"],
     "oem": [r"^oem$", r"^manufacturer$", r"^brand$"],
+    "pb": [r"^pb\s*(number|no\.?|#|num)?$", r"^partsbender\s*(number|no\.?|num)$", r"^pb-?number"],
+    "gnum": [r"^g[\s-]*(number|no\.?|#|num)$", r"^g$"],
 }
 CURRENCY_RE = re.compile(r"\b(usd|aud|eur|eu|gbp|nzd)\b|[$€£]")
 DATE_RE = re.compile(r"(19|20)\d\d")
@@ -218,6 +223,14 @@ def split_common(s: str | None) -> list[str]:
     return sorted(set(out))
 
 
+def multi_pumps(pump: str | None) -> list[str]:
+    """'PP66S12_PP66S14_PP88S12' -> ['PP66S12', 'PP66S14', 'PP88S12']; single pump names -> []."""
+    if not pump or "_" not in pump:
+        return []
+    pumps = split_common(pump)
+    return pumps if len(pumps) > 1 else []
+
+
 # --------------------------------------------------------------------------- #
 # Reading files
 # --------------------------------------------------------------------------- #
@@ -268,6 +281,7 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
             "part": part, "key": part_key(part),
             "desc": g("desc"), "qty": g("qty"), "assembly": g("assembly"),
             "pump": g("pump"), "common": g("common"), "location": g("location"),
+            "pb": g("pb"), "gnum": g("gnum"),
             "prices": pl, "row": i,
             "raw": {str(header[j]).strip(): (row[j].isoformat() if hasattr(row[j], "isoformat") else row[j])
                     for j in range(len(header)) if header[j] is not None and row[j] is not None},
@@ -295,8 +309,8 @@ CREATE TABLE IF NOT EXISTS imports (
 CREATE TABLE IF NOT EXISTS records (
   id INTEGER PRIMARY KEY, import_id INTEGER, oem TEXT, part TEXT, key TEXT, desc TEXT,
   qty TEXT, assembly TEXT, pump TEXT, pump_key TEXT, common TEXT, location TEXT, src_row INTEGER, raw TEXT,
-  model TEXT, model_key TEXT, variant TEXT);
-CREATE TABLE IF NOT EXISTS common_pumps (record_id INTEGER, pump TEXT, pump_key TEXT);
+  model TEXT, model_key TEXT, variant TEXT, pb TEXT, gnum TEXT);
+CREATE TABLE IF NOT EXISTS common_pumps (record_id INTEGER, pump TEXT, pump_key TEXT, kind TEXT DEFAULT 'common');
 CREATE TABLE IF NOT EXISTS prices (
   id INTEGER PRIMARY KEY, record_id INTEGER, import_id INTEGER, key TEXT, oem TEXT,
   label TEXT, value REAL, currency TEXT, date TEXT, imported_at TEXT);
@@ -322,6 +336,21 @@ def db() -> sqlite3.Connection:
         for rid, pump in con.execute("SELECT id, pump FROM records WHERE pump IS NOT NULL").fetchall():
             model, variant = split_pump(pump)
             con.execute("UPDATE records SET model=?, model_key=?, variant=? WHERE id=?", (model, pump_key(model), variant, rid))
+        con.commit()
+    if cols and "pb" not in cols:
+        con.execute("ALTER TABLE records ADD COLUMN pb TEXT")
+        con.execute("ALTER TABLE records ADD COLUMN gnum TEXT")
+        con.commit()
+    cp_cols = {r[1] for r in con.execute("PRAGMA table_info(common_pumps)")}
+    if cp_cols and "kind" not in cp_cols:
+        con.execute("ALTER TABLE common_pumps ADD COLUMN kind TEXT DEFAULT 'common'")
+        for rid, pump in con.execute("SELECT id, pump FROM records WHERE instr(pump, '_') > 0").fetchall():
+            multi = multi_pumps(pump)
+            if multi:
+                con.execute("UPDATE records SET model=NULL, model_key=NULL WHERE id=?", (rid,))
+                con.execute(f"DELETE FROM common_pumps WHERE record_id=? AND pump_key IN ({','.join('?' * len(multi))})",
+                            [rid] + [pump_key(p) for p in multi])
+                con.executemany("INSERT INTO common_pumps VALUES(?,?,?,'pump')", [(rid, p, pump_key(p)) for p in multi])
         con.commit()
     con.executescript(SCHEMA)
     return con
@@ -439,18 +468,21 @@ def _commit_sheets(pv: dict, choices: dict, con: sqlite3.Connection, path: Path,
         iid = cur.lastrowid
         for r in s["_records"]:
             ro = oem if override else (r["oem"] or oem)
-            model, variant = split_pump(r["pump"])
+            # a pump cell like 'PP66S12_PP66S14_PP88S12' is a list of pumps, not a model of its own
+            multi = multi_pumps(r["pump"])
+            model, variant = (None, None) if multi else split_pump(r["pump"])
             c2 = con.execute(
-                "INSERT INTO records(import_id,oem,part,key,desc,qty,assembly,pump,pump_key,common,location,src_row,raw,model,model_key,variant) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO records(import_id,oem,part,key,desc,qty,assembly,pump,pump_key,common,location,src_row,raw,model,model_key,variant,pb,gnum) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (iid, ro, r["part"], r["key"], r["desc"], r["qty"], r["assembly"], r["pump"],
                  pump_key(r["pump"]) if r["pump"] else None, r["common"], r["location"], r["row"],
-                 json.dumps(r["raw"], default=str), model, pump_key(model) if model else None, variant))
+                 json.dumps(r["raw"], default=str), model, pump_key(model) if model else None, variant,
+                 r.get("pb"), r.get("gnum")))
             rid = c2.lastrowid
-            # a pump cell like 'PP66S12_PP66S14_PP88S12' names several pumps; index each of them too
-            multi = split_common(r["pump"]) if r["pump"] and "_" in r["pump"] else []
-            con.executemany("INSERT INTO common_pumps VALUES(?,?,?)",
-                            [(rid, p, pump_key(p)) for p in sorted(set(r["commonPumps"]) | set(multi))])
+            mk = {pump_key(p) for p in multi}
+            con.executemany("INSERT INTO common_pumps VALUES(?,?,?,'pump')", [(rid, p, pump_key(p)) for p in multi])
+            con.executemany("INSERT INTO common_pumps VALUES(?,?,?,'common')",
+                            [(rid, p, pump_key(p)) for p in sorted(set(r["commonPumps"])) if pump_key(p) not in mk])
             con.executemany(
                 "INSERT INTO prices(record_id,import_id,key,oem,label,value,currency,date,imported_at) VALUES(?,?,?,?,?,?,?,?,?)",
                 [(rid, iid, r["key"], ro, p["label"], p["value"], p["currency"], p["date"], ts) for p in r["prices"]])
@@ -488,7 +520,8 @@ def q_stats(con) -> dict:
     return {
         "rows": con.execute("SELECT COUNT(*) FROM records").fetchone()[0],
         "parts": con.execute("SELECT COUNT(DISTINCT key) FROM records").fetchone()[0],
-        "pumps": con.execute("SELECT COUNT(DISTINCT pump_key) FROM records WHERE pump_key IS NOT NULL").fetchone()[0],
+        "pumps": con.execute("SELECT COUNT(*) FROM (SELECT DISTINCT model_key FROM records WHERE model_key IS NOT NULL "
+                             "UNION SELECT DISTINCT pump_key FROM common_pumps)").fetchone()[0],
         "oems": [r[0] for r in con.execute("SELECT DISTINCT oem FROM records WHERE oem IS NOT NULL ORDER BY oem")],
         "issues": con.execute("SELECT COUNT(*) FROM issues WHERE status='open'").fetchone()[0],
     }
@@ -504,17 +537,20 @@ def q_search(con, q: str, oem: str | None) -> dict:
         where.append("oem=?")
         params.append(oem)
     # part-number-ish match OR all words in desc/assembly/part
-    text_clause = " AND ".join(["(LOWER(part)||' '||LOWER(IFNULL(desc,''))||' '||LOWER(IFNULL(assembly,''))) LIKE ?"] * len(like))
-    where.append(f"(key LIKE ? OR ({text_clause}))")
-    params += ["%" + nk + "%"] + like
+    text_clause = " AND ".join(["(LOWER(part)||' '||LOWER(IFNULL(desc,''))||' '||LOWER(IFNULL(assembly,''))"
+                                "||' '||LOWER(IFNULL(pb,''))||' '||LOWER(IFNULL(gnum,''))) LIKE ?"] * len(like))
+    ident = "LOWER(REPLACE(REPLACE(REPLACE(IFNULL({0},''),'-',''),' ',''),'_',''))"
+    where.append(f"(key LIKE ? OR {ident.format('pb')} LIKE ? OR {ident.format('gnum')} LIKE ? OR ({text_clause}))")
+    params += ["%" + nk + "%"] * 3 + like
     rows = con.execute(
         f"SELECT key, MIN(part) part, MAX(desc) desc, GROUP_CONCAT(DISTINCT oem) oems, "
         f"COUNT(DISTINCT pump_key) pumps FROM records WHERE {' AND '.join(where)} "
         f"GROUP BY key ORDER BY (key=?) DESC, (key LIKE ?) DESC, part LIMIT 300",
         params + [nk, nk + "%"]).fetchall()
     pumps = [r[0] for r in con.execute(
-        "SELECT DISTINCT pump FROM records WHERE pump_key LIKE ? UNION SELECT DISTINCT pump FROM common_pumps WHERE pump_key=? LIMIT 60",
-        ("%" + nk + "%", nk))]
+        "SELECT DISTINCT pump FROM records WHERE pump_key LIKE ? AND model_key IS NOT NULL "
+        "UNION SELECT DISTINCT pump FROM common_pumps WHERE pump_key LIKE ? LIMIT 60",
+        ("%" + nk + "%", "%" + nk + "%"))]
     oems = [r[0] for r in con.execute("SELECT DISTINCT oem FROM records WHERE LOWER(oem) LIKE ?", ("%" + q.lower() + "%",))]
     return {"parts": rec_dicts(rows), "pumps": pumps, "oems": oems}
 
@@ -527,10 +563,11 @@ def q_part(con, key: str) -> dict:
         return {"found": False}
     for r in rows:
         r["raw"] = json.loads(r["raw"]) if r["raw"] else {}
-    pumps = sorted({r["pump"] for r in rows if r["pump"]})
+    listed = [(c[0], c[1]) for c in con.execute(
+        "SELECT DISTINCT cp.pump, cp.kind FROM common_pumps cp JOIN records r ON r.id=cp.record_id WHERE r.key=?", (key,))]
+    pumps = sorted({r["pump"] for r in rows if r["pump"] and r["model_key"]} | {p for p, k in listed if k == "pump"})
     assemblies = sorted({r["assembly"] for r in rows if r["assembly"]})
-    common = sorted({c[0] for c in con.execute(
-        "SELECT DISTINCT cp.pump FROM common_pumps cp JOIN records r ON r.id=cp.record_id WHERE r.key=?", (key,))})
+    common = sorted({p for p, k in listed if k == "common"})
     prices = rec_dicts(con.execute(
         "SELECT p.oem, p.label, p.value, p.currency, p.date, p.imported_at, i.file, i.sheet FROM prices p JOIN imports i ON i.id=p.import_id "
         "WHERE p.key=? GROUP BY p.oem, p.label, p.currency, p.value, p.date, i.file, i.sheet ORDER BY p.oem, p.label, p.imported_at", (key,)))
@@ -559,7 +596,7 @@ def q_part(con, key: str) -> dict:
         by_oem.append({
             "oem": o,
             "descs": sorted({r["desc"] for r in orows if r["desc"]}),
-            "pumps": sorted({r["pump"] for r in orows if r["pump"]}),
+            "pumps": sorted({p for r in orows if r["pump"] for p in (multi_pumps(r["pump"]) or [r["pump"]])}),
             "assemblies": sorted({r["assembly"] for r in orows if r["assembly"]}),
             "prices": [p for p in prices if p["oem"] == o],
             "rows": len(orows)})
@@ -568,46 +605,68 @@ def q_part(con, key: str) -> dict:
             "oems": sorted({r["oem"] for r in rows if r["oem"]}), "descs": sorted({r["desc"] for r in rows if r["desc"]}),
             "pumps": pumps, "assemblies": assemblies, "common": common,
             "common_raw": sorted({r["common"] for r in rows if r["common"]}),
+            "pb": sorted({r["pb"] for r in rows if r["pb"]}), "gnum": sorted({r["gnum"] for r in rows if r["gnum"]}),
             "prices": prices, "related": related, "alternates": alts, "rows": rows}
 
 
 def q_pump(con, pump: str) -> dict:
     pk = pump_key(pump)
     direct = rec_dicts(con.execute(
-        "SELECT * FROM records WHERE pump_key=? OR model_key=? ORDER BY assembly, part", (pk, pk)))
+        "SELECT r.* FROM records r WHERE r.pump_key=? OR r.model_key=? "
+        "OR r.id IN (SELECT record_id FROM common_pumps WHERE pump_key=? AND kind='pump') ORDER BY r.assembly, r.part", (pk, pk, pk)))
     via = rec_dicts(con.execute(
-        "SELECT r.* FROM records r JOIN common_pumps cp ON cp.record_id=r.id WHERE cp.pump_key=? ORDER BY r.assembly, r.part", (pk,)))
+        "SELECT r.* FROM records r JOIN common_pumps cp ON cp.record_id=r.id WHERE cp.pump_key=? AND cp.kind='common' "
+        "ORDER BY r.assembly, r.part", (pk,)))
     direct_ids = {r["id"] for r in direct}
     rows = direct + [r for r in via if r["id"] not in direct_ids]
-    names = sorted({r["pump"] for r in direct}) or [pump]
+    names = sorted({r["pump"] for r in direct if r["model_key"]})
+    if not names:
+        names = sorted({c[0] for c in con.execute("SELECT DISTINCT pump FROM common_pumps WHERE pump_key=?", (pk,))}) or [pump]
     variants = sorted({r["variant"] for r in direct if r["variant"]})
-    common = sorted({c[0] for c in con.execute(
-        "SELECT DISTINCT cp.pump FROM common_pumps cp JOIN records r ON r.id=cp.record_id "
-        "WHERE (r.pump_key=? OR r.model_key=?) AND cp.pump_key<>? AND cp.pump_key<>r.pump_key", (pk, pk, pk))})
+    ids = [r["id"] for r in rows]
+    common: set[str] = set()
+    row_common: dict[int, list[str]] = {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        for rid, cpump in con.execute(
+                f"SELECT r.id, cp.pump FROM common_pumps cp JOIN records r ON r.id=cp.record_id "
+                f"WHERE r.id IN ({','.join('?' * len(chunk))}) AND cp.pump_key<>? AND cp.pump_key<>IFNULL(r.pump_key,'') "
+                f"AND cp.pump_key<>IFNULL(r.model_key,'')", chunk + [pk]):
+            common.add(cpump)
+            row_common.setdefault(rid, []).append(cpump)
+    common = sorted(common)
     # parts unique to this pump (appear on no other pump)
     unique = [r for r in rows if con.execute(
-        "SELECT 1 FROM records WHERE key=? AND pump_key IS NOT NULL AND pump_key<>? LIMIT 1", (r["key"], pk)).fetchone() is None
+        "SELECT 1 FROM records WHERE key=? AND model_key IS NOT NULL AND model_key<>? AND pump_key<>? LIMIT 1", (r["key"], pk, pk)).fetchone() is None
         and con.execute("SELECT 1 FROM records r JOIN common_pumps cp ON cp.record_id=r.id WHERE r.key=? AND cp.pump_key<>? LIMIT 1",
                         (r["key"], pk)).fetchone() is None]
     seen, parts = set(), []
+    by_key: dict[str, dict] = {}
     for r in rows:
         if r["key"] not in seen:
             seen.add(r["key"])
+            r["common_with"] = []
+            by_key[r["key"]] = r
             parts.append(r)
+        by_key[r["key"]]["common_with"] = sorted(set(by_key[r["key"]]["common_with"]) | set(row_common.get(r["id"], [])))
     ukeys = {r["key"] for r in unique}
-    model = next((r["model"] for r in direct if r["model"]), pump)
-    return {"pump": model if len(names) > 1 else names[0], "names": names, "variants": variants,
+    model = next((r["model"] for r in direct if r["model"]), names[0] if names else pump)
+    also_on = sorted({p for r in via if r["pump"] and r["id"] not in direct_ids
+                      for p in (multi_pumps(r["pump"]) or [r["pump"]])})
+    return {"pump": model if len(names) > 1 else names[0], "names": names, "variants": variants, "via_common": len(via),
+            "also_on": also_on,
             "oems": sorted({r["oem"] for r in rows if r["oem"]}), "direct": bool(direct),
             "common": common, "parts": parts, "unique_keys": sorted(ukeys)}
 
 
 def q_oem(con, oem: str) -> dict:
-    pumps = [r[0] for r in con.execute("SELECT DISTINCT pump FROM records WHERE oem=? AND pump IS NOT NULL ORDER BY pump", (oem,))]
+    tree = next((o for o in q_browse(con) if o["oem"] == oem), None)
+    models = tree["models"] if tree else []
     asm = [r[0] for r in con.execute("SELECT DISTINCT assembly FROM records WHERE oem=? AND assembly IS NOT NULL ORDER BY assembly", (oem,))]
     return {"oem": oem,
             "rows": con.execute("SELECT COUNT(*) FROM records WHERE oem=?", (oem,)).fetchone()[0],
             "parts": con.execute("SELECT COUNT(DISTINCT key) FROM records WHERE oem=?", (oem,)).fetchone()[0],
-            "pumps": pumps, "assemblies": asm,
+            "models": models, "assemblies": asm,
             "imports": rec_dicts(con.execute("SELECT * FROM imports WHERE oem=? ORDER BY id DESC", (oem,)))}
 
 
@@ -616,13 +675,23 @@ def q_browse(con) -> list[dict]:
     out: dict[str, dict] = {}
     for r in con.execute(
             "SELECT oem, model, model_key, pump, variant, COUNT(DISTINCT key) parts FROM records "
-            "WHERE pump IS NOT NULL GROUP BY oem, model_key, pump_key ORDER BY oem, model, variant"):
+            "WHERE model_key IS NOT NULL GROUP BY oem, model_key, pump_key ORDER BY oem, model, variant"):
         o = out.setdefault(r["oem"] or "Unknown", {"oem": r["oem"] or "Unknown", "models": {}})
         m = o["models"].setdefault(r["model_key"], {"model": r["model"], "variants": [], "parts": 0})
         m["variants"].append({"pump": r["pump"], "variant": r["variant"], "parts": r["parts"]})
+    # pumps named in a multi-pump cell ('PP66S12_PP66S14') or only in Common fields are models in their own right
+    for r in con.execute(
+            "SELECT r.oem, cp.pump, cp.pump_key, MIN(cp.kind) kind FROM common_pumps cp JOIN records r ON r.id=cp.record_id "
+            "GROUP BY r.oem, cp.pump_key ORDER BY r.oem, cp.pump"):
+        o = out.setdefault(r["oem"] or "Unknown", {"oem": r["oem"] or "Unknown", "models": {}})
+        if r["pump_key"] not in o["models"] and not any(v["pump"] and pump_key(v["pump"]) == r["pump_key"]
+                                                        for m in o["models"].values() for v in m["variants"]):
+            o["models"][r["pump_key"]] = {"model": r["pump"], "variants": [], "parts": 0, "common": r["kind"] == "common"}
     for o in out.values():
         for mk, m in o["models"].items():
-            m["parts"] = con.execute("SELECT COUNT(DISTINCT key) FROM records WHERE model_key=?", (mk,)).fetchone()[0]
+            m["parts"] = con.execute(
+                "SELECT COUNT(DISTINCT key) FROM records WHERE model_key=? OR pump_key=? "
+                "OR id IN (SELECT record_id FROM common_pumps WHERE pump_key=?)", (mk, mk, mk)).fetchone()[0]
         o["models"] = sorted(o["models"].values(), key=lambda m: m["model"].lower())
         o["parts"] = con.execute("SELECT COUNT(DISTINCT key) FROM records WHERE oem=?", (o["oem"],)).fetchone()[0]
     return sorted(out.values(), key=lambda o: o["oem"].lower())
@@ -662,7 +731,7 @@ HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Par
 <style>
 :root,[data-theme=light]{--bg:#ffffff;--panel:#f6f7fb;--line:#e3e6ee;--txt:#111827;--dim:#6b7280;--acc:#0a3ad6;--acc2:#0a3ad6;--field:#ffffff;--edge:#cfd5e3;--hover:#f1f3f9;--btntxt:#fff}
 [data-theme=dark]{--bg:#0b0d12;--panel:#10131a;--line:#262a33;--txt:#e5e7eb;--dim:#8b93a3;--acc:#5b8cff;--acc2:#8fb0ff;--field:#171a22;--edge:#3a3f4b;--hover:#171a22;--btntxt:#fff}
-header img{height:30px;display:block}[data-theme=dark] header img{filter:brightness(0) invert(1)}.theme{background:none;border:1px solid var(--edge);color:var(--dim);border-radius:6px;padding:3px 8px;cursor:pointer;font:11px ui-monospace,Consolas,monospace}
+header img{height:30px;display:block}[data-theme=dark] header img{filter:brightness(0) invert(1)}.theme{background:none;border:1px solid var(--edge);color:var(--dim);border-radius:6px;padding:3px 8px;cursor:pointer;font:11px ui-monospace,Consolas,monospace}.theme.on{color:var(--acc2);border-color:var(--acc)}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,Segoe UI,sans-serif}
 a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 header{border-bottom:1px solid var(--line);background:var(--panel)}
@@ -706,25 +775,50 @@ select,input[type=text]{background:var(--field);color:var(--txt);border:1px soli
 .warn{color:#b45309}.ok{color:#4ade80}.err{color:#f87171}
 details summary{cursor:pointer;color:var(--dim);font-size:12px}
 .toast{position:fixed;bottom:16px;right:16px;background:var(--field);border:1px solid var(--acc);padding:10px 14px;border-radius:6px}
+.ids{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:6px;font:13px ui-monospace,Consolas,monospace}.ids b{color:var(--acc2);font-weight:600}
+.filt{font:12px ui-monospace,Consolas,monospace;color:var(--dim);margin:8px 0 0}.filt b{color:var(--acc2);font-weight:normal}
+aside{position:fixed;left:0;top:48px;bottom:0;width:230px;overflow:auto;border-right:1px solid var(--line);background:var(--panel);padding:12px;display:none;font:12px ui-monospace,Consolas,monospace}
+body.hist aside{display:block}body.hist main{margin-left:230px}@media(max-width:900px){body.hist main{margin-left:0}aside{box-shadow:4px 0 16px rgba(0,0,0,.25)}}
+aside h4{margin:0 0 6px;font:11px ui-monospace,Consolas,monospace;letter-spacing:.2em;color:var(--acc);display:flex;justify-content:space-between}aside h4 button{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;padding:0;letter-spacing:0}
+.hi{display:flex;align-items:flex-start;gap:6px;padding:4px 2px;border-radius:4px}.hi:hover{background:var(--hover)}.hi .st{background:none;border:0;cursor:pointer;color:var(--dim);font-size:14px;padding:0;line-height:1.2}.hi .st.on{color:#f59e0b}
+.hi a{flex:1;color:var(--txt);word-break:break-word;line-height:1.3}.hi a small{display:block;color:var(--dim);font-size:10px;letter-spacing:.1em}
+.hi .rm{background:none;border:0;cursor:pointer;color:var(--dim);padding:0;font-size:11px;visibility:hidden}.hi:hover .rm{visibility:visible}
 </style></head><body>
-<header><div class="wrap"><a href="#/"><img src="/logo.png" alt="PartsBender"></a><span class="brand" onclick="nav('#/')">PARTS FINDER</span>
-<nav><a href="#/" id="n-search">SEARCH</a><a href="#/browse" id="n-browse">BROWSE</a><a href="#/data" id="n-data">DATA</a><a href="#/review" id="n-review">REVIEW <span id="issuecount"></span></a><button class="theme" id="theme" onclick="toggleTheme()"></button></nav></div></header>
+<header><div class="wrap"><a href="#/" onclick="goHome();return false"><img src="/logo.png" alt="PartsBender"></a><span class="brand" onclick="goHome()">PARTS FINDER</span>
+<nav><button class="theme" id="histbtn" onclick="toggleHist()" title="Recently viewed pages">HISTORY</button><a href="#/" id="n-search">SEARCH</a><a href="#/browse" id="n-browse">BROWSE</a><a href="#/data" id="n-data">DATA</a><a href="#/review" id="n-review">REVIEW <span id="issuecount"></span></a><button class="theme" id="theme" onclick="toggleTheme()"></button></nav></div></header>
+<aside id="hist"></aside>
 <main><div class="wrap" id="app"></div></main>
 <script>
 const setTheme=t=>{document.documentElement.dataset.theme=t;localStorage.pfTheme=t;document.getElementById('theme').textContent=t==='dark'?'LIGHT':'DARK'};
 const toggleTheme=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 setTheme(localStorage.pfTheme||'light');
+function goHome(){q='';oemFilter='';sharedOnly=false;if(location.hash&&location.hash!=='#/')location.hash='#/';else render()}
+// ---- history sidebar (recent pages, starred ones pinned to the top; kept in this browser) ----
+let hist=[];try{hist=JSON.parse(localStorage.pfHist||'[]')}catch(e){hist=[]}
+const saveHist=()=>{localStorage.pfHist=JSON.stringify(hist);drawHist()};
+function addHist(h,kind,title){if(!title)return;const i=hist.findIndex(x=>x.h===h);const e=i>=0?hist.splice(i,1)[0]:{h,star:false};e.k=kind;e.t=title;e.ts=Date.now();hist.unshift(e);
+ let n=0;hist=hist.filter(x=>x.star||++n<=40);saveHist()}
+function starHist(h){const e=hist.find(x=>x.h===h);if(e){e.star=!e.star;saveHist()}}
+function rmHist(h){hist=hist.filter(x=>x.h!==h);saveHist()}
+function clearHist(){hist=hist.filter(x=>x.star);saveHist()}
+function drawHist(){const a=$('#hist');const cur=location.hash;const row=e=>`<div class="hi"><button class="st ${e.star?'on':''}" title="${e.star?'Unstar':'Star — keep at the top'}" onclick="starHist('${esc(e.h).replace(/'/g,'%27')}')">${e.star?'★':'☆'}</button><a href="${esc(e.h)}" style="${e.h===cur?'color:var(--acc2)':''}"><small>${esc(e.k)}</small>${esc(e.t)}</a><button class="rm" title="Remove" onclick="rmHist('${esc(e.h).replace(/'/g,'%27')}')">✕</button></div>`;
+ const st=hist.filter(e=>e.star).sort((x,y)=>y.ts-x.ts),re=hist.filter(e=>!e.star);
+ a.innerHTML=`<h4>STARRED</h4>${st.map(row).join('')||'<p class="dim" style="margin:0 0 10px">Click ☆ on a page below to pin it here.</p>'}<h4 style="margin-top:14px">RECENT <button onclick="clearHist()">clear</button></h4>${re.map(row).join('')||'<p class="dim" style="margin:0">Pages you open will appear here.</p>'}`}
+function setHist(on){document.body.classList.toggle('hist',on);localStorage.pfHistOpen=on?'1':'0';$('#histbtn').classList.toggle('on',on)}
+const toggleHist=()=>setHist(!document.body.classList.contains('hist'));
 const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=(p,o)=>fetch('/api'+p,o).then(r=>r.json());
 let stats={oems:[]},oemFilter='',q='';
 const nav=h=>{location.hash=h};
+setHist(localStorage.pfHistOpen?localStorage.pfHistOpen==='1':innerWidth>1100);drawHist();
 const money=p=>(p.currency||'')+' '+Number(p.value).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function chip(t,h,on){return `<button class="chip${on?' on':''}" onclick="nav('${esc(h).replace(/'/g,'%27')}')">${esc(t)}</button>`}
+function fchip(t,fn,on){return `<button class="chip${on?' on':''}" onclick="${esc(fn)}">${esc(t)}</button>`}
 function partRow(r){return `<li><button class="row" onclick="nav('#/part/${encodeURIComponent(r.key)}')"><span class="pn">${esc(r.part)}</span><span>${esc(r.desc||'—')}</span><span class="r">${esc(r.oems||r.oem||'')}${r.assembly?' · '+esc(r.assembly):''}${r.qty?' · qty '+esc(r.qty):''}${r.pumps!=null?' · '+r.pumps+' pump(s)':''}</span></button></li>`}
 function searchBox(){return `<div class="search">🔎 <input id="q" placeholder="Search part number, pump, OEM or description… (or: common BA150 BA200)" value="${esc(q)}" autofocus></div>
 <div class="meta">OEM: <button class="${oemFilter?'':'on'}" onclick="setOem('')">All</button>${stats.oems.map(o=>`<button class="${oemFilter===o?'on':''}" onclick="setOem('${esc(o)}')">· ${esc(o)}</button>`).join('')}
 <span class="right">${stats.rows?.toLocaleString()} rows · ${stats.parts?.toLocaleString()} parts · ${stats.pumps} pumps</span></div>`}
-function setOem(o){oemFilter=o;render()}
+function setOem(o){oemFilter=o;if(o&&q.trim().length<2){nav('#/oem/'+encodeURIComponent(o));return}if(location.hash!=='#/'&&!location.hash.startsWith('#/q/'))location.hash='#/';else render()}
 async function loadStats(){stats=await api('/stats');$('#issuecount').textContent=stats.issues?`(${stats.issues})`:''}
 let t;function bindSearch(){const i=$('#q');if(!i)return;i.focus();i.setSelectionRange(i.value.length,i.value.length);i.oninput=()=>{q=i.value;clearTimeout(t);t=setTimeout(doSearch,180);if(location.hash!=='#/'&&!location.hash.startsWith('#/q/'))location.hash='#/'}}
 let seq=0;
@@ -743,7 +837,7 @@ let sharedOnly=false;
 function sec(t,b){return `<section><h3>${t}</h3>${b}</section>`}
 const NS='<span class="dim">Not specified in imported source.</span>';
 async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key));if(!d.found)return `<p class="dim">Part not found.</p>`;
- let h=`<div><h2>${esc(d.part)}</h2><p class="sub">${esc(d.oems.join(' / '))} — ${esc(d.descs.join(' · ')||'No description')}</p>${d.variants.length>1?`<p class="small">Part-number variants in source: ${esc(d.variants.join(', '))}</p>`:''}</div>`;
+ let h=`<div><h2>${esc(d.part)}</h2><p class="sub">${esc(d.oems.join(' / '))} — ${esc(d.descs.join(' · ')||'No description')}</p>${d.pb.length||d.gnum.length?`<div class="ids">${d.pb.length?`<span><span class="dim">PB number</span> <b>${esc(d.pb.join(', '))}</b></span>`:''}${d.gnum.length?`<span><span class="dim">G-number</span> <b>${esc(d.gnum.join(', '))}</b></span>`:''}</div>`:''}${d.variants.length>1?`<p class="small">Part-number variants in source: ${esc(d.variants.join(', '))}</p>`:''}</div>`;
  if(d.shared)h+=sec(`Shared across ${d.by_oem.length} companies`,`<table><tr><th>Company</th><th>Pumps</th><th>Assembly</th><th>Description</th><th>Prices</th></tr>${d.by_oem.map(o=>`<tr><td class="g">${chip(o.oem,'#/oem/'+encodeURIComponent(o.oem))}</td><td>${o.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' ')||'<span class="dim">—</span>'}</td><td>${esc(o.assemblies.join(', ')||'—')}</td><td>${esc(o.descs.join(' · ')||'—')}</td><td>${o.prices.length?o.prices.map(p=>`<div><span class="g">${money(p)}</span> <span class="dim">${esc(p.label)}${p.date?' · '+esc(p.date):''}</span></div>`).join(''):'<span class="dim">none</span>'}</td></tr>`).join('')}</table>`);
  h+=sec('Used on',d.pumps.length?`<div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div>`:'<span class="dim">Pump compatibility: Not specified in imported source.</span>');
  h+=sec('Assembly',d.assemblies.length?esc(d.assemblies.join(', ')):NS);
@@ -753,14 +847,21 @@ async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key))
  if(d.related.length)h+=sec('Related parts (same pump & assembly)',`<div class="chips">${d.related.map(x=>chip(x.part+(x.desc?' — '+x.desc:''),'#/part/'+encodeURIComponent(x.key))).join('')}</div>`);
  h+=sec('Source rows',`<ul class="small" style="margin:0;padding-left:16px">${d.rows.map(r=>`<li>${esc(r.file)} › ${esc(r.sheet)} · row ${r.src_row}${r.pump?' · '+esc(r.pump):''}${r.qty?' · qty '+esc(r.qty):''}${r.location?' · loc '+esc(r.location):''} · imported ${esc(r.imported_at)} <details style="display:inline"><summary style="display:inline">raw</summary><code>${esc(JSON.stringify(r.raw))}</code></details></li>`).join('')}</ul>`);
  return h}
-let asmFilter='';
-async function viewPump(p){const d=await api('/pump/'+encodeURIComponent(p));const asms={};d.parts.forEach(r=>{const a=r.assembly||'Unspecified';asms[a]=(asms[a]||0)+1});
- const uk=new Set(d.unique_keys);
- let h=`<div><h2>${esc(d.pump)}</h2><p class="sub">${esc(d.oems.join(' / ')||'—')}</p>${d.direct?'':'<p class="small">No rows list this pump directly; showing parts whose “Common” field names it.</p>'}${d.variants.length?`<p class="small">Variants: ${d.variants.map((v,i)=>chip(v,'#/pump/'+encodeURIComponent(d.names[i]||v))).join(' ')}</p>`:''}${d.names.length>1&&!d.variants.length?`<p class="small">Name variants: ${esc(d.names.join(' | '))}</p>`:''}</div>`;
- if(d.common.length)h+=sec('Common with',`<div class="chips">${d.common.map(c=>chip(c,'#/pump/'+encodeURIComponent(c))).join('')}</div>`);
- h+=sec('Assembly breakdown',`<div class="chips"><button class="chip ${asmFilter?'':'on'}" onclick="asmFilter='';render()">All · ${d.parts.length}</button>${Object.keys(asms).sort().map(a=>`<button class="chip ${asmFilter===a?'on':''}" onclick="asmFilter=${JSON.stringify(a)};render()">${esc(a)} · ${asms[a]}</button>`).join('')}</div>`);
- const list=d.parts.filter(r=>!asmFilter||(r.assembly||'Unspecified')===asmFilter);
- h+=sec(`Parts found · ${list.length} <span class="dim">(${uk.size} unique to this pump ★)</span>`,`<ul class="list">${list.map(r=>partRow({...r,part:(uk.has(r.key)?'★ ':'')+r.part})).join('')}</ul>`);
+// pump page filters: Common-with and Assembly chips narrow the parts list in place (page/URL unchanged)
+let pumpD=null,pumpCur='',asmFilter='',cwFilter='';
+function setPF(kind,v){if(kind==='asm')asmFilter=asmFilter===v?'':v;else cwFilter=cwFilter===v?'':v;const el=$('#pumpbody');if(el&&pumpD)el.innerHTML=pumpBody(pumpD)}
+function pumpBody(d){const asms={};d.parts.forEach(r=>{const a=r.assembly||'Unspecified';asms[a]=(asms[a]||0)+1});
+ const cws={};d.parts.forEach(r=>(r.common_with||[]).forEach(c=>{cws[c]=(cws[c]||0)+1}));
+ const uk=new Set(d.unique_keys);let h='';
+ if(d.common.length)h+=sec(`Common with <span class="dim">· click to keep only the parts shared with that pump</span>`,`<div class="chips">${d.common.map(c=>fchip(`${c} · ${cws[c]||0}`,`setPF('cw',${JSON.stringify(c)})`,cwFilter===c)).join('')}</div>`);
+ h+=sec(`Assembly breakdown <span class="dim">· click to keep only that assembly</span>`,`<div class="chips">${fchip(`All · ${d.parts.length}`,"setPF('asm','')",!asmFilter)}${Object.keys(asms).sort().map(a=>fchip(`${a} · ${asms[a]}`,`setPF('asm',${JSON.stringify(a)})`,asmFilter===a)).join('')}</div>`);
+ const list=d.parts.filter(r=>(!asmFilter||(r.assembly||'Unspecified')===asmFilter)&&(!cwFilter||(r.common_with||[]).includes(cwFilter)));
+ const on=[cwFilter&&`common with <b>${esc(cwFilter)}</b>`,asmFilter&&`assembly <b>${esc(asmFilter)}</b>`].filter(Boolean);
+ h+=sec(`Parts found · ${list.length}${on.length?` <span class="dim">of ${d.parts.length}</span>`:''} <span class="dim">(${uk.size} unique to this pump ★)</span>`,`${on.length?`<p class="filt">Showing parts on ${esc(d.pump)} that are ${on.join(' and ')} — <a href="javascript:void(0)" onclick="asmFilter='';cwFilter='';setPF('asm','')">clear filters</a></p>`:''}<ul class="list">${list.map(r=>partRow({...r,part:(uk.has(r.key)?'★ ':'')+r.part})).join('')||'<li class="dim">No parts match these filters.</li>'}</ul>`);
+ return h}
+async function viewPump(p){const d=await api('/pump/'+encodeURIComponent(p));if(p!==pumpCur){asmFilter='';cwFilter='';pumpCur=p}pumpD=d;
+ let h=`<div><h2>${esc(d.pump)}</h2><p class="sub">${esc(d.oems.join(' / ')||'—')}</p>${d.direct?'':`<p class="small">No rows list this pump directly; showing the ${d.via_common} parts whose “Common” field names it${d.also_on.length?' (listed on: '+d.also_on.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' ')+')':''}.</p>`}${d.variants.length?`<p class="small">Variants: ${d.variants.map((v,i)=>chip(v,'#/pump/'+encodeURIComponent(d.names[i]||v))).join(' ')}</p>`:''}${d.names.length>1&&!d.variants.length?`<p class="small">Name variants: ${esc(d.names.join(' | '))}</p>`:''}</div>`;
+ h+=`<div id="pumpbody">${pumpBody(d)}</div>`;
  return h}
 let browse=null;
 async function viewBrowse(oem,model){browse=browse||await api('/browse');
@@ -769,11 +870,15 @@ async function viewBrowse(oem,model){browse=browse||await api('/browse');
  const o=browse.find(x=>x.oem===oem);if(!o)return h;
  h+=sec(`Pump models · ${o.models.length}`,`<div class="chips">${o.models.map(m=>chip(`${m.model} · ${m.parts}`,'#/browse/'+encodeURIComponent(oem)+'/'+encodeURIComponent(m.model),m.model===model)).join('')}</div>`);
  const m=o.models.find(x=>x.model===model);if(!m)return h;
- if(m.variants.length>1||m.variants[0].variant)h+=sec('Variants',`<div class="chips">${m.variants.map(v=>chip(`${v.variant||v.pump} · ${v.parts}`,'#/pump/'+encodeURIComponent(v.pump))).join('')}</div><p class="small">Click a variant for just that build, or see all parts for the model below.</p>`);
+ if(m.common)h+=`<p class="small">${esc(model)} is named in “Common” fields only — parts below are the ones shared with it.</p>`;
+ if(m.variants.length&&(m.variants.length>1||m.variants[0].variant))h+=sec('Variants',`<div class="chips">${m.variants.map(v=>chip(`${v.variant||v.pump} · ${v.parts}`,'#/pump/'+encodeURIComponent(v.pump))).join('')}</div><p class="small">Click a variant for just that build, or see all parts for the model below.</p>`);
  h+=`<div style="margin-top:20px">${await viewPump(model)}</div>`;return h}
 async function viewOem(o){const d=await api('/oem/'+encodeURIComponent(o));
  let h=`<div><h2>${esc(d.oem.toUpperCase())}</h2><p class="sub">${d.rows.toLocaleString()} rows · ${d.parts.toLocaleString()} distinct part numbers</p></div>`;
- h+=sec(`Pump types · ${d.pumps.length}`,d.pumps.length?`<div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div>`:NS);
+ const cm=d.models.filter(m=>m.common),dm=d.models.filter(m=>!m.common);
+ const mchip=m=>chip(`${m.model} · ${m.parts}`,'#/pump/'+encodeURIComponent(m.model));
+ const vars=dm.filter(m=>m.variants.length&&(m.variants.length>1||m.variants[0].variant));
+ h+=sec(`Pump types · ${d.models.length}`,d.models.length?`<div class="chips">${dm.map(mchip).join('')}</div>${vars.length?`<p class="small" style="margin-top:10px">Variants: ${vars.map(m=>`${esc(m.model)} → ${m.variants.map(v=>chip(v.variant||v.pump,'#/pump/'+encodeURIComponent(v.pump))).join(' ')}`).join(' &nbsp;·&nbsp; ')}</p>`:''}${cm.length?`<p class="small" style="margin-top:10px">Named in “Common” fields (parts shared with them):</p><div class="chips">${cm.map(mchip).join('')}</div>`:''}`:NS);
  h+=sec(`Assemblies · ${d.assemblies.length}`,d.assemblies.length?esc(d.assemblies.slice(0,80).join(' · ')):NS);
  h+=sec('Imports',`<table><tr><th>Date</th><th>File</th><th>Sheet</th><th>Rows</th></tr>${d.imports.map(i=>`<tr><td class="dim">${esc(i.imported_at)}</td><td>${esc(i.file)}</td><td>${esc(i.sheet)}</td><td class="g">${i.rows}</td></tr>`).join('')}</table>`);
  return h}
@@ -815,9 +920,10 @@ async function resolve(id){await api('/issues/'+id+'/resolve',{method:'POST'});a
 function toast(m,err){const t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3500)}
 async function render(){const h=location.hash||'#/';const app=$('#app');['search','browse','data','review'].forEach(n=>$('#n-'+n).classList.toggle('on',h.startsWith('#/'+n)||(n==='search'&&!/^#\/(browse|data|review)/.test(h))));
  const parts=h.slice(2).split('/');const kind=parts[0]||'';const arg=decodeURIComponent(parts.slice(1).join('/'));
- if(kind==='data'){app.innerHTML=await viewData();return}if(kind==='browse'){app.innerHTML=await viewBrowse(parts[1]?decodeURIComponent(parts[1]):'',parts[2]?decodeURIComponent(parts[2]):'');window.scrollTo(0,0);return}if(kind==='review'){app.innerHTML=await viewReview();return}
+ if(kind==='data'){app.innerHTML=await viewData();drawHist();return}if(kind==='browse'){const bo=parts[1]?decodeURIComponent(parts[1]):'',bm=parts[2]?decodeURIComponent(parts[2]):'';app.innerHTML=await viewBrowse(bo,bm);window.scrollTo(0,0);if(bm)addHist(h,'BROWSE',bo+' › '+bm);else drawHist();return}if(kind==='review'){app.innerHTML=await viewReview();drawHist();return}
  let body='';if(kind==='part')body=await viewPart(arg);else if(kind==='pump')body=await viewPump(arg);else if(kind==='oem')body=await viewOem(arg);
- app.innerHTML=searchBox()+(body?`<div style="margin-top:20px">${body}</div>`:'<div id="results" style="margin-top:20px"></div>');bindSearch();if(!body)doSearch();window.scrollTo(0,0)}
+ app.innerHTML=searchBox()+(body?`<div style="margin-top:20px">${body}</div>`:'<div id="results" style="margin-top:20px"></div>');bindSearch();if(!body)doSearch();window.scrollTo(0,0);
+ if(body){const t=$('#app h2')?.textContent;const sub=kind==='part'?$('#app .sub')?.textContent.split(' — ')[1]||'':'';addHist(h,{part:'PART',pump:'PUMP',oem:'COMPANY'}[kind]||kind,t?t+(sub?' — '+sub.slice(0,40):''):'')}else drawHist()}
 window.onhashchange=render;loadStats().then(render);
 </script></body></html>"""
 
