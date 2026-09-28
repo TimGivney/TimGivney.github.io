@@ -63,6 +63,20 @@ A part page shows: used-on pumps, assembly, common-with pumps (parsed from `BA10
 PartsBender (PB) and G-numbers when the sheet has them, every price ever imported (never overwritten), related parts in the same assembly, and the
 source rows. Missing data is shown as _Not specified in imported source_ – nothing is invented.
 
+## Editing, notes, history
+
+- **Edit anything**: on a part page, click any cell in *Source rows* (company, part number, description,
+  qty, assembly, pump, common-with, location, PB/G number), type, press Enter or click away to save.
+  Esc cancels. Keys, pump variants and common-with links are recalculated automatically.
+- **Add / remove rows**: "+ Add another row for this part" (or "+ Add a part" on a pump/company page);
+  the × at the end of a row deletes it. Prices can be added or removed under *Pricing found* too.
+- **Rename a pump** everywhere it appears (pump, variants, common-with) from the pump page.
+- **Notes** on any part, pump or company – stored with the data, shown on the page and listed on DATA.
+- Every change is logged under **DATA → Edit history** with an **Undo** button. Your original
+  spreadsheets and the `raw/` copies are never modified – edits live only in `partsfinder.db`.
+- **Export list to CSV** (opens in Excel) and **Print** buttons on part, pump and search pages.
+- Keyboard: `/` jumps to the search box, `Esc` clears it.
+
 ## Importing more spreadsheets
 
 Any `.xlsx` / `.xlsm` / `.csv`. The program finds the header row, maps columns by name
