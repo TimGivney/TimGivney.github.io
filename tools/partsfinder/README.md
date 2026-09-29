@@ -118,7 +118,11 @@ REVIEW, never silently corrected**:
   (`whitespace_part_number`). Punctuation-only variants (`35-0399-8402/110` vs `35-0399-8402110`)
   are the same part.
 - Rows with no OEM part number but a PB/G number are kept under that number and flagged; rows with
-  no identifier at all are skipped and flagged.
+  no identifier at all are skipped and flagged (`blank_part_number`).
+- `Cornell, Pioneer` in the OEM column means the part is shared: one record per company.
+- An OEM Part Number cell listing several numbers (`30500107; 31900404; …`, a kit) is stored under the
+  row's PB/G number with the list kept as a note (`multi_part_number`). One PB number used for different
+  items is flagged (`pb_conflict`).
 - Text in a price column (`on demand`, `2016 List`) is not imported as a price – flagged
   (`non_numeric_price`). Sell price below cost is flagged. `Discount` and any other unknown column is
   kept in the row's raw data and listed as an `unmapped_column` issue.

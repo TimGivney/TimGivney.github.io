@@ -139,6 +139,13 @@ STANDARD_HEADER = ["OEM", "Location #", "Part Number", "Description", "Qty", "As
                    "Cost Estimate USD", "List Price USD", "List Price AUD", "Discount"]
 
 
+def split_oems(v: str | None) -> list[str]:
+    """'Cornell, Pioneer' / 'Godwin / Sykes' -> ['Cornell', 'Pioneer'] (a part shared by several companies)."""
+    if not v:
+        return []
+    return [p.strip() for p in re.split(r"\s*[,/;]\s*", v) if p.strip()]
+
+
 def guess_oem(sheet_name: str, file_name: str, sample_oem_values: list[str]) -> str | None:
     vals = [v for v in sample_oem_values if v]
     if vals:
@@ -261,7 +268,7 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     header = rows[hdr]
     cols, prices = map_columns(header)
     body = rows[hdr + 1:]
-    oem_vals = [clean(r[cols["oem"]]) for r in body if "oem" in cols and len(r) > cols["oem"]]
+    oem_vals = [o for r in body if "oem" in cols and len(r) > cols["oem"] for o in split_oems(clean(r[cols["oem"]]))]
     # only trust per-row OEM values that occur repeatedly; stray part numbers in the OEM column fall back to the sheet OEM
     trusted_oems = {v for v in set(oem_vals) if v and oem_vals.count(v) >= 3}
     oem = guess_oem(sheet, file_name, [v for v in oem_vals if v in trusted_oems])
@@ -283,6 +290,15 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
                     flags.append(("blank_part_number", f"row {i}", f"{sheet}: row has data but no OEM / PB / G number — skipped"))
                 continue
             flags.append(("no_oem_part_number", part, f"{sheet} row {i}: no OEM part number, listed under its PB/G number"))
+        comments = g("comments")
+        if isinstance(rawpart, str) and ";" in rawpart:
+            # a kit row listing its component OEM numbers: the PB/G number identifies the row, the list is kept as a note
+            ident = g("gnum") or g("pb")
+            flags.append(("multi_part_number", ident or part, f"{sheet} row {i}: OEM Part Number lists several numbers ({rawpart.strip()!r})"
+                          + (f" — listed under {ident}, list kept as a note" if ident else " — kept as one identifier; no PB/G number to use instead")))
+            if ident:
+                comments = ("OEM part numbers: " + rawpart.strip()) + (f"\n{comments}" if comments else "")
+                part = ident
         if isinstance(rawpart, str) and rawpart != rawpart.strip():
             flags.append(("whitespace_part_number", part, f"{sheet} row {i}: leading/trailing spaces in {rawpart!r} (trimmed)"))
         pl = []
@@ -305,26 +321,31 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
             if f not in flags:
                 flags.append(f)
             assembly = None
-        if g("oem") and g("oem") not in trusted_oems:
-            flags.append(("unrecognised_oem", part, f"{sheet} row {i}: OEM column says {g('oem')!r} (seen fewer than 3 times) — "
-                          f"imported under the sheet's OEM {oem!r}"))
-        rec = {
-            "oem": g("oem") if g("oem") in trusted_oems else None,
-            "part": part, "key": part_key(part),
-            "desc": desc, "qty": qty, "assembly": assembly,
-            "pump": g("pump"), "common": g("common"), "location": g("location"),
-            "pb": g("pb"), "gnum": g("gnum"), "comments": g("comments"),
-            "prices": pl, "row": i,
-            "raw": {str(header[j]).strip(): (row[j].isoformat() if hasattr(row[j], "isoformat") else row[j])
-                    for j in range(len(header)) if header[j] is not None and row[j] is not None},
-        }
-        rec["commonPumps"] = split_common(rec["common"])
-        sig = record_sig(rec)
-        if sig in seen_rows:
-            flags.append(("duplicate_row", part, f"{sheet} row {i} repeats row {seen_rows[sig]} exactly — imported once"))
-            continue
-        seen_rows[sig] = i
-        recs.append(rec)
+        row_oems = split_oems(g("oem")) or [None]
+        for o in row_oems:
+            if o and o not in trusted_oems:
+                flags.append(("unrecognised_oem", part, f"{sheet} row {i}: OEM column says {o!r} (seen fewer than 3 times) — "
+                              f"imported under the sheet's OEM {oem!r}"))
+        raw = {str(header[j]).strip(): (row[j].isoformat() if hasattr(row[j], "isoformat") else row[j])
+               for j in range(len(header)) if header[j] is not None and row[j] is not None}
+        # 'Cornell, Pioneer' in the OEM column = the same part is used by both companies: one record per company
+        for o in row_oems:
+            rec = {
+                "oem": o if o in trusted_oems else None,
+                "part": part, "key": part_key(part),
+                "desc": desc, "qty": qty, "assembly": assembly,
+                "pump": g("pump"), "common": g("common"), "location": g("location"),
+                "pb": g("pb"), "gnum": g("gnum"), "comments": comments,
+                "prices": pl, "row": i, "raw": raw,
+            }
+            rec["commonPumps"] = split_common(rec["common"])
+            sig = record_sig(rec)
+            if sig in seen_rows:
+                if seen_rows[sig] != i:
+                    flags.append(("duplicate_row", part, f"{sheet} row {i} repeats row {seen_rows[sig]} exactly — imported once"))
+                continue
+            seen_rows[sig] = i
+            recs.append(rec)
     # same part number with different descriptions inside this sheet
     descs: dict[str, set] = {}
     for r in recs:
@@ -333,6 +354,14 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     for r in recs:
         if len(descs.get(r["key"], ())) > 1 and not any(f[0] == "conflicting_description" and f[1] == r["part"] for f in flags):
             flags.append(("conflicting_description", r["part"], f"{sheet}: " + " | ".join(sorted(descs[r["key"]]))))
+    # one PB number pointing at different items
+    pbdesc: dict[str, set] = {}
+    for r in recs:
+        if r["pb"] and r["desc"]:
+            pbdesc.setdefault(r["pb"], set()).add(r["desc"])
+    for pb, ds in pbdesc.items():
+        if len(ds) > 1:
+            flags.append(("pb_conflict", pb, f"{sheet}: PB number {pb} is used for different items: " + " | ".join(sorted(ds))))
     for r in recs:
         by = {p["label"].lower(): p["value"] for p in r["prices"]}
         cost = next((v for k, v in by.items() if "cost" in k), None)
@@ -1380,7 +1409,7 @@ async function doImport(pid,sheets){const choices={};sheets.forEach((s,i)=>{cons
  const d=await api('/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preview_id:pid,choices})});
  if(d.error){toast(d.error,true);return}toast('Imported '+d.done.map(x=>`${x.sheet} (${x.rows})`).join(', '));browse=null;await loadStats();render()}
 const FLAG_LABEL={duplicate_part:'possible duplicate part numbers',unknown_pump:'new / unknown pump models',similar_pumps:'pump names that may be the same model',price_change:'price changes detected',missing_description:'descriptions need review',
- duplicate_row:'identical rows in the sheet (imported once)',conflicting_description:'same part number, different descriptions',no_oem_part_number:'no OEM part number (listed under PB / G number)',blank_part_number:'row with no identifier at all (skipped)',whitespace_part_number:'part number had stray spaces',non_numeric_price:'text in a price cell (not imported as a price)',non_numeric_qty:'quantity is not a number',sell_below_cost:'sell price below cost',placeholder_assembly:'assembly was a worksheet name (treated as blank)',similar_assemblies:'assembly names that may be the same',unrecognised_oem:'OEM column value not recognised',unmapped_column:'spreadsheet column not understood'};
+ duplicate_row:'identical rows in the sheet (imported once)',conflicting_description:'same part number, different descriptions',no_oem_part_number:'no OEM part number (listed under PB / G number)',blank_part_number:'row with no identifier at all (skipped)',whitespace_part_number:'part number had stray spaces',non_numeric_price:'text in a price cell (not imported as a price)',non_numeric_qty:'quantity is not a number',sell_below_cost:'sell price below cost',placeholder_assembly:'assembly was a worksheet name (treated as blank)',similar_assemblies:'assembly names that may be the same',unrecognised_oem:'OEM column value not recognised',multi_part_number:'OEM part number cell lists several numbers',pb_conflict:'one PB number used for different items',unmapped_column:'spreadsheet column not understood'};
 async function viewReview(){const d=await api('/issues');const kinds={};d.forEach(i=>{kinds[i.kind]=(kinds[i.kind]||0)+1});
  const label=FLAG_LABEL;
  let h=`<h2 style="font-size:20px">REVIEW · ${d.length} open</h2><p class="dim">Nothing here is merged automatically. Resolve items when you have time; the source rows are never altered.</p>`;
