@@ -47,16 +47,15 @@ RES = Path(getattr(sys, "_MEIPASS", BASE))
 LOGO = RES / "logo.png"
 SEED = RES / "seed" if getattr(sys, "frozen", False) else BASE.parent.parent / "data" / "parts" / "raw"
 SKIP_SHEETS = {"plan", "priority", "category", "combined data", "combined data phase 1", "oem price comparison"}
-# datasets that still need reformatting in the workbook; kept in raw/ but not pre-loaded
-SEED_HOLD = {"cornell master", "50cfm cornell", "atlas copco"}
+PLACEHOLDER_ASSEMBLY = re.compile(r"(sheet\s*\d+|data|oem mapping)", re.I)
 
 
 def seed_sheet_wanted(file_name: str, sheets: list[str], sheet: str) -> bool:
     """Only master data is pre-loaded: '* Master' sheets where a workbook has them, plus sheets that have
-    no master counterpart (50CFM_Pioneer); the unclean per-OEM sheets, planning tabs and the sheets in
-    SEED_HOLD (Cornell / Atlas Copco, awaiting reformatting) are skipped."""
+    no master counterpart (50CFM_Pioneer, 50CFM_Cornell, Atlas Copco); the unclean per-OEM sheets and
+    planning tabs are skipped."""
     s = sheet.lower()
-    if s in SKIP_SHEETS or s in SEED_HOLD:
+    if s in SKIP_SHEETS:
         return False
     has_masters = any(x.lower().endswith("master") for x in sheets)
     if not has_masters:
@@ -284,9 +283,6 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
                     flags.append(("blank_part_number", f"row {i}", f"{sheet}: row has data but no OEM / PB / G number — skipped"))
                 continue
             flags.append(("no_oem_part_number", part, f"{sheet} row {i}: no OEM part number, listed under its PB/G number"))
-        if isinstance(rawpart, float) and not rawpart.is_integer():
-            flags.append(("numeric_part_number", part, f"{sheet} row {i}: stored as a number in Excel ({rawpart!r}); "
-                          "check it hasn't lost digits/leading zeros"))
         if isinstance(rawpart, str) and rawpart != rawpart.strip():
             flags.append(("whitespace_part_number", part, f"{sheet} row {i}: leading/trailing spaces in {rawpart!r} (trimmed)"))
         pl = []
@@ -304,10 +300,11 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
             flags.append(("non_numeric_qty", part, f"{sheet} row {i}: Qty = {qty!r}"))
         desc = g("desc") or g("pbdesc")
         assembly = g("assembly")
-        if assembly and re.fullmatch(r"(sheet\s*\d+|data|oem mapping)", assembly, re.I):
-            f = ("placeholder_assembly", assembly, f"{sheet}: Assembly '{assembly}' looks like a worksheet name, not an assembly")
+        if assembly and PLACEHOLDER_ASSEMBLY.fullmatch(assembly):
+            f = ("placeholder_assembly", assembly, f"{sheet}: Assembly '{assembly}' is a worksheet name, not an assembly — treated as blank")
             if f not in flags:
                 flags.append(f)
+            assembly = None
         if g("oem") and g("oem") not in trusted_oems:
             flags.append(("unrecognised_oem", part, f"{sheet} row {i}: OEM column says {g('oem')!r} (seen fewer than 3 times) — "
                           f"imported under the sheet's OEM {oem!r}"))
@@ -1383,7 +1380,7 @@ async function doImport(pid,sheets){const choices={};sheets.forEach((s,i)=>{cons
  const d=await api('/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preview_id:pid,choices})});
  if(d.error){toast(d.error,true);return}toast('Imported '+d.done.map(x=>`${x.sheet} (${x.rows})`).join(', '));browse=null;await loadStats();render()}
 const FLAG_LABEL={duplicate_part:'possible duplicate part numbers',unknown_pump:'new / unknown pump models',similar_pumps:'pump names that may be the same model',price_change:'price changes detected',missing_description:'descriptions need review',
- duplicate_row:'identical rows in the sheet (imported once)',conflicting_description:'same part number, different descriptions',no_oem_part_number:'no OEM part number (listed under PB / G number)',blank_part_number:'row with no identifier at all (skipped)',numeric_part_number:'part number stored as a number in Excel',whitespace_part_number:'part number had stray spaces',non_numeric_price:'text in a price cell (not imported as a price)',non_numeric_qty:'quantity is not a number',sell_below_cost:'sell price below cost',placeholder_assembly:'assembly looks like a worksheet name',similar_assemblies:'assembly names that may be the same',unrecognised_oem:'OEM column value not recognised',unmapped_column:'spreadsheet column not understood'};
+ duplicate_row:'identical rows in the sheet (imported once)',conflicting_description:'same part number, different descriptions',no_oem_part_number:'no OEM part number (listed under PB / G number)',blank_part_number:'row with no identifier at all (skipped)',whitespace_part_number:'part number had stray spaces',non_numeric_price:'text in a price cell (not imported as a price)',non_numeric_qty:'quantity is not a number',sell_below_cost:'sell price below cost',placeholder_assembly:'assembly was a worksheet name (treated as blank)',similar_assemblies:'assembly names that may be the same',unrecognised_oem:'OEM column value not recognised',unmapped_column:'spreadsheet column not understood'};
 async function viewReview(){const d=await api('/issues');const kinds={};d.forEach(i=>{kinds[i.kind]=(kinds[i.kind]||0)+1});
  const label=FLAG_LABEL;
  let h=`<h2 style="font-size:20px">REVIEW · ${d.length} open</h2><p class="dim">Nothing here is merged automatically. Resolve items when you have time; the source rows are never altered.</p>`;
@@ -1569,17 +1566,30 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def seed_if_empty(con: sqlite3.Connection) -> None:
-    """First run: load the workbooks bundled with the program so it starts with data."""
-    if con.execute("SELECT 1 FROM imports LIMIT 1").fetchone() or not SEED.is_dir():
+    """Load the bundled workbooks: everything on first run, and on later runs any bundled sheet that has
+    never been imported (so newly un-held sheets such as Cornell / Atlas Copco appear without a flush)."""
+    if not SEED.is_dir():
         return
+    done = {(r[0].lower(), (r[1] or "").lower()) for r in con.execute("SELECT file, sheet FROM imports")}
     for f in sorted(SEED.iterdir()):
         if f.suffix.lower() not in (".xlsx", ".xlsm", ".csv") or f.name.lower().startswith("cleaned"):
             continue
-        print(f"  loading bundled {f.name} ...")
+        if f.suffix.lower() == ".csv":
+            names = [f.stem]
+        else:
+            wb = openpyxl.load_workbook(f, read_only=True)
+            try:
+                names = list(wb.sheetnames)
+            finally:
+                wb.close()
+        wanted = [n for n in names if seed_sheet_wanted(f.name, names, n) and (f.name.lower(), n.lower()) not in done]
+        if not wanted:
+            continue
         pv = preview_file(f, con)
-        names = [s["sheet"] for s in pv["sheets"]]
-        choices = {n: {"import": seed_sheet_wanted(f.name, names, n)} for n in names}
-        commit_import(pv["preview_id"], choices, con)
+        choices = {s["sheet"]: {"import": s["sheet"] in wanted} for s in pv["sheets"]}
+        if any(c["import"] for c in choices.values()):
+            print(f"  loading bundled {f.name}: {', '.join(n for n, c in choices.items() if c['import'])} ...")
+            commit_import(pv["preview_id"], choices, con)
 
 
 def main():
