@@ -47,16 +47,15 @@ RES = Path(getattr(sys, "_MEIPASS", BASE))
 LOGO = RES / "logo.png"
 SEED = RES / "seed" if getattr(sys, "frozen", False) else BASE.parent.parent / "data" / "parts" / "raw"
 SKIP_SHEETS = {"plan", "priority", "category", "combined data", "combined data phase 1", "oem price comparison"}
-# datasets that still need reformatting in the workbook; kept in raw/ but not pre-loaded
-SEED_HOLD = {"cornell master", "50cfm cornell", "atlas copco"}
+PLACEHOLDER_ASSEMBLY = re.compile(r"(sheet\s*\d+|data|oem mapping)", re.I)
 
 
 def seed_sheet_wanted(file_name: str, sheets: list[str], sheet: str) -> bool:
     """Only master data is pre-loaded: '* Master' sheets where a workbook has them, plus sheets that have
-    no master counterpart (50CFM_Pioneer); the unclean per-OEM sheets, planning tabs and the sheets in
-    SEED_HOLD (Cornell / Atlas Copco, awaiting reformatting) are skipped."""
+    no master counterpart (50CFM_Pioneer, 50CFM_Cornell, Atlas Copco); the unclean per-OEM sheets and
+    planning tabs are skipped."""
     s = sheet.lower()
-    if s in SKIP_SHEETS or s in SEED_HOLD:
+    if s in SKIP_SHEETS:
         return False
     has_masters = any(x.lower().endswith("master") for x in sheets)
     if not has_masters:
@@ -69,8 +68,10 @@ def seed_sheet_wanted(file_name: str, sheets: list[str], sheet: str) -> bool:
 
 # field -> list of regexes matched against a lower-cased, whitespace-collapsed header
 FIELD_PATTERNS = {
-    "part": [r"^part\s*(number|no\.?|#)?$", r"^part\s*number", r"^partno", r"^part no"],
-    "desc": [r"^description english$", r"^description$", r"^name$", r"^oem description$", r"description"],
+    "part": [r"^oem part\s*(number|no\.?|#)$", r"^part\s*(number|no\.?|#)?$", r"^part\s*number", r"^partno", r"^part no"],
+    "desc": [r"^oem description$", r"^description english$", r"^description$", r"^name$", r"^(?!pb )(.*\b)?description"],
+    "pbdesc": [r"^pb description$", r"^partsbender description$"],
+    "comments": [r"^comments?$", r"^notes?$", r"^remarks?$"],
     "qty": [r"^qty$", r"^quantity$"],
     "assembly": [r"^assembly( number)?$", r"^assembly"],
     "pump": [r"^pump type$", r"^pump( model)?$", r"^model$"],
@@ -105,12 +106,13 @@ def detect_header_row(rows: list[list]) -> int | None:
 def map_columns(header: list) -> tuple[dict[str, int], list[dict]]:
     """Map header cells to normalised fields; every cost/price-like column becomes a price field."""
     cols: dict[str, int] = {}
+    ranks: dict[str, int] = {}
     prices: list[dict] = []
     for idx, raw in enumerate(header):
         h = norm_header(raw)
         if not h:
             continue
-        if PRICE_WORDS.search(h) and not NON_PRICE_WORDS.search(h):
+        if PRICE_WORDS.search(h) and not NON_PRICE_WORDS.search(h) and not h.endswith("description"):
             cur = CURRENCY_RE.search(h)
             c = {"$": "USD", "€": "EUR", "£": "GBP", "eu": "EUR"}.get(cur.group(0), cur.group(0).upper()) if cur else None
             d = DATE_RE.search(h)
@@ -123,19 +125,25 @@ def map_columns(header: list) -> tuple[dict[str, int], list[dict]]:
             prices.append({"col": idx, "label": str(raw).replace("\n", " ").strip(), "currency": c, "date": date})
             continue
         for field, pats in FIELD_PATTERNS.items():
-            if field in cols:
+            rank = next((n for n, p in enumerate(pats) if re.search(p, h)), None)
+            if rank is None:
                 continue
-            if any(re.search(p, h) for p in pats):
-                cols[field] = idx
-                break
-    for idx, raw in enumerate(header):
-        if norm_header(raw) == "description english":
-            cols["desc"] = idx
+            # patterns are ordered best-first: 'OEM Part Number' beats 'Part Number', 'OEM Description' beats 'PB Description'
+            if field not in cols or rank < ranks[field]:
+                cols[field], ranks[field] = idx, rank
+            break
     return cols, prices
 
 
 STANDARD_HEADER = ["OEM", "Location #", "Part Number", "Description", "Qty", "Assembly", "Pump Type", "Common",
                    "Cost Estimate USD", "List Price USD", "List Price AUD", "Discount"]
+
+
+def split_oems(v: str | None) -> list[str]:
+    """'Cornell, Pioneer' / 'Godwin / Sykes' -> ['Cornell', 'Pioneer'] (a part shared by several companies)."""
+    if not v:
+        return []
+    return [p.strip() for p in re.split(r"\s*[,/;]\s*", v) if p.strip()]
 
 
 def guess_oem(sheet_name: str, file_name: str, sample_oem_values: list[str]) -> str | None:
@@ -260,41 +268,130 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     header = rows[hdr]
     cols, prices = map_columns(header)
     body = rows[hdr + 1:]
-    oem_vals = [clean(r[cols["oem"]]) for r in body if "oem" in cols and len(r) > cols["oem"]]
+    oem_vals = [o for r in body if "oem" in cols and len(r) > cols["oem"] for o in split_oems(clean(r[cols["oem"]]))]
     # only trust per-row OEM values that occur repeatedly; stray part numbers in the OEM column fall back to the sheet OEM
     trusted_oems = {v for v in set(oem_vals) if v and oem_vals.count(v) >= 3}
     oem = guess_oem(sheet, file_name, [v for v in oem_vals if v in trusted_oems])
     recs = []
+    flags: list[tuple[str, str, str]] = []  # (kind, subject, detail) — questionable data, surfaced on REVIEW, never auto-fixed
+    seen_rows: dict[tuple, int] = {}
     for i, row in enumerate(body, start=hdr + first_data_row):
         row = list(row) + [None] * (len(header) + 2)
-        part = clean(row[cols["part"]])
-        if not part or norm_header(part) in ("part number", "part no.", "part no"):
+        g = lambda f: clean(row[cols[f]]) if f in cols else None  # noqa: E731
+        rawpart = row[cols["part"]]
+        part = clean(rawpart)
+        if part and norm_header(part) in ("part number", "part no.", "part no", "oem part number"):
             continue
+        if not part:
+            # PartsBender-only items carry a PB or G number but no OEM number: keep them, keyed by that number
+            part = g("gnum") or g("pb")
+            if not part:
+                if any(v not in (None, "") for v in row[:len(header)]):
+                    flags.append(("blank_part_number", f"row {i}", f"{sheet}: row has data but no OEM / PB / G number — skipped"))
+                continue
+            flags.append(("no_oem_part_number", part, f"{sheet} row {i}: no OEM part number, listed under its PB/G number"))
+        comments = g("comments")
+        if isinstance(rawpart, str) and ";" in rawpart:
+            # a kit row listing its component OEM numbers: the PB/G number identifies the row, the list is kept as a note
+            ident = g("gnum") or g("pb")
+            flags.append(("multi_part_number", ident or part, f"{sheet} row {i}: OEM Part Number lists several numbers ({rawpart.strip()!r})"
+                          + (f" — listed under {ident}, list kept as a note" if ident else " — kept as one identifier; no PB/G number to use instead")))
+            if ident:
+                comments = ("OEM part numbers: " + rawpart.strip()) + (f"\n{comments}" if comments else "")
+                part = ident
+        if isinstance(rawpart, str) and rawpart != rawpart.strip():
+            flags.append(("whitespace_part_number", part, f"{sheet} row {i}: leading/trailing spaces in {rawpart!r} (trimmed)"))
         pl = []
         for p in prices:
-            v = num(row[p["col"]])
+            cell = row[p["col"]]
+            v = num(cell)
+            if isinstance(cell, str) and re.search(r"[a-z]", re.sub(r"\b(usd|aud|eur|gbp|nzd|ex|inc|gst)\b", "", cell, flags=re.I)):
+                v = None  # '2016 List', 'on demand' — text in a price cell is not a price
             if v is not None:
                 pl.append({"label": p["label"], "value": v, "currency": p["currency"], "date": p["date"]})
-        g = lambda f: clean(row[cols[f]]) if f in cols else None  # noqa: E731
-        rec = {
-            "oem": g("oem") if g("oem") in trusted_oems else None,
-            "part": part, "key": part_key(part),
-            "desc": g("desc"), "qty": g("qty"), "assembly": g("assembly"),
-            "pump": g("pump"), "common": g("common"), "location": g("location"),
-            "pb": g("pb"), "gnum": g("gnum"),
-            "prices": pl, "row": i,
-            "raw": {str(header[j]).strip(): (row[j].isoformat() if hasattr(row[j], "isoformat") else row[j])
-                    for j in range(len(header)) if header[j] is not None and row[j] is not None},
-        }
-        rec["commonPumps"] = split_common(rec["common"])
-        recs.append(rec)
+            elif cell not in (None, "") and not (isinstance(cell, (int, float)) and cell == 0):
+                flags.append(("non_numeric_price", part, f"{sheet} row {i}: {p['label']} = {cell!r} (not a number, not imported)"))
+        qty = g("qty")
+        if qty and num(qty) is None:
+            flags.append(("non_numeric_qty", part, f"{sheet} row {i}: Qty = {qty!r}"))
+        desc = g("desc") or g("pbdesc")
+        assembly = g("assembly")
+        if assembly and PLACEHOLDER_ASSEMBLY.fullmatch(assembly):
+            f = ("placeholder_assembly", assembly, f"{sheet}: Assembly '{assembly}' is a worksheet name, not an assembly — treated as blank")
+            if f not in flags:
+                flags.append(f)
+            assembly = None
+        row_oems = split_oems(g("oem")) or [None]
+        for o in row_oems:
+            if o and o not in trusted_oems:
+                flags.append(("unrecognised_oem", part, f"{sheet} row {i}: OEM column says {o!r} (seen fewer than 3 times) — "
+                              f"imported under the sheet's OEM {oem!r}"))
+        raw = {str(header[j]).strip(): (row[j].isoformat() if hasattr(row[j], "isoformat") else row[j])
+               for j in range(len(header)) if header[j] is not None and row[j] is not None}
+        # 'Cornell, Pioneer' in the OEM column = the same part is used by both companies: one record per company
+        for o in row_oems:
+            rec = {
+                "oem": o if o in trusted_oems else None,
+                "part": part, "key": part_key(part),
+                "desc": desc, "qty": qty, "assembly": assembly,
+                "pump": g("pump"), "common": g("common"), "location": g("location"),
+                "pb": g("pb"), "gnum": g("gnum"), "comments": comments,
+                "prices": pl, "row": i, "raw": raw,
+            }
+            rec["commonPumps"] = split_common(rec["common"])
+            sig = record_sig(rec)
+            if sig in seen_rows:
+                if seen_rows[sig] != i:
+                    flags.append(("duplicate_row", part, f"{sheet} row {i} repeats row {seen_rows[sig]} exactly — imported once"))
+                continue
+            seen_rows[sig] = i
+            recs.append(rec)
+    # same part number with different descriptions inside this sheet
+    descs: dict[str, set] = {}
+    for r in recs:
+        if r["desc"]:
+            descs.setdefault(r["key"], set()).add(r["desc"])
+    for r in recs:
+        if len(descs.get(r["key"], ())) > 1 and not any(f[0] == "conflicting_description" and f[1] == r["part"] for f in flags):
+            flags.append(("conflicting_description", r["part"], f"{sheet}: " + " | ".join(sorted(descs[r["key"]]))))
+    # one PB number pointing at different items
+    pbdesc: dict[str, set] = {}
+    for r in recs:
+        if r["pb"] and r["desc"]:
+            pbdesc.setdefault(r["pb"], set()).add(r["desc"])
+    for pb, ds in pbdesc.items():
+        if len(ds) > 1:
+            flags.append(("pb_conflict", pb, f"{sheet}: PB number {pb} is used for different items: " + " | ".join(sorted(ds))))
+    for r in recs:
+        by = {p["label"].lower(): p["value"] for p in r["prices"]}
+        cost = next((v for k, v in by.items() if "cost" in k), None)
+        sell = next((v for k, v in by.items() if "sell" in k), None)
+        if cost and sell and sell < cost:
+            flags.append(("sell_below_cost", r["part"], f"{sheet} row {r['row']}: sell {sell} < cost {cost}"))
+    dup_asm: dict[str, set] = {}
+    for r in recs:
+        if r["assembly"]:
+            dup_asm.setdefault(re.sub(r"[\s\-_]+", "", r["assembly"].lower()), set()).add(r["assembly"])
+    for v in dup_asm.values():
+        if len(v) > 1:
+            flags.append(("similar_assemblies", sorted(v)[0], f"{sheet}: probably the same assembly: " + " | ".join(sorted(v))))
     dataset = "parts" if "pump" in cols or "assembly" in cols else ("pricing" if prices and "desc" in cols else "parts")
     return {
         "sheet": sheet, "usable": len(recs) > 0, "header_row": hdr + 1, "rows": len(body),
-        "records": recs, "oem": oem, "dataset": dataset,
+        "records": recs, "oem": oem, "dataset": dataset, "flags": flags,
         "columns": {k: str(header[v]).replace("\n", " ").strip() for k, v in cols.items()},
         "price_columns": [p["label"] for p in prices],
+        "extra_columns": [str(header[j]).strip() for j in range(len(header)) if header[j] is not None
+                          and j not in cols.values() and j not in {p["col"] for p in prices}],
     }
+
+
+SIG_FIELDS = ("oem", "key", "desc", "qty", "assembly", "pump", "common", "location", "pb", "gnum")
+
+
+def record_sig(r: dict) -> tuple:
+    """What makes two source rows 'the same fact' (prices excluded — they are tracked as history)."""
+    return tuple((r.get(f) or "").strip().lower() if isinstance(r.get(f), str) else (r.get(f) or "") for f in SIG_FIELDS)
 
 
 # --------------------------------------------------------------------------- #
@@ -305,7 +402,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS imports (
   id INTEGER PRIMARY KEY, file TEXT, sheet TEXT, oem TEXT, dataset TEXT,
   imported_at TEXT, rows INTEGER, new_parts INTEGER, existing_parts INTEGER,
-  price_changes INTEGER, raw_path TEXT, columns TEXT);
+  price_changes INTEGER, raw_path TEXT, columns TEXT, skipped INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS records (
   id INTEGER PRIMARY KEY, import_id INTEGER, oem TEXT, part TEXT, key TEXT, desc TEXT,
   qty TEXT, assembly TEXT, pump TEXT, pump_key TEXT, common TEXT, location TEXT, src_row INTEGER, raw TEXT,
@@ -346,6 +443,10 @@ def db() -> sqlite3.Connection:
     if cols and "pb" not in cols:
         con.execute("ALTER TABLE records ADD COLUMN pb TEXT")
         con.execute("ALTER TABLE records ADD COLUMN gnum TEXT")
+        con.commit()
+    imp_cols = {r[1] for r in con.execute("PRAGMA table_info(imports)")}
+    if imp_cols and "skipped" not in imp_cols:
+        con.execute("ALTER TABLE imports ADD COLUMN skipped INTEGER DEFAULT 0")
         con.commit()
     cp_cols = {r[1] for r in con.execute("PRAGMA table_info(common_pumps)")}
     if cp_cols and "kind" not in cp_cols:
@@ -418,6 +519,14 @@ def preview_file(path: Path, con: sqlite3.Connection) -> dict:
             near.setdefault(re.sub(r"(mm|\s|-|_)", "", p.lower()), set()).add(p)
         near = [sorted(v) for v in near.values() if len(v) > 1]
         missing_desc = sum(1 for r in a["records"] if not r["desc"])
+        # rows already in the database with identical content are not imported twice (re-uploading a sheet is safe)
+        unchanged = 0
+        for r in a["records"]:
+            r["_dup"] = _already_stored(con, r)
+            unchanged += r["_dup"]
+        flag_counts: dict[str, int] = {}
+        for k, _s, _d in a["flags"]:
+            flag_counts[k] = flag_counts.get(k, 0) + 1
         sheets.append({
             "sheet": name, "usable": True, "oem": a["oem"], "dataset": a["dataset"],
             "header_row": a["header_row"], "columns": a["columns"], "price_columns": a["price_columns"],
@@ -425,12 +534,31 @@ def preview_file(path: Path, con: sqlite3.Connection) -> dict:
             "existing_parts": len(existing), "new_parts": len(keys - existing),
             "price_changes": changes, "duplicates": dupes, "unmatched_pumps": unmatched,
             "similar_pumps": near, "missing_desc": missing_desc,
+            "unchanged_rows": unchanged, "extra_columns": a["extra_columns"],
+            "flags": a["flags"], "flag_counts": flag_counts,
             "_records": a["records"],
         })
     pid = f"{int(time.time()*1000)}"
     PREVIEWS[pid] = {"path": str(path), "sheets": sheets}
     return {"preview_id": pid, "file": path.name,
             "sheets": [{k: v for k, v in s.items() if k != "_records"} for s in sheets]}
+
+
+def _already_stored(con: sqlite3.Connection, r: dict) -> bool:
+    rows = con.execute(
+        "SELECT oem,key,desc,qty,assembly,pump,common,location,pb,gnum FROM records WHERE key=? AND IFNULL(pump,'')=IFNULL(?,'') "
+        "AND IFNULL(assembly,'')=IFNULL(?,'')", (r["key"], r["pump"], r["assembly"])).fetchall()
+    if not rows:
+        return False
+    sig = record_sig(r)
+    for row in rows:
+        d = dict(row)
+        # a row whose OEM was inferred from the sheet still matches the stored explicit OEM
+        if r["oem"] is None:
+            d["oem"] = None
+        if record_sig(d) == sig:
+            return True
+    return False
 
 
 def commit_import(pid: str, choices: dict, con: sqlite3.Connection) -> tuple[list[dict], Path]:
@@ -466,14 +594,28 @@ def _commit_sheets(pv: dict, choices: dict, con: sqlite3.Connection, path: Path,
         oem = ch.get("oem") or s["oem"]
         override = bool(ch.get("oem")) and ch["oem"] != s["oem"]
         dataset = ch.get("dataset") or s["dataset"]
+        skip_dups = ch.get("skip_unchanged", True)
         cur = con.execute(
-            "INSERT INTO imports(file,sheet,oem,dataset,imported_at,rows,new_parts,existing_parts,price_changes,raw_path,columns) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO imports(file,sheet,oem,dataset,imported_at,rows,new_parts,existing_parts,price_changes,raw_path,columns,skipped) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (path.name, s["sheet"], oem, dataset, ts, s["rows"], s["new_parts"], s["existing_parts"],
-             len(s["price_changes"]), str(raw_dest.relative_to(DATA)), json.dumps(s["columns"])))
+             len(s["price_changes"]), str(raw_dest.relative_to(DATA)), json.dumps(s["columns"]),
+             s.get("unchanged_rows", 0) if skip_dups else 0))
         iid = cur.lastrowid
         for r in s["_records"]:
             ro = oem if override else (r["oem"] or oem)
+            if skip_dups and r.get("_dup"):
+                # identical row already stored: only record prices that changed
+                for p in r["prices"]:
+                    same = con.execute(
+                        "SELECT 1 FROM prices WHERE key=? AND label=? AND IFNULL(currency,'')=IFNULL(?,'') AND abs(value-?)<0.005 LIMIT 1",
+                        (r["key"], p["label"], p["currency"], p["value"])).fetchone()
+                    if same is None:
+                        rid0 = con.execute("SELECT id FROM records WHERE key=? ORDER BY id DESC LIMIT 1", (r["key"],)).fetchone()[0]
+                        con.execute(
+                            "INSERT INTO prices(record_id,import_id,key,oem,label,value,currency,date,imported_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                            (rid0, iid, r["key"], ro, p["label"], p["value"], p["currency"], p["date"], ts))
+                continue
             # a pump cell like 'PP66S12_PP66S14_PP88S12' is a list of pumps, not a model of its own
             multi = multi_pumps(r["pump"])
             model, variant = (None, None) if multi else split_pump(r["pump"])
@@ -492,8 +634,13 @@ def _commit_sheets(pv: dict, choices: dict, con: sqlite3.Connection, path: Path,
             con.executemany(
                 "INSERT INTO prices(record_id,import_id,key,oem,label,value,currency,date,imported_at) VALUES(?,?,?,?,?,?,?,?,?)",
                 [(rid, iid, r["key"], ro, p["label"], p["value"], p["currency"], p["date"], ts) for p in r["prices"]])
+            if r.get("comments"):
+                con.execute("INSERT INTO notes(kind,subject,title,text,created_at,updated_at) VALUES('part',?,?,?,?,?)",
+                            (r["key"], f"Comment from {path.name} / {s['sheet']}", r["comments"], ts, ts))
         # issues
-        iss = []
+        iss = list(s.get("flags", []))
+        for col in s.get("extra_columns", []):
+            iss.append(("unmapped_column", col, f"{s['sheet']}: column '{col}' not understood — kept in the raw source row only"))
         for d in s["duplicates"]:
             iss.append(("duplicate_part", d["variants"][0], "Variants: " + " | ".join(d["variants"])))
         for p in s["unmatched_pumps"]:
@@ -588,8 +735,8 @@ def q_part(con, key: str) -> dict:
             asm_clause = f" AND assembly IN ({','.join('?' * len(assemblies))})"
             params += assemblies
         related = rec_dicts(con.execute(
-            f"SELECT key, MIN(part) part, MAX(desc) desc FROM records WHERE pump_key IN ({ph}) AND key<>?{asm_clause} "
-            "GROUP BY key ORDER BY part LIMIT 40", params))
+            f"SELECT key, MIN(part) part, MAX(desc) desc, MIN(pump) pump, MIN(assembly) assembly FROM records "
+            f"WHERE pump_key IN ({ph}) AND key<>?{asm_clause} GROUP BY key, pump, assembly ORDER BY pump, assembly, part LIMIT 60", params))
     # alternates: same description + same OEM, different key (only where description exact)
     alts = []
     d0 = rows[0]["desc"]
@@ -972,6 +1119,56 @@ def q_common(con, a: str, b: str) -> dict:
 # HTTP
 # --------------------------------------------------------------------------- #
 
+SCREENS_HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PartsFinder — Screens</title>
+<style>
+:root,[data-theme=light]{--bg:#e9ebf2;--panel:#f6f7fb;--line:#cfd5e3;--txt:#111827;--dim:#6b7280;--acc:#0a3ad6}
+[data-theme=dark]{--bg:#06070a;--panel:#10131a;--line:#2a2f3a;--txt:#e5e7eb;--dim:#8b93a3;--acc:#5b8cff}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{background:var(--bg);color:var(--txt);font:13px system-ui,Segoe UI,sans-serif;overflow:hidden}
+#bar{height:40px;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line);font:12px ui-monospace,Consolas,monospace}
+#bar img{height:22px}[data-theme=dark] #bar img{filter:brightness(0) invert(1)}#bar .t{letter-spacing:.25em;color:var(--acc);font-weight:600}
+#bar button{background:none;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit}#bar button:hover{border-color:var(--acc);color:var(--acc)}#bar .sp{margin-left:auto;color:var(--dim)}
+#desk{position:absolute;top:40px;left:0;right:0;bottom:0;overflow:auto}
+.scr{position:absolute;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);min-width:320px;min-height:220px;resize:both;overflow:hidden}
+.scr.on{border-color:var(--acc);z-index:5}.scr.max{position:fixed!important;top:40px!important;left:0!important;width:100%!important;height:calc(100% - 40px)!important;border-radius:0;z-index:9;resize:none}
+.tb{height:30px;display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);cursor:move;user-select:none;font:11px ui-monospace,Consolas,monospace}
+.tb .n{color:var(--acc);font-weight:600;letter-spacing:.1em}.tb .ti{flex:1;color:var(--txt);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tb button{background:none;border:0;color:var(--dim);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px}.tb button:hover{background:var(--bg);color:var(--txt)}.tb button.x:hover{color:#f87171}
+.scr iframe{flex:1;border:0;width:100%;background:#fff}[data-theme=dark] .scr iframe{background:#0b0d12}
+.scr.drag iframe{pointer-events:none}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+</style></head><body>
+<div id="bar"><a href="/" title="Back to the single-screen view"><img src="/logo.png" alt="PartsBender"></a><span class="t">SCREENS</span>
+<button onclick="add('#/')">+ Add screen</button><button onclick="tile()" title="Arrange all screens side-by-side">Tile</button><button onclick="if(confirm('Close all screens?'))closeAll()">Close all</button>
+<span class="sp">Drag a title bar to move · drag the bottom-right corner to resize · each screen searches and navigates on its own</span><a href="/" style="color:var(--dim)">single screen →</a></div>
+<div id="desk"><div class="empty" id="empty">No screens open — click “+ Add screen”.</div></div>
+<script>
+const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));document.documentElement.dataset.theme=localStorage.pfTheme||'light';
+window.addEventListener('storage',e=>{if(e.key==='pfTheme'&&e.newValue)document.documentElement.dataset.theme=e.newValue});
+let scr=[];try{scr=JSON.parse(localStorage.pfScreens||'[]')}catch(e){scr=[]}
+let n=0;const save=()=>{scr.forEach(s=>{const el=document.getElementById(s.id);if(el&&!el.classList.contains('max')){s.x=el.offsetLeft;s.y=el.offsetTop;s.w=el.offsetWidth;s.h=el.offsetHeight}});localStorage.pfScreens=JSON.stringify(scr)};
+function add(hash,from){const i=scr.length;const s={id:'s'+Date.now()+Math.floor(Math.random()*1e4),hash:hash||'#/',x:from?from.x+30:20+(i%4)*40,y:from?from.y+30:20+(i%4)*30,w:from?from.w:Math.min(640,innerWidth-60),h:from?from.h:Math.min(560,innerHeight-100),title:''};scr.push(s);draw(s);focus(s.id);save()}
+function draw(s){const d=document.createElement('div');d.className='scr';d.id=s.id;d.style.cssText=`left:${s.x}px;top:${s.y}px;width:${s.w}px;height:${s.h}px`;n++;
+ d.innerHTML=`<div class="tb"><span class="n">${scr.indexOf(s)+1}</span><span class="ti" title="">${esc(s.title||s.hash)}</span><button title="Duplicate this screen" onclick="dup('${s.id}')">⧉</button><button title="Maximise / restore" onclick="max('${s.id}')">□</button><button class="x" title="Close this screen" onclick="close_('${s.id}')">✕</button></div><iframe src="/${esc(s.hash)}" name="${s.id}"></iframe>`;
+ $('#desk').appendChild(d);$('#empty').style.display='none';
+ const tb=d.querySelector('.tb');tb.onmousedown=e=>{if(e.target.tagName==='BUTTON'||d.classList.contains('max'))return;focus(s.id);const ox=e.clientX-d.offsetLeft,oy=e.clientY-d.offsetTop;d.classList.add('drag');const mv=ev=>{d.style.left=Math.max(0,ev.clientX-ox)+'px';d.style.top=Math.max(0,ev.clientY-oy)+'px'};const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);d.classList.remove('drag');save()};document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up)};
+ d.onmousedown=()=>focus(s.id);new ResizeObserver(()=>save()).observe(d);d.querySelector('iframe').addEventListener('load',()=>{try{d.querySelector('iframe').contentWindow.focus()}catch(e){}})}
+function focus(id){document.querySelectorAll('.scr').forEach(e=>e.classList.toggle('on',e.id===id))}
+function hashOf(s){try{return document.getElementById(s.id).querySelector('iframe').contentWindow.location.hash||s.hash}catch(e){return s.hash}}
+function dup(id){const s=scr.find(x=>x.id===id);if(!s)return;s.hash=hashOf(s);const el=document.getElementById(id);add(s.hash,{x:el.offsetLeft,y:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight})}
+function max(id){const el=document.getElementById(id);if(!el)return;save();el.classList.toggle('max');focus(id);el.querySelector('[title="Maximise / restore"]').textContent=el.classList.contains('max')?'❐':'□'}
+function close_(id){scr=scr.filter(x=>x.id!==id);const el=document.getElementById(id);if(el)el.remove();renumber();save();if(!scr.length)$('#empty').style.display=''}
+function closeAll(){scr.slice().forEach(s=>close_(s.id))}
+function renumber(){scr.forEach((s,i)=>{const el=document.getElementById(s.id);if(el)el.querySelector('.n').textContent=i+1})}
+function tile(){const k=scr.length;if(!k)return;const W=$('#desk').clientWidth,H=$('#desk').clientHeight;const cols=Math.ceil(Math.sqrt(k)),rows=Math.ceil(k/cols);const g=10;scr.forEach((s,i)=>{const el=document.getElementById(s.id);el.classList.remove('max');const c=i%cols,r=Math.floor(i/cols);el.style.left=(g+c*(W-g)/cols)+'px';el.style.top=(g+r*(H-g)/rows)+'px';el.style.width=((W-g)/cols-g)+'px';el.style.height=((H-g)/rows-g)+'px'});save()}
+window.addEventListener('message',e=>{const m=e.data||{};if(!m.pf)return;const s=scr.find(x=>{try{return document.getElementById(x.id).querySelector('iframe').contentWindow===e.source}catch(err){return false}});
+ if(m.pf==='add'){const el=s&&document.getElementById(s.id);add(m.hash||'#/',el?{x:el.offsetLeft,y:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight}:null)}
+ if(m.pf==='title'&&s){s.hash=m.hash;s.title=m.title;const t=document.getElementById(s.id).querySelector('.ti');t.textContent=m.title;t.title=m.title;save()}});
+window.addEventListener('beforeunload',()=>{scr.forEach(s=>{s.hash=hashOf(s)});save()});
+const u=new URLSearchParams(location.search).get('u');
+if(scr.length){scr.forEach(draw);if(u&&!scr.some(s=>s.hash===u))add(u);else if(u){focus(scr.find(s=>s.hash===u).id)}}else{add(u||'#/')}
+if(u)history.replaceState(null,'','/screens');
+</script></body></html>"""
+
 HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PartsBender Parts Finder</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -1011,6 +1208,15 @@ textarea{width:100%;box-sizing:border-box;background:var(--field);color:var(--tx
 kbd{border:1px solid var(--edge);border-radius:3px;padding:0 4px;font:11px ui-monospace,Consolas,monospace}
 @media print{header,aside,.search,.meta,.tools,.x,.chip.act,textarea,.note form,.btn{display:none!important}body.hist main{margin-left:0}main{padding:0}.ed{border:0}section{break-inside:avoid}}
 .sub{font-size:18px;margin:2px 0 0}
+h3.tog{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}h3.tog:hover{color:var(--acc2)}
+.car{display:inline-block;width:0;height:0;border:5px solid transparent;border-left:7px solid var(--acc);border-right:0;transform:rotate(90deg);transition:transform .12s;margin-right:2px}
+section.closed .car{transform:rotate(0)}section.closed .sb{display:none}section.closed h3{opacity:.75}h3 .hint{font-size:10px;letter-spacing:.05em;text-transform:none;color:var(--dim);margin-left:auto;font-weight:normal}
+.uses{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:14px}
+.grp{--h:215;border:1px solid hsl(var(--h) 45% 60% / .55);border-left:5px solid hsl(var(--h) 60% 48%);background:hsl(var(--h) 60% 50% / .07);border-radius:6px;padding:8px 10px;font:13px ui-monospace,Consolas,monospace}
+[data-theme=dark] .grp{background:hsl(var(--h) 45% 55% / .12)}
+.grp .gp{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.grp .fl{color:var(--dim);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-right:6px}.grp .ga{margin-bottom:4px}
+.grow{--h:215}tr.grow td:first-child,li.grow{box-shadow:inset 4px 0 0 hsl(var(--h) 60% 48%)}li.grow .row{padding-left:10px}
+.gchip{--h:215;display:inline-block;border-radius:5px;padding:2px;background:hsl(var(--h) 60% 50% / .14);box-shadow:inset 3px 0 0 hsl(var(--h) 60% 48%)}.gchip .chip{background:transparent;border-color:transparent}.gchip .chip:hover,.gchip .chip.on{border-color:var(--acc)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--edge);background:var(--field);color:var(--txt);border-radius:4px;padding:4px 8px;font:12px ui-monospace,Consolas,monospace;cursor:pointer}
 .chip:hover,.chip.on{border-color:var(--acc);color:var(--acc2)}
@@ -1037,6 +1243,7 @@ details summary{cursor:pointer;color:var(--dim);font-size:12px}
 .toast{position:fixed;bottom:16px;right:16px;background:var(--field);border:1px solid var(--acc);padding:10px 14px;border-radius:6px}
 .ids{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:6px;font:13px ui-monospace,Consolas,monospace}.ids b{color:var(--acc2);font-weight:600}
 .filt{font:12px ui-monospace,Consolas,monospace;color:var(--dim);margin:8px 0 0}.filt b{color:var(--acc2);font-weight:normal}
+body.inscreen aside{display:none!important}body.inscreen.hist main{margin-left:0!important}body.inscreen #histbtn,body.inscreen .brand{display:none}body.inscreen header .wrap{padding:6px 10px}body.inscreen nav{gap:8px}
 aside{position:fixed;left:0;top:48px;bottom:0;width:230px;overflow:auto;border-right:1px solid var(--line);background:var(--panel);padding:12px;display:none;font:12px ui-monospace,Consolas,monospace}
 body.hist aside{display:block}body.hist main{margin-left:230px}@media(max-width:900px){body.hist main{margin-left:0}aside{box-shadow:4px 0 16px rgba(0,0,0,.25)}}
 aside h4{margin:0 0 6px;font:11px ui-monospace,Consolas,monospace;letter-spacing:.2em;color:var(--acc);display:flex;justify-content:space-between}aside h4 button{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;padding:0;letter-spacing:0}
@@ -1045,7 +1252,7 @@ aside h4{margin:0 0 6px;font:11px ui-monospace,Consolas,monospace;letter-spacing
 .hi .rm{background:none;border:0;cursor:pointer;color:var(--dim);padding:0;font-size:11px;visibility:hidden}.hi:hover .rm{visibility:visible}
 </style></head><body>
 <header><div class="wrap"><a href="#/" onclick="goHome();return false"><img src="/logo.png" alt="PartsBender"></a><span class="brand" onclick="goHome()">PARTS FINDER</span>
-<nav><button class="theme" id="histbtn" onclick="toggleHist()" title="Recently viewed pages">HISTORY</button><a href="#/" id="n-search">SEARCH</a><a href="#/browse" id="n-browse">BROWSE</a><a href="#/data" id="n-data">DATA</a><a href="#/review" id="n-review">REVIEW <span id="issuecount"></span></a><button class="theme" id="theme" onclick="toggleTheme()"></button></nav></div></header>
+<nav><button class="theme" id="scrbtn" onclick="addScreen()" title="Open another independent PartsFinder screen to compare side-by-side">+ SCREEN</button><button class="theme" id="histbtn" onclick="toggleHist()" title="Recently viewed pages">HISTORY</button><a href="#/" id="n-search">SEARCH</a><a href="#/browse" id="n-browse">BROWSE</a><a href="#/data" id="n-data">DATA</a><a href="#/review" id="n-review">REVIEW <span id="issuecount"></span></a><button class="theme" id="theme" onclick="toggleTheme()"></button></nav></div></header>
 <aside id="hist"></aside>
 <main><div class="wrap" id="app"></div></main>
 <script>
@@ -1053,10 +1260,15 @@ const setTheme=t=>{document.documentElement.dataset.theme=t;localStorage.pfTheme
 const toggleTheme=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 setTheme(localStorage.pfTheme||'light');
 function goHome(){q='';oemFilter='';sharedOnly=false;if(location.hash&&location.hash!=='#/')location.hash='#/';else render()}
+// ---- multiple screens: this page may be one panel inside /screens; tell the workspace what we are showing ----
+const inScreens=window.parent!==window;
+function addScreen(){if(inScreens)parent.postMessage({pf:'add',hash:location.hash},'*');else location.href='/screens?u='+encodeURIComponent(location.hash||'#/')}
+function tellParent(title){if(inScreens)parent.postMessage({pf:'title',hash:location.hash,title},'*')}
+if(inScreens){document.body.classList.add('inscreen');window.addEventListener('storage',e=>{if(e.key==='pfColl'){try{coll=JSON.parse(e.newValue||'{}')}catch(x){}document.querySelectorAll('section[data-sec]').forEach(s=>s.classList.toggle('closed',!!coll[s.dataset.sec]))}if(e.key==='pfHist'){try{hist=JSON.parse(e.newValue||'[]')}catch(x){}drawHist()}if(e.key==='pfTheme'&&e.newValue)setTheme(e.newValue)})}
 // ---- history sidebar (recent pages, starred ones pinned to the top; kept in this browser) ----
 let hist=[];try{hist=JSON.parse(localStorage.pfHist||'[]')}catch(e){hist=[]}
 const saveHist=()=>{localStorage.pfHist=JSON.stringify(hist);drawHist()};
-function addHist(h,kind,title){if(!title)return;const i=hist.findIndex(x=>x.h===h);const e=i>=0?hist.splice(i,1)[0]:{h,star:false};e.k=kind;e.t=title;e.ts=Date.now();hist.unshift(e);
+function addHist(h,kind,title){if(!title)return;tellParent(kind.toUpperCase()+' · '+title);const i=hist.findIndex(x=>x.h===h);const e=i>=0?hist.splice(i,1)[0]:{h,star:false};e.k=kind;e.t=title;e.ts=Date.now();hist.unshift(e);
  let n=0;hist=hist.filter(x=>x.star||++n<=40);saveHist()}
 function starHist(h){const e=hist.find(x=>x.h===h);if(e){e.star=!e.star;saveHist()}}
 function rmHist(h){hist=hist.filter(x=>x.h!==h);saveHist()}
@@ -1074,7 +1286,7 @@ setHist(localStorage.pfHistOpen?localStorage.pfHistOpen==='1':innerWidth>1100);d
 const money=p=>(p.currency||'')+' '+Number(p.value).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function chip(t,h,on){return `<button class="chip${on?' on':''}" onclick="nav('${esc(h).replace(/'/g,'%27')}')">${esc(t)}</button>`}
 function fchip(t,fn,on){return `<button class="chip${on?' on':''}" onclick="${esc(fn)}">${esc(t)}</button>`}
-function partRow(r){return `<li><button class="row" onclick="nav('#/part/${encodeURIComponent(r.key)}')"><span class="pn">${esc(r.part)}</span><span>${esc(r.desc||'—')}</span><span class="r">${esc(r.oems||r.oem||'')}${r.assembly?' · '+esc(r.assembly):''}${r.qty?' · qty '+esc(r.qty):''}${r.pumps!=null?' · '+r.pumps+' pump(s)':''}</span></button></li>`}
+function partRow(r){return `<li class="grow" ${r.pump||r.assembly?gstyle(r.pump,r.assembly):''}><button class="row" onclick="nav('#/part/${encodeURIComponent(r.key)}')"><span class="pn">${esc(r.part)}</span><span>${esc(r.desc||'—')}</span><span class="r">${esc(r.oems||r.oem||'')}${r.assembly?' · '+esc(r.assembly):''}${r.qty?' · qty '+esc(r.qty):''}${r.pumps!=null?' · '+r.pumps+' pump(s)':''}</span></button></li>`}
 function searchBox(){return `<div class="search">🔎 <input id="q" placeholder="Search part number, pump, OEM or description… (or: common BA150 BA200)" value="${esc(q)}" autofocus></div>
 <div class="meta">OEM: <button class="${oemFilter?'':'on'}" onclick="setOem('')">All</button>${stats.oems.map(o=>`<button class="${oemFilter===o?'on':''}" onclick="setOem('${esc(o)}')">· ${esc(o)}</button>`).join('')}
 <span class="right">${stats.rows?.toLocaleString()} rows · ${stats.parts?.toLocaleString()} parts · ${stats.pumps} pumps</span></div>`}
@@ -1094,30 +1306,44 @@ async function doSearch(){const out=$('#results');if(!out)return;const s=q.trim(
  if(sharedOnly)d.parts=d.parts.filter(r=>(r.oems||'').includes(','));
  lastList=d.parts;h+=`<section><h3>Parts · ${d.parts.length}${d.parts.length>=300?'+':''} <button class="chip ${sharedOnly?'on':''}" style="margin-left:8px" onclick="sharedOnly=!sharedOnly;doSearch()">shared by 2+ companies</button> <button class="chip act" onclick="csv(lastList,PCOLS,'search_${esc(s)}')">⬇ CSV</button></h3><ul class="list">${d.parts.map(partRow).join('')||'<li class="dim">No parts match.</li>'}</ul></section>`;put(h)}
 let sharedOnly=false;
-function sec(t,b){return `<section><h3>${t}</h3>${b}</section>`}
+// ---- collapsible sections: click the blue heading; state is remembered per heading in this browser ----
+let coll={};try{coll=JSON.parse(localStorage.pfColl||'{}')}catch(e){coll={}}
+const secId=t=>String(t).replace(/<[^>]*>/g,'').replace(/[\d·★⬇].*$/,'').trim().toLowerCase().replace(/[^a-z]+/g,'_').replace(/_+$/,'');
+function togSec(id,ev){if(ev&&ev.target.closest('button,a,input,select'))return;coll[id]=!coll[id];localStorage.pfColl=JSON.stringify(coll);document.querySelectorAll(`section[data-sec="${id}"]`).forEach(s=>{s.classList.toggle('closed',!!coll[id]);const h=s.querySelector('h3 .hint');if(h)h.textContent=coll[id]?'collapsed — click to expand':'';s.querySelector('h3').title=coll[id]?'Click to expand':'Click to collapse'})}
+function sec(t,b){const id=secId(t);const c=!!coll[id];return `<section data-sec="${id}" class="${c?'closed':''}"><h3 class="tog" onclick="togSec('${id}',event)" title="${c?'Click to expand':'Click to collapse'}"><span class="car"></span>${t}<span class="hint">${c?'collapsed — click to expand':''}</span></h3><div class="sb">${b}</div></section>`}
+// ---- consistent colours: the same pump / assembly always gets the same colour, everywhere ----
+const HUES=[215,150,20,280,50,340,180,110,0,245,80,320];
+const gkey=(pump,asm)=>(String(pump||'')+'|'+String(asm||'')).toLowerCase().replace(/[^a-z0-9|]/g,'');
+function hue(k){let h=0;for(const c of k)h=(h*31+c.charCodeAt(0))>>>0;return HUES[h%HUES.length]}
+const gstyle=(pump,asm)=>`style="--h:${hue(gkey(pump,asm))}"`;
 const NS='<span class="dim">Not specified in imported source.</span>';
 const fact=(l,v,b)=>`<span class="fl">${l}</span><span class="fv">${v?(b?`<b>${v}</b>`:v):'<span class="dim">Not specified in imported source</span>'}</span>`;
+// one coloured card per pump + assembly the part is used on: quantity and location(s) stay attached to their assembly
+function useCards(rows){const g={};rows.forEach(r=>{if(!r.pump&&!r.assembly&&!r.location&&!r.qty)return;const k=gkey(r.pump,r.assembly);(g[k]=g[k]||{pump:r.pump,asm:r.assembly,oem:r.oem,qty:new Set(),loc:new Set()});if(r.qty)g[k].qty.add(r.qty);if(r.location)g[k].loc.add(r.location)});
+ const cards=Object.values(g);if(!cards.length)return '';
+ return `<div class="uses">${cards.map(c=>`<div class="grp" ${gstyle(c.pump,c.asm)}><div class="gp">${c.pump?chip(c.pump,'#/pump/'+encodeURIComponent(c.pump)):'<span class="dim">Pump not specified</span>'}<span class="dim small">${esc(c.oem||'')}</span></div><div class="ga"><span class="fl">Assembly</span>${esc(c.asm||'—')}</div><div class="gq"><span class="fl">Qty</span>${esc([...c.qty].join(' / ')||'—')}<span class="fl" style="margin-left:14px">Location</span>${esc([...c.loc].join(', ')||'—')}</div></div>`).join('')}</div>`}
 async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key));if(!d.found)return `<p class="dim">Part not found.</p>`;lastList=d.rows;
  const qtys=[...new Set(d.rows.filter(r=>r.qty).map(r=>r.qty))],locs=[...new Set(d.rows.filter(r=>r.location).map(r=>r.location))];
  let h=`<div><h2><span class="lbl">OEM Part Number</span>${esc(d.part)}</h2><p class="sub">${esc(d.descs.join(' · ')||'No description')}</p>
- <div class="facts">${fact('OEM Part Number',esc(d.part),1)}${fact('Company',d.oems.map(o=>chip(o,'#/oem/'+encodeURIComponent(o))).join(' '))}${fact('Description',esc(d.descs.join(' · ')))}${fact('PB Number',esc(d.pb.join(', ')),1)}${fact('G-Number',esc(d.gnum.join(', ')),1)}${fact('Used on pumps',d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' '))}${fact('Assembly',esc(d.assemblies.join(', ')))}${fact('Quantity per pump',esc(qtys.join(' / ')))}${fact('Location',esc(locs.join(', ')))}${d.variants.length>1?fact('Part number written as',esc(d.variants.join(', '))):''}</div>${tools('part_'+d.part)}</div>`;
+ <div class="facts">${fact('OEM Part Number',esc(d.part),1)}${fact('Company',d.oems.map(o=>chip(o,'#/oem/'+encodeURIComponent(o))).join(' '))}${fact('Description',esc(d.descs.join(' · ')))}${fact('PB Number',esc(d.pb.join(', ')),1)}${fact('G-Number',esc(d.gnum.join(', ')),1)}${fact('Used on pumps',d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' '))}${d.variants.length>1?fact('Part number written as',esc(d.variants.join(', '))):''}</div>${useCards(d.rows)}${tools('part_'+d.part)}</div>`;
  if(d.shared)h+=sec(`Shared across ${d.by_oem.length} companies`,`<table><tr><th>Company</th><th>Pumps</th><th>Assembly</th><th>Description</th><th>Prices</th></tr>${d.by_oem.map(o=>`<tr><td class="g">${chip(o.oem,'#/oem/'+encodeURIComponent(o.oem))}</td><td>${o.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join(' ')||'<span class="dim">—</span>'}</td><td>${esc(o.assemblies.join(', ')||'—')}</td><td>${esc(o.descs.join(' · ')||'—')}</td><td>${o.prices.length?o.prices.map(p=>`<div><span class="g">${money(p)}</span> <span class="dim">${esc(p.label)}${p.date?' · '+esc(p.date):''}</span></div>`).join(''):'<span class="dim">none</span>'}</td></tr>`).join('')}</table>`);
  h+=sec('Used on pumps',d.pumps.length?`<div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div>`:'<span class="dim">Pump compatibility: Not specified in imported source.</span>');
  h+=sec('Common with (also fits these pumps)',d.common.length?`<div class="chips">${d.common.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div><p class="small">Source value: ${esc(d.common_raw.join(' | '))}</p>`:NS);
  h+=sec(`Pricing found · ${d.prices.length} <button class="chip act" style="margin-left:8px" onclick="addPrice(${d.rows[0].id})">+ Add a price</button>`,d.prices.length?`<table><tr><th>Company</th><th>Price type</th><th>Price</th><th>Price date</th><th>Imported</th><th>Source file</th><th></th></tr>${d.prices.map(p=>`<tr><td>${esc(p.oem||'')}</td><td>${esc(p.label)}</td><td class="g">${money(p)}</td><td class="dim">${esc(p.date||'—')}</td><td class="dim">${esc(p.imported_at)}</td><td class="dim">${esc(p.file)} › ${esc(p.sheet)}</td><td><button class="x" title="Remove this price" onclick="delPrice(${p.id})">✕</button></td></tr>`).join('')}</table>`:'<span class="dim">No pricing in imported source.</span>');
  if(d.alternates.length)h+=sec('Same description, different part number (check — not confirmed alternates)',`<div class="chips">${d.alternates.map(a=>chip(a.part,'#/part/'+encodeURIComponent(a.key))).join('')}</div>`);
- if(d.related.length)h+=sec('Related parts (same pump & assembly)',`<div class="chips">${d.related.map(x=>chip(x.part+(x.desc?' — '+x.desc:''),'#/part/'+encodeURIComponent(x.key))).join('')}</div>`);
+ if(d.related.length){const rg={};d.related.forEach(x=>{const k=gkey(x.pump,x.assembly);(rg[k]=rg[k]||{pump:x.pump,asm:x.assembly,items:[]}).items.push(x)});
+  h+=sec('Related parts (same pump & assembly)',`<div class="uses">${Object.values(rg).map(g=>`<div class="grp" ${gstyle(g.pump,g.asm)}><div class="gp">${g.pump?chip(g.pump,'#/pump/'+encodeURIComponent(g.pump)):'<span class="dim">Pump not specified</span>'}<span class="dim small">${esc(g.asm||'')}</span></div><div class="chips">${g.items.map(x=>chip(x.part+(x.desc?' — '+x.desc:''),'#/part/'+encodeURIComponent(x.key))).join('')}</div></div>`).join('')}</div>`)}
  h+=notesBlock('part',d.key,d.part,d.notes);
- h+=sec(`Source rows · ${d.rows.length} <span class="dim">· click any cell to edit — every change is logged and can be undone (DATA › Edit history)</span>`,`<div style="overflow:auto"><table class="edt"><tr>${FIELDS.map(f=>`<th>${f[1]}</th>`).join('')}<th>Source</th><th></th></tr>${d.rows.map(r=>`<tr>${FIELDS.map(f=>edCell(r,f[0])).join('')}<td class="dim" style="white-space:nowrap">${esc(r.file)} › ${esc(r.sheet)}${r.src_row?' · row '+r.src_row:''}<br>imported ${esc(r.imported_at)} <details style="display:inline"><summary style="display:inline">raw</summary><code>${esc(JSON.stringify(r.raw))}</code></details></td><td class="act"><button class="x" title="Delete this row" onclick="delRow(${r.id})">✕</button></td></tr>`).join('')}</table></div><div class="tools"><button class="chip act" onclick='showAddRow(${JSON.stringify({part:d.part,oem:d.oems[0]||'',desc:d.descs[0]||''})})'>+ Add another row for this part</button></div><div id="addrow"></div>`);
+ h+=sec(`Source rows · ${d.rows.length} <span class="dim">· click any cell to edit — every change is logged and can be undone (DATA › Edit history)</span>`,`<div style="overflow:auto"><table class="edt"><tr>${FIELDS.map(f=>`<th>${f[1]}</th>`).join('')}<th>Source</th><th></th></tr>${d.rows.map(r=>`<tr class="grow" ${gstyle(r.pump,r.assembly)}>${FIELDS.map(f=>edCell(r,f[0])).join('')}<td class="dim" style="white-space:nowrap">${esc(r.file)} › ${esc(r.sheet)}${r.src_row?' · row '+r.src_row:''}<br>imported ${esc(r.imported_at)} <details style="display:inline"><summary style="display:inline">raw</summary><code>${esc(JSON.stringify(r.raw))}</code></details></td><td class="act"><button class="x" title="Delete this row" onclick="delRow(${r.id})">✕</button></td></tr>`).join('')}</table></div><div class="tools"><button class="chip act" onclick='showAddRow(${JSON.stringify({part:d.part,oem:d.oems[0]||'',desc:d.descs[0]||''})})'>+ Add another row for this part</button></div><div id="addrow"></div>`);
  return h}
 // pump page filters: Common-with and Assembly chips narrow the parts list in place (page/URL unchanged)
 let pumpD=null,pumpCur='',asmFilter='',cwFilter='';
 function setPF(kind,v){if(kind==='asm')asmFilter=asmFilter===v?'':v;else cwFilter=cwFilter===v?'':v;const el=$('#pumpbody');if(el&&pumpD)el.innerHTML=pumpBody(pumpD)}
-function pumpBody(d){const asms={};d.parts.forEach(r=>{const a=r.assembly||'Unspecified';asms[a]=(asms[a]||0)+1});
+function pumpBody(d){const asms={},asmPump={};d.parts.forEach(r=>{const a=r.assembly||'Unspecified';asms[a]=(asms[a]||0)+1;if(r.pump&&!asmPump[a])asmPump[a]=r.pump});
  const cws={};d.parts.forEach(r=>(r.common_with||[]).forEach(c=>{cws[c]=(cws[c]||0)+1}));
  const uk=new Set(d.unique_keys);let h='';
  if(d.common.length)h+=sec(`Common with <span class="dim">· click to keep only the parts shared with that pump</span>`,`<div class="chips">${d.common.map(c=>fchip(`${c} · ${cws[c]||0}`,`setPF('cw',${JSON.stringify(c)})`,cwFilter===c)).join('')}</div>`);
- h+=sec(`Assembly breakdown <span class="dim">· click to keep only that assembly</span>`,`<div class="chips">${fchip(`All · ${d.parts.length}`,"setPF('asm','')",!asmFilter)}${Object.keys(asms).sort().map(a=>fchip(`${a} · ${asms[a]}`,`setPF('asm',${JSON.stringify(a)})`,asmFilter===a)).join('')}</div>`);
+ h+=sec(`Assembly breakdown <span class="dim">· click to keep only that assembly</span>`,`<div class="chips">${fchip(`All · ${d.parts.length}`,"setPF('asm','')",!asmFilter)}${Object.keys(asms).sort().map(a=>`<span class="gchip" ${gstyle(asmPump[a]||d.pump,a==='Unspecified'?'':a)}>${fchip(`${a} · ${asms[a]}`,`setPF('asm',${JSON.stringify(a)})`,asmFilter===a)}</span>`).join('')}</div>`);
  const list=d.parts.filter(r=>(!asmFilter||(r.assembly||'Unspecified')===asmFilter)&&(!cwFilter||(r.common_with||[]).includes(cwFilter)));
  const on=[cwFilter&&`common with <b>${esc(cwFilter)}</b>`,asmFilter&&`assembly <b>${esc(asmFilter)}</b>`].filter(Boolean);
  lastList=list;h+=sec(`Parts found · ${list.length}${on.length?` <span class="dim">of ${d.parts.length}</span>`:''} <span class="dim">(${uk.size} unique to this pump ★)</span> <button class="chip act" style="margin-left:8px" onclick="csv(lastList,PCOLS,'pump_${esc(d.pump)}')">⬇ CSV</button>`,`${on.length?`<p class="filt">Showing parts on ${esc(d.pump)} that are ${on.join(' and ')} — <a href="javascript:void(0)" onclick="asmFilter='';cwFilter='';setPF('asm','')">clear filters</a></p>`:''}<ul class="list">${list.map(r=>partRow({...r,part:(uk.has(r.key)?'★ ':'')+r.part})).join('')||'<li class="dim">No parts match these filters.</li>'}</ul>`);
@@ -1152,7 +1378,7 @@ async function viewData(){const d=await api('/imports');const ed=await api('/edi
  let h=`<h2 style="font-size:20px">DATA</h2><p class="dim">Raw uploads are kept untouched in <code>PartsFinder/raw/</code>. Drop files here or into <code>PartsFinder/inbox/</code> and click Scan inbox.</p>
  <div class="drop" id="drop" onclick="$('#file').click()">Drop Excel / CSV here, or click to choose<input type="file" id="file" multiple accept=".xlsx,.xlsm,.csv" style="display:none"></div>
  <p><button class="btn sec" onclick="scanInbox()">Scan inbox folder</button> <button class="btn sec" style="color:#f87171" onclick="flushAll()">Flush ALL data…</button> <span class="small">${esc(d.inbox.length)} file(s) waiting: ${esc(d.inbox.join(', '))}</span></p><div id="preview"></div>`;
- h+=sec('Import history',d.imports.length?`<table><tr><th>Date</th><th>File</th><th>Sheet</th><th>OEM</th><th>Type</th><th>Rows</th><th>New</th><th>Existing</th><th>Price Δ</th><th>Raw copy</th></tr>${d.imports.map(i=>`<tr><td class="dim">${esc(i.imported_at)}</td><td>${esc(i.file)}</td><td>${esc(i.sheet)}</td><td>${esc(i.oem||'?')}</td><td class="dim">${esc(i.dataset)}</td><td class="g">${i.rows}</td><td>${i.new_parts}</td><td>${i.existing_parts}</td><td>${i.price_changes}</td><td class="dim">${esc(i.raw_path)}</td></tr>`).join('')}</table>`:'<span class="dim">Nothing imported yet.</span>');
+ h+=sec('Import history',d.imports.length?`<table><tr><th>Date</th><th>File</th><th>Sheet</th><th>OEM</th><th>Type</th><th>Rows</th><th>New</th><th>Existing</th><th>Skipped</th><th>Price Δ</th><th>Raw copy</th></tr>${d.imports.map(i=>`<tr><td class="dim">${esc(i.imported_at)}</td><td>${esc(i.file)}</td><td>${esc(i.sheet)}</td><td>${esc(i.oem||'?')}</td><td class="dim">${esc(i.dataset)}</td><td class="g">${i.rows}</td><td>${i.new_parts}</td><td>${i.existing_parts}</td><td class="dim" title="rows identical to ones already loaded">${i.skipped||0}</td><td>${i.price_changes}</td><td class="dim">${esc(i.raw_path)}</td></tr>`).join('')}</table>`:'<span class="dim">Nothing imported yet.</span>');
  const val=v=>v==null?'<span class="dim">(blank)</span>':v.length>60?`<span title="${esc(v)}">${esc(v.slice(0,60))}…</span>`:esc(v);
  h+=sec(`Edit history · ${ed.length} <span class="dim">· changes made in the app; imported source rows are never rewritten</span>`,ed.length?`<table><tr><th>When</th><th>Part</th><th>What changed</th><th>From</th><th>To</th><th></th></tr>${ed.map(e=>`<tr style="${e.undone?'opacity:.45':''}"><td class="dim">${esc(e.edited_at)}</td><td class="g">${e.part?chip(e.part,'#/part/'+encodeURIComponent(e.part.toLowerCase().replace(/[^a-z0-9]/g,''))):''}</td><td>${esc(e.label)}</td><td>${val(e.old)}</td><td>${val(e.new)}</td><td>${e.undone?'<span class="dim">undone</span>':`<button class="chip" onclick="undo(${e.id})">undo</button>`}</td></tr>`).join('')}</table>`:'<span class="dim">No edits yet. Click any cell in a part\'s Source rows table to change it.</span>');
  h+=sec(`All notes · ${nt.length}`,nt.length?`<table><tr><th>Updated</th><th>About</th><th>Note</th></tr>${nt.map(n=>`<tr><td class="dim">${esc(n.updated_at)}</td><td>${n.kind==='part'?chip(n.title,'#/part/'+encodeURIComponent(n.subject)):n.kind==='pump'?chip(n.title,'#/pump/'+encodeURIComponent(n.title)):n.kind==='oem'?chip(n.title,'#/oem/'+encodeURIComponent(n.subject)):esc(n.title)}</td><td style="white-space:pre-wrap">${esc(n.text)}</td></tr>`).join('')}</table>`:'<span class="dim">No notes yet — add them on any part, pump or company page.</span>');
@@ -1169,7 +1395,9 @@ function showPreview(d){if(d.error){$('#preview').innerHTML=`<div class="card er
  d.sheets.forEach((s,i)=>{if(!s.usable){h+=`<p class="small">Sheet “${esc(s.sheet)}” skipped: ${esc(s.reason)} (${s.rows} rows)</p>`;return}
   h+=`<div class="card"><label><input type="checkbox" id="imp${i}" checked> <b>${esc(s.sheet)}</b></label> &nbsp; OEM: <input type="text" id="oem${i}" value="${esc(s.oem||'')}" placeholder="unknown" list="oems"> &nbsp; Dataset: <select id="ds${i}"><option ${s.dataset==='parts'?'selected':''}>parts</option><option ${s.dataset==='pricing'?'selected':''}>pricing</option><option>pump parts</option><option>reference</option></select>
   <p class="small">header row ${s.header_row} · columns: ${Object.entries(s.columns).map(([k,v])=>`${k}=“${esc(v)}”`).join(', ')} · price columns: ${esc(s.price_columns.join(' | ')||'none')}</p>
-  <div class="stats"><div class="stat"><b>${s.rows}</b><span>rows found</span></div><div class="stat"><b>${s.existing_parts}</b><span>existing parts</span></div><div class="stat"><b>${s.new_parts}</b><span>new parts</span></div><div class="stat"><b class="${s.price_changes.length?'warn':''}">${s.price_changes.length}</b><span>price changes</span></div><div class="stat"><b class="${s.duplicates.length?'warn':''}">${s.duplicates.length}</b><span>possible duplicates</span></div><div class="stat"><b class="${s.unmatched_pumps.length?'warn':''}">${s.unmatched_pumps.length}</b><span>new pump names</span></div><div class="stat"><b>${s.missing_desc}</b><span>no description</span></div></div>
+  <div class="stats"><div class="stat"><b>${s.rows}</b><span>rows found</span></div><div class="stat"><b>${s.existing_parts}</b><span>existing parts</span></div><div class="stat"><b>${s.new_parts}</b><span>new parts</span></div><div class="stat"><b class="${s.price_changes.length?'warn':''}">${s.price_changes.length}</b><span>price changes</span></div><div class="stat"><b class="${s.duplicates.length?'warn':''}">${s.duplicates.length}</b><span>possible duplicates</span></div><div class="stat"><b class="${s.unmatched_pumps.length?'warn':''}">${s.unmatched_pumps.length}</b><span>new pump names</span></div><div class="stat"><b>${s.missing_desc}</b><span>no description</span></div><div class="stat"><b>${s.unchanged_rows||0}</b><span>already loaded (skipped)</span></div><div class="stat"><b class="${(s.flags||[]).length?'warn':''}">${(s.flags||[]).length}</b><span>flagged for review</span></div></div>
+  ${(s.extra_columns||[]).length?`<p class="small warn">Columns not understood (kept in the raw row only): ${esc(s.extra_columns.join(', '))}</p>`:''}
+  ${(s.flags||[]).length?`<details><summary>Flagged for review — nothing is changed automatically, these become REVIEW items</summary>${Object.entries(s.flag_counts||{}).map(([k,n])=>`<p class="small"><b>${n}</b> ${esc(FLAG_LABEL[k]||k)}</p>`).join('')}<table>${s.flags.slice(0,300).map(f=>`<tr><td class="dim">${esc(FLAG_LABEL[f[0]]||f[0])}</td><td class="g">${esc(f[1])}</td><td>${esc(f[2])}</td></tr>`).join('')}${s.flags.length>300?`<tr><td colspan=3 class="dim">… ${s.flags.length-300} more (all listed on REVIEW after import)</td></tr>`:''}</table></details>`:''}
   ${s.price_changes.length?`<details><summary>Price changes</summary><table>${s.price_changes.slice(0,200).map(c=>`<tr><td>${esc(c.part)}</td><td class="dim">${esc(c.label)}</td><td>${esc(c.currency||'')} ${c.old} <span class="dim">(${esc(c.old_date)})</span></td><td class="g">→ ${c.new}</td></tr>`).join('')}</table></details>`:''}
   ${s.duplicates.length?`<details><summary>Possible duplicate part numbers</summary><ul class="small">${s.duplicates.slice(0,200).map(x=>`<li>${esc(x.variants.join(' | '))}</li>`).join('')}</ul></details>`:''}
   ${s.unmatched_pumps.length?`<details><summary>Pump names not seen before</summary><p class="small">${esc(s.unmatched_pumps.join(' · '))}</p></details>`:''}
@@ -1180,8 +1408,10 @@ function showPreview(d){if(d.error){$('#preview').innerHTML=`<div class="card er
 async function doImport(pid,sheets){const choices={};sheets.forEach((s,i)=>{const c=$('#imp'+i);if(!c)return;choices[s]={import:c.checked,oem:$('#oem'+i).value||null,dataset:$('#ds'+i).value}});
  const d=await api('/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preview_id:pid,choices})});
  if(d.error){toast(d.error,true);return}toast('Imported '+d.done.map(x=>`${x.sheet} (${x.rows})`).join(', '));browse=null;await loadStats();render()}
+const FLAG_LABEL={duplicate_part:'possible duplicate part numbers',unknown_pump:'new / unknown pump models',similar_pumps:'pump names that may be the same model',price_change:'price changes detected',missing_description:'descriptions need review',
+ duplicate_row:'identical rows in the sheet (imported once)',conflicting_description:'same part number, different descriptions',no_oem_part_number:'no OEM part number (listed under PB / G number)',blank_part_number:'row with no identifier at all (skipped)',whitespace_part_number:'part number had stray spaces',non_numeric_price:'text in a price cell (not imported as a price)',non_numeric_qty:'quantity is not a number',sell_below_cost:'sell price below cost',placeholder_assembly:'assembly was a worksheet name (treated as blank)',similar_assemblies:'assembly names that may be the same',unrecognised_oem:'OEM column value not recognised',multi_part_number:'OEM part number cell lists several numbers',pb_conflict:'one PB number used for different items',unmapped_column:'spreadsheet column not understood'};
 async function viewReview(){const d=await api('/issues');const kinds={};d.forEach(i=>{kinds[i.kind]=(kinds[i.kind]||0)+1});
- const label={duplicate_part:'possible duplicate part numbers',unknown_pump:'new / unknown pump models',similar_pumps:'pump names that may be the same model',price_change:'price changes detected',missing_description:'descriptions need review'};
+ const label=FLAG_LABEL;
  let h=`<h2 style="font-size:20px">REVIEW · ${d.length} open</h2><p class="dim">Nothing here is merged automatically. Resolve items when you have time; the source rows are never altered.</p>`;
  h+=`<div class="stats">${Object.entries(kinds).map(([k,n])=>`<div class="stat"><b class="warn">${n}</b><span>${label[k]||k}</span></div>`).join('')}</div>`;
  h+=`<table><tr><th>Kind</th><th>Subject</th><th>Detail</th><th>Found</th><th></th></tr>${d.map(i=>`<tr><td class="dim">${esc(label[i.kind]||i.kind)}</td><td class="g">${esc(i.subject)}</td><td>${esc(i.detail)}</td><td class="dim">${esc(i.created_at)}</td><td><button class="chip" onclick="resolve(${i.id})">resolve</button></td></tr>`).join('')}</table>`;
@@ -1246,7 +1476,7 @@ class Handler(BaseHTTPRequestHandler):
         con = self.server.con  # type: ignore[attr-defined]
         try:
             if p == "/" or (not p.startswith("/api/") and p != "/logo.png"):
-                data = HTML.encode()
+                data = (SCREENS_HTML if p == "/screens" else HTML).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(data)))
@@ -1365,17 +1595,30 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def seed_if_empty(con: sqlite3.Connection) -> None:
-    """First run: load the workbooks bundled with the program so it starts with data."""
-    if con.execute("SELECT 1 FROM imports LIMIT 1").fetchone() or not SEED.is_dir():
+    """Load the bundled workbooks: everything on first run, and on later runs any bundled sheet that has
+    never been imported (so newly un-held sheets such as Cornell / Atlas Copco appear without a flush)."""
+    if not SEED.is_dir():
         return
+    done = {(r[0].lower(), (r[1] or "").lower()) for r in con.execute("SELECT file, sheet FROM imports")}
     for f in sorted(SEED.iterdir()):
         if f.suffix.lower() not in (".xlsx", ".xlsm", ".csv") or f.name.lower().startswith("cleaned"):
             continue
-        print(f"  loading bundled {f.name} ...")
+        if f.suffix.lower() == ".csv":
+            names = [f.stem]
+        else:
+            wb = openpyxl.load_workbook(f, read_only=True)
+            try:
+                names = list(wb.sheetnames)
+            finally:
+                wb.close()
+        wanted = [n for n in names if seed_sheet_wanted(f.name, names, n) and (f.name.lower(), n.lower()) not in done]
+        if not wanted:
+            continue
         pv = preview_file(f, con)
-        names = [s["sheet"] for s in pv["sheets"]]
-        choices = {n: {"import": seed_sheet_wanted(f.name, names, n)} for n in names}
-        commit_import(pv["preview_id"], choices, con)
+        choices = {s["sheet"]: {"import": s["sheet"] in wanted} for s in pv["sheets"]}
+        if any(c["import"] for c in choices.values()):
+            print(f"  loading bundled {f.name}: {', '.join(n for n, c in choices.items() if c['import'])} ...")
+            commit_import(pv["preview_id"], choices, con)
 
 
 def main():

@@ -11,10 +11,10 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
 3. First run only: the exe loads the **Master** sheets of the bundled `Parts_Rev4.xlsx`
-   (`Godwin/Sykes/BBA/Pioneer Master`, `50CFM_Pioneer`; the unclean per-OEM tabs, planning tabs,
-   `Cleaned Pump Data.xlsx` and — until they are reformatted — `Cornell Master`, `50CFM Cornell`
-   and `Atlas Copco` are not loaded; import them yourself from DATA if you want them).
-   Takes ~20 s; the console shows progress.
+   (`Godwin/Sykes/BBA/Pioneer/Cornell Master`, `50CFM_Pioneer`, `50CFM Cornell`, `Atlas Copco`;
+   the unclean per-OEM tabs, planning tabs and `Cleaned Pump Data.xlsx` are not loaded).
+   Takes ~30 s; the console shows progress. On later runs any bundled sheet that has never been
+   imported into your data folder is added automatically (nothing already there is touched).
    Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, a pump cell
    like `PP66S12_PP66S14_PP88S12` becomes three separate pumps, and common values like
    `BA_100_150_180_200_300` or `CD100M_150M_200M` expand to every pump listed — each of those
@@ -77,6 +77,25 @@ source rows. Missing data is shown as _Not specified in imported source_ – not
 - **Export list to CSV** (opens in Excel) and **Print** buttons on part, pump and search pages.
 - Keyboard: `/` jumps to the search box, `Esc` clears it.
 
+## Reading a part page
+
+- **Collapsible sections**: click any blue heading (Used on pumps, Pricing found, Source rows, …) to
+  fold it away; the arrow turns sideways and the heading says *collapsed*. The state is remembered per
+  heading in this browser, so a section you close stays closed on every part until you open it again.
+- **Coloured cards**: each pump + assembly combination a part is used on gets its own card, with the
+  quantity and location that belong to that combination. The colour is derived from the pump/assembly
+  name, so the same pump/assembly is always the same colour everywhere (source rows, related parts,
+  the assembly chips on a pump page). Colours are only a hint – with 12 colours two different
+  combinations can share one, so read the card.
+
+## Screens (side-by-side comparison)
+
+**+ SCREEN** in the header opens the Screens workspace (`/screens`) with the page you were on as
+screen 1. Each screen is a fully independent PartsFinder: search, browse and edit in one without
+affecting the others. Title bar buttons: ⧉ duplicate, □ maximise/restore, ✕ close. Drag the title
+bar to move, drag the bottom-right corner to resize, **Tile** arranges them all in a grid. The layout
+and what each screen shows is remembered in this browser. *single screen →* goes back to the normal view.
+
 ## Importing more spreadsheets
 
 Any `.xlsx` / `.xlsm` / `.csv`. The program finds the header row, maps columns by name
@@ -86,6 +105,33 @@ cost / list / dealer price columns with their currency and year), and guesses th
 sheet name or OEM column. You can correct the OEM and dataset type in the preview before importing.
 Import history is listed on the DATA page; anomalies (possible duplicate part numbers, new pump
 names, price changes, missing descriptions) go to **REVIEW** where they can be resolved gradually.
+
+### The standardized workbook format (Standardized_Pump_Data…)
+
+One sheet per company with the columns *PB Number, PB Description, G-Number, OEM Description,
+OEM Part Number, OEM List Price, Our Costs Price, Sell Price, OEM, Location #, Qty, Assembly, Pump Type,
+Common, Discount* imports directly. Rules the importer follows – questionable data is **flagged on
+REVIEW, never silently corrected**:
+
+- Part numbers are identifiers: leading zeros (`001-0003`, `00150 1000`) and decimal-looking values
+  (`18799.123`) are kept exactly as written; stray spaces are trimmed and flagged
+  (`whitespace_part_number`). Punctuation-only variants (`35-0399-8402/110` vs `35-0399-8402110`)
+  are the same part.
+- Rows with no OEM part number but a PB/G number are kept under that number and flagged; rows with
+  no identifier at all are skipped and flagged (`blank_part_number`).
+- `Cornell, Pioneer` in the OEM column means the part is shared: one record per company.
+- An OEM Part Number cell listing several numbers (`30500107; 31900404; …`, a kit) is stored under the
+  row's PB/G number with the list kept as a note (`multi_part_number`). One PB number used for different
+  items is flagged (`pb_conflict`).
+- Text in a price column (`on demand`, `2016 List`) is not imported as a price – flagged
+  (`non_numeric_price`). Sell price below cost is flagged. `Discount` and any other unknown column is
+  kept in the row's raw data and listed as an `unmapped_column` issue.
+- Non-numeric quantities (`A/R`, `AIR`, `1m`) are kept as text and flagged; the same part with
+  different descriptions and near-duplicate assembly names are flagged for you to decide. Assembly
+  cells that are just a worksheet name (`Sheet1`, `Data`) are treated as blank (and flagged once).
+- Exact duplicate rows inside a sheet are imported once. Re-importing the same file adds nothing
+  (the preview shows the rows as *unchanged*); only prices that actually changed are added as history.
+- Nothing pre-existing is touched: an import is one transaction and is appended to the database.
 
 ## Running from source
 
