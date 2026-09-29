@@ -11,10 +11,10 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
 3. First run only: the exe loads the **Master** sheets of the bundled `Parts_Rev4.xlsx`
-   (`Godwin/Sykes/BBA/Pioneer Master`, `50CFM_Pioneer`; the unclean per-OEM tabs, planning tabs,
-   `Cleaned Pump Data.xlsx` and — until they are reformatted — `Cornell Master`, `50CFM Cornell`
-   and `Atlas Copco` are not loaded; import them yourself from DATA if you want them).
-   Takes ~20 s; the console shows progress.
+   (`Godwin/Sykes/BBA/Pioneer/Cornell Master`, `50CFM_Pioneer`, `50CFM Cornell`, `Atlas Copco`;
+   the unclean per-OEM tabs, planning tabs and `Cleaned Pump Data.xlsx` are not loaded).
+   Takes ~30 s; the console shows progress. On later runs any bundled sheet that has never been
+   imported into your data folder is added automatically (nothing already there is touched).
    Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, a pump cell
    like `PP66S12_PP66S14_PP88S12` becomes three separate pumps, and common values like
    `BA_100_150_180_200_300` or `CD100M_150M_200M` expand to every pump listed — each of those
@@ -114,15 +114,17 @@ Common, Discount* imports directly. Rules the importer follows – questionable 
 REVIEW, never silently corrected**:
 
 - Part numbers are identifiers: leading zeros (`001-0003`, `00150 1000`) and decimal-looking values
-  (`18799.123`) are kept exactly as written; numbers stored as Excel numbers are flagged
-  (`numeric_part_number`), stray spaces are trimmed and flagged (`whitespace_part_number`).
+  (`18799.123`) are kept exactly as written; stray spaces are trimmed and flagged
+  (`whitespace_part_number`). Punctuation-only variants (`35-0399-8402/110` vs `35-0399-8402110`)
+  are the same part.
 - Rows with no OEM part number but a PB/G number are kept under that number and flagged; rows with
   no identifier at all are skipped and flagged.
 - Text in a price column (`on demand`, `2016 List`) is not imported as a price – flagged
   (`non_numeric_price`). Sell price below cost is flagged. `Discount` and any other unknown column is
   kept in the row's raw data and listed as an `unmapped_column` issue.
-- Non-numeric quantities (`A/R`, `AIR`, `1m`), placeholder assemblies (`Sheet1`, `Data`), the same part
-  with different descriptions, and near-duplicate assembly names are flagged for you to decide.
+- Non-numeric quantities (`A/R`, `AIR`, `1m`) are kept as text and flagged; the same part with
+  different descriptions and near-duplicate assembly names are flagged for you to decide. Assembly
+  cells that are just a worksheet name (`Sheet1`, `Data`) are treated as blank (and flagged once).
 - Exact duplicate rows inside a sheet are imported once. Re-importing the same file adds nothing
   (the preview shows the rows as *unchanged*); only prices that actually changed are added as history.
 - Nothing pre-existing is touched: an import is one transaction and is appended to the database.
