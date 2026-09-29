@@ -77,6 +77,25 @@ source rows. Missing data is shown as _Not specified in imported source_ – not
 - **Export list to CSV** (opens in Excel) and **Print** buttons on part, pump and search pages.
 - Keyboard: `/` jumps to the search box, `Esc` clears it.
 
+## Reading a part page
+
+- **Collapsible sections**: click any blue heading (Used on pumps, Pricing found, Source rows, …) to
+  fold it away; the arrow turns sideways and the heading says *collapsed*. The state is remembered per
+  heading in this browser, so a section you close stays closed on every part until you open it again.
+- **Coloured cards**: each pump + assembly combination a part is used on gets its own card, with the
+  quantity and location that belong to that combination. The colour is derived from the pump/assembly
+  name, so the same pump/assembly is always the same colour everywhere (source rows, related parts,
+  the assembly chips on a pump page). Colours are only a hint – with 12 colours two different
+  combinations can share one, so read the card.
+
+## Screens (side-by-side comparison)
+
+**+ SCREEN** in the header opens the Screens workspace (`/screens`) with the page you were on as
+screen 1. Each screen is a fully independent PartsFinder: search, browse and edit in one without
+affecting the others. Title bar buttons: ⧉ duplicate, □ maximise/restore, ✕ close. Drag the title
+bar to move, drag the bottom-right corner to resize, **Tile** arranges them all in a grid. The layout
+and what each screen shows is remembered in this browser. *single screen →* goes back to the normal view.
+
 ## Importing more spreadsheets
 
 Any `.xlsx` / `.xlsm` / `.csv`. The program finds the header row, maps columns by name
@@ -86,6 +105,27 @@ cost / list / dealer price columns with their currency and year), and guesses th
 sheet name or OEM column. You can correct the OEM and dataset type in the preview before importing.
 Import history is listed on the DATA page; anomalies (possible duplicate part numbers, new pump
 names, price changes, missing descriptions) go to **REVIEW** where they can be resolved gradually.
+
+### The standardized workbook format (Standardized_Pump_Data…)
+
+One sheet per company with the columns *PB Number, PB Description, G-Number, OEM Description,
+OEM Part Number, OEM List Price, Our Costs Price, Sell Price, OEM, Location #, Qty, Assembly, Pump Type,
+Common, Discount* imports directly. Rules the importer follows – questionable data is **flagged on
+REVIEW, never silently corrected**:
+
+- Part numbers are identifiers: leading zeros (`001-0003`, `00150 1000`) and decimal-looking values
+  (`18799.123`) are kept exactly as written; numbers stored as Excel numbers are flagged
+  (`numeric_part_number`), stray spaces are trimmed and flagged (`whitespace_part_number`).
+- Rows with no OEM part number but a PB/G number are kept under that number and flagged; rows with
+  no identifier at all are skipped and flagged.
+- Text in a price column (`on demand`, `2016 List`) is not imported as a price – flagged
+  (`non_numeric_price`). Sell price below cost is flagged. `Discount` and any other unknown column is
+  kept in the row's raw data and listed as an `unmapped_column` issue.
+- Non-numeric quantities (`A/R`, `AIR`, `1m`), placeholder assemblies (`Sheet1`, `Data`), the same part
+  with different descriptions, and near-duplicate assembly names are flagged for you to decide.
+- Exact duplicate rows inside a sheet are imported once. Re-importing the same file adds nothing
+  (the preview shows the rows as *unchanged*); only prices that actually changed are added as history.
+- Nothing pre-existing is touched: an import is one transaction and is appended to the database.
 
 ## Running from source
 
