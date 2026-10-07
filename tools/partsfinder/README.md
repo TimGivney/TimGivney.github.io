@@ -10,11 +10,10 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
    e.g. `C:\PartsFinder\`.
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
-3. First run only: the exe loads the **Master** sheets of the bundled `Parts_Rev4.xlsx`
-   (`Godwin/Sykes/BBA/Pioneer/Cornell Master`, `50CFM_Pioneer`, `50CFM Cornell`, `Atlas Copco`;
-   the unclean per-OEM tabs, planning tabs and `Cleaned Pump Data.xlsx` are not loaded).
-   Takes ~30 s; the console shows progress. On later runs any bundled sheet that has never been
-   imported into your data folder is added automatically (nothing already there is touched).
+3. The exe ships with **no data** — nothing is bundled, so your spreadsheets never leave your PC.
+   First run opens an empty app: go to the **DATA** tab, drop `Register_Part Numbers.xlsx` and
+   `Standardized_Pump_Data_v6_Canonical_OEM.xlsx` (Register first so it can fill in PB numbers),
+   preview and import. Info tabs (OEM Audit / Audit Notes / Controlled Lists) are skipped automatically.
    Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, a pump cell
    like `PP66S12_PP66S14_PP88S12` becomes three separate pumps, and common values like
    `BA_100_150_180_200_300` or `CD100M_150M_200M` expand to every pump listed — each of those
@@ -123,6 +122,15 @@ REVIEW, never silently corrected**:
 - An OEM Part Number cell listing several numbers (`30500107; 31900404; …`, a kit) is stored under the
   row's PB/G number with the list kept as a note (`multi_part_number`). One PB number used for different
   items is flagged (`pb_conflict`).
+- The `Document`/`Document Name` column (the exploded-view drawing the Location # callout belongs to) is
+  imported as `document` and shown on each pump/assembly card — editable like any other field.
+- A **Register Part Numbers** workbook (sheets headed `PartsBender Part Number` mapping each PB number to
+  per-OEM part numbers and descriptions) imports as PartsBender parts. Its other tabs (Category etc.) are
+  lookup legends and are skipped. After every import, any row still missing a PB number whose OEM part
+  number the Register maps is filled in (`pb_from_register`). On a conflict the non-assembly PB is picked
+  automatically (assembly/kit-style numbers are `ASM-…`, `KIT-…`, `G4C07-…`); still-ambiguous matches are
+  flagged `register_conflict`. Kit rows get a note resolving each component OEM number to its PB/G number.
+  Rows with no identifier at all stay skipped — no PB/G number is ever invented.
 - Text in a price column (`on demand`, `2016 List`) is not imported as a price – flagged
   (`non_numeric_price`). Sell price below cost is flagged. `Discount` and any other unknown column is
   kept in the row's raw data and listed as an `unmapped_column` issue.

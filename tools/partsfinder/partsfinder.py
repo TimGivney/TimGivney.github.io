@@ -53,10 +53,12 @@ PLACEHOLDER_ASSEMBLY = re.compile(r"(sheet\s*\d+|data|oem mapping)", re.I)
 def seed_sheet_wanted(file_name: str, sheets: list[str], sheet: str) -> bool:
     """Only master data is pre-loaded: '* Master' sheets where a workbook has them, plus sheets that have
     no master counterpart (50CFM_Pioneer, 50CFM_Cornell, Atlas Copco); the unclean per-OEM sheets and
-    planning tabs are skipped."""
+    planning tabs are skipped. Register workbooks seed every usable tab (Category is unusable anyway)."""
     s = sheet.lower()
     if s in SKIP_SHEETS:
         return False
+    if "register" in file_name.lower():
+        return True
     has_masters = any(x.lower().endswith("master") for x in sheets)
     if not has_masters:
         return True
@@ -78,13 +80,15 @@ FIELD_PATTERNS = {
     "common": [r"^common$", r"^commonality$"],
     "location": [r"^location\s*#?$", r"^item$", r"^partsbender\s*#$", r"^pos(ition)?$"],
     "oem": [r"^oem$", r"^manufacturer$", r"^brand$"],
-    "pb": [r"^pb\s*(number|no\.?|#|num)?$", r"^partsbender\s*(number|no\.?|num)$", r"^pb-?number"],
+    "pb": [r"^pb\s*(number|no\.?|#|num)?$", r"^partsbender\s*(number|no\.?|num)$", r"^pb-?number",
+           r"^partsbender\s*part\s*(number|no\.?|num)$"],
     "gnum": [r"^g[\s-]*(number|no\.?|#|num)$", r"^g$"],
+    "document": [r"^document\s*(name)?$", r"^doc\s*name$", r"^exploded\s*view$", r"drawing", r"dxf", r"cad\s*file"],
 }
 CURRENCY_RE = re.compile(r"\b(usd|aud|eur|eu|gbp|nzd)\b|[$€£]")
 DATE_RE = re.compile(r"(19|20)\d\d")
-PRICE_WORDS = re.compile(r"\b(cost|price|list|dealer|rrp)\b|\$|€")
-NON_PRICE_WORDS = re.compile(r"discount|margin|qty|extended")
+PRICE_WORDS = re.compile(r"\b(cost|price|list|dealer|rrp|discount)\b|\$|€")
+NON_PRICE_WORDS = re.compile(r"margin|qty|extended")
 
 KNOWN_OEMS = ["Godwin", "Sykes", "BBA", "Pioneer", "Cornell", "Atlas Copco", "SPP", "Hudig",
               "Multiflo", "Weir", "John Deere", "Selwood", "Xylem", "Flygt", "Grindex"]
@@ -98,15 +102,18 @@ def detect_header_row(rows: list[list]) -> int | None:
     """Return the index of the first row that looks like a header (has a part-number column)."""
     for i, row in enumerate(rows[:12]):
         heads = [norm_header(c) for c in row]
-        if any(re.search(p, h) for h in heads if h for p in FIELD_PATTERNS["part"]):
+        if any(re.search(p, h) for h in heads if h for p in FIELD_PATTERNS["part"] + FIELD_PATTERNS["pb"]):
             return i
     return None
 
 
-def map_columns(header: list) -> tuple[dict[str, int], list[dict]]:
-    """Map header cells to normalised fields; every cost/price-like column becomes a price field."""
+def map_columns(header: list) -> tuple[dict[str, int], dict[str, list[int]], list[dict]]:
+    """Map header cells to normalised fields; every cost/price-like column becomes a price field.
+    Extra headers matching an already-claimed field are returned in `merged` — their values are
+    joined into the primary column (e.g. Weir's separate 'document' and 'Document Name')."""
     cols: dict[str, int] = {}
     ranks: dict[str, int] = {}
+    merged: dict[str, list[int]] = {}
     prices: list[dict] = []
     for idx, raw in enumerate(header):
         h = norm_header(raw)
@@ -130,9 +137,13 @@ def map_columns(header: list) -> tuple[dict[str, int], list[dict]]:
                 continue
             # patterns are ordered best-first: 'OEM Part Number' beats 'Part Number', 'OEM Description' beats 'PB Description'
             if field not in cols or rank < ranks[field]:
+                if field in cols:
+                    merged.setdefault(field, []).append(idx)
                 cols[field], ranks[field] = idx, rank
+            else:
+                merged.setdefault(field, []).append(idx)
             break
-    return cols, prices
+    return cols, merged, prices
 
 
 STANDARD_HEADER = ["OEM", "Location #", "Part Number", "Description", "Qty", "Assembly", "Pump Type", "Common",
@@ -143,7 +154,7 @@ def split_oems(v: str | None) -> list[str]:
     """'Cornell, Pioneer' / 'Godwin / Sykes' -> ['Cornell', 'Pioneer'] (a part shared by several companies)."""
     if not v:
         return []
-    return [p.strip() for p in re.split(r"\s*[,/;]\s*", v) if p.strip()]
+    return [p.strip() for p in re.split(r"\s*[,/;]\s*|\s+and\s+", v, flags=re.I) if p.strip()]
 
 
 def guess_oem(sheet_name: str, file_name: str, sample_oem_values: list[str]) -> str | None:
@@ -266,7 +277,7 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     if hdr is None:
         return {"sheet": sheet, "usable": False, "reason": "no part-number column found", "rows": len(rows)}
     header = rows[hdr]
-    cols, prices = map_columns(header)
+    cols, merged, prices = map_columns(header)
     body = rows[hdr + 1:]
     oem_vals = [o for r in body if "oem" in cols and len(r) > cols["oem"] for o in split_oems(clean(r[cols["oem"]]))]
     # only trust per-row OEM values that occur repeatedly; stray part numbers in the OEM column fall back to the sheet OEM
@@ -275,10 +286,19 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     recs = []
     flags: list[tuple[str, str, str]] = []  # (kind, subject, detail) — questionable data, surfaced on REVIEW, never auto-fixed
     seen_rows: dict[tuple, int] = {}
+    # the Register workbook keys every row by its 'PartsBender Part Number' — it IS the part identifier
+    is_register = "pb" in cols and "part" not in cols and "partsbender" in norm_header(header[cols["pb"]])
+    if is_register and oem is None:
+        oem = "PartsBender"
     for i, row in enumerate(body, start=hdr + first_data_row):
         row = list(row) + [None] * (len(header) + 2)
-        g = lambda f: clean(row[cols[f]]) if f in cols else None  # noqa: E731
-        rawpart = row[cols["part"]]
+        def g(f):
+            if f not in cols:
+                return None
+            vals = [clean(row[cols[f]])] + [clean(row[j]) for j in merged.get(f, [])]
+            uniq = [v for n, v in enumerate(vals) if v and v not in vals[:n]]
+            return " · ".join(uniq) or None
+        rawpart = row[cols["part"]] if "part" in cols else None
         part = clean(rawpart)
         if part and norm_header(part) in ("part number", "part no.", "part no", "oem part number"):
             continue
@@ -289,7 +309,8 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
                 if any(v not in (None, "") for v in row[:len(header)]):
                     flags.append(("blank_part_number", f"row {i}", f"{sheet}: row has data but no OEM / PB / G number — skipped"))
                 continue
-            flags.append(("no_oem_part_number", part, f"{sheet} row {i}: no OEM part number, listed under its PB/G number"))
+            if not is_register:
+                flags.append(("no_oem_part_number", part, f"{sheet} row {i}: no OEM part number, listed under its PB/G number"))
         comments = g("comments")
         if isinstance(rawpart, str) and ";" in rawpart:
             # a kit row listing its component OEM numbers: the PB/G number identifies the row, the list is kept as a note
@@ -314,7 +335,12 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
         qty = g("qty")
         if qty and num(qty) is None:
             flags.append(("non_numeric_qty", part, f"{sheet} row {i}: Qty = {qty!r}"))
-        desc = g("desc") or g("pbdesc")
+        # PB Description is the internal 'bible' wording; OEM Description is the fallback
+        desc = g("pbdesc") or g("desc")
+        if desc and desc.startswith("="):
+            # the workbook stores a formula where Excel never cached a value (e.g. =VLOOKUP(...))
+            flags.append(("formula_value", part, f"{sheet} row {i}: description is an unevaluated formula {desc[:60]!r} — treated as blank"))
+            desc = None
         assembly = g("assembly")
         if assembly and PLACEHOLDER_ASSEMBLY.fullmatch(assembly):
             f = ("placeholder_assembly", assembly, f"{sheet}: Assembly '{assembly}' is a worksheet name, not an assembly — treated as blank")
@@ -330,12 +356,18 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
                for j in range(len(header)) if header[j] is not None and row[j] is not None}
         # 'Cornell, Pioneer' in the OEM column = the same part is used by both companies: one record per company
         for o in row_oems:
+            pb_v, gn_v, doc_v = g("pb"), g("gnum"), g("document")
+            if is_register and doc_v and re.match(r"^PB\d", doc_v, re.I) and not re.match(r"^PB\d", pb_v or "", re.I):
+                # the '3D Drawing #/ Ref' column carries the real PB####; the Part Number column is usually the G-number
+                if pb_v and not gn_v:
+                    gn_v = pb_v
+                pb_v = doc_v
             rec = {
                 "oem": o if o in trusted_oems else None,
                 "part": part, "key": part_key(part),
                 "desc": desc, "qty": qty, "assembly": assembly,
                 "pump": g("pump"), "common": g("common"), "location": g("location"),
-                "pb": g("pb"), "gnum": g("gnum"), "comments": comments,
+                "pb": pb_v, "gnum": gn_v, "comments": comments, "document": doc_v,
                 "prices": pl, "row": i, "raw": raw,
             }
             rec["commonPumps"] = split_common(rec["common"])
@@ -375,6 +407,9 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     for v in dup_asm.values():
         if len(v) > 1:
             flags.append(("similar_assemblies", sorted(v)[0], f"{sheet}: probably the same assembly: " + " | ".join(sorted(v))))
+    # a legend/reference sheet (e.g. the Register's Category tab) has only word-like 'part numbers'
+    if recs and all(re.fullmatch(r"[A-Za-z][A-Za-z .\-/]*", r["part"]) for r in recs):
+        return {"sheet": sheet, "usable": False, "reason": "reference sheet — no real part numbers", "rows": len(body)}
     dataset = "parts" if "pump" in cols or "assembly" in cols else ("pricing" if prices and "desc" in cols else "parts")
     return {
         "sheet": sheet, "usable": len(recs) > 0, "header_row": hdr + 1, "rows": len(body),
@@ -382,11 +417,12 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
         "columns": {k: str(header[v]).replace("\n", " ").strip() for k, v in cols.items()},
         "price_columns": [p["label"] for p in prices],
         "extra_columns": [str(header[j]).strip() for j in range(len(header)) if header[j] is not None
-                          and j not in cols.values() and j not in {p["col"] for p in prices}],
+                          and j not in cols.values() and j not in {p["col"] for p in prices}
+                          and j not in {x for v in merged.values() for x in v}],
     }
 
 
-SIG_FIELDS = ("oem", "key", "desc", "qty", "assembly", "pump", "common", "location", "pb", "gnum")
+SIG_FIELDS = ("oem", "key", "desc", "qty", "assembly", "pump", "common", "location", "pb", "gnum", "document")
 
 
 def record_sig(r: dict) -> tuple:
@@ -406,7 +442,7 @@ CREATE TABLE IF NOT EXISTS imports (
 CREATE TABLE IF NOT EXISTS records (
   id INTEGER PRIMARY KEY, import_id INTEGER, oem TEXT, part TEXT, key TEXT, desc TEXT,
   qty TEXT, assembly TEXT, pump TEXT, pump_key TEXT, common TEXT, location TEXT, src_row INTEGER, raw TEXT,
-  model TEXT, model_key TEXT, variant TEXT, pb TEXT, gnum TEXT);
+  model TEXT, model_key TEXT, variant TEXT, pb TEXT, gnum TEXT, document TEXT);
 CREATE TABLE IF NOT EXISTS common_pumps (record_id INTEGER, pump TEXT, pump_key TEXT, kind TEXT DEFAULT 'common');
 CREATE TABLE IF NOT EXISTS prices (
   id INTEGER PRIMARY KEY, record_id INTEGER, import_id INTEGER, key TEXT, oem TEXT,
@@ -443,6 +479,9 @@ def db() -> sqlite3.Connection:
     if cols and "pb" not in cols:
         con.execute("ALTER TABLE records ADD COLUMN pb TEXT")
         con.execute("ALTER TABLE records ADD COLUMN gnum TEXT")
+        con.commit()
+    if cols and "document" not in cols:
+        con.execute("ALTER TABLE records ADD COLUMN document TEXT")
         con.commit()
     imp_cols = {r[1] for r in con.execute("PRAGMA table_info(imports)")}
     if imp_cols and "skipped" not in imp_cols:
@@ -538,6 +577,14 @@ def preview_file(path: Path, con: sqlite3.Connection) -> dict:
             "flags": a["flags"], "flag_counts": flag_counts,
             "_records": a["records"],
         })
+    # a Register-style workbook keys rows by 'PartsBender Part Number'; any sheet that has neither an
+    # OEM part-number column nor that PB header is a lookup legend and is skipped
+    if any("partsbender" in (s.get("columns", {}).get("pb") or "").lower() for s in sheets):
+        for s in sheets:
+            cols = s.get("columns", {})
+            if s["usable"] and "part" not in cols and "partsbender" not in (cols.get("pb") or "").lower():
+                s.update({"usable": False, "reason": "register workbook lookup tab — only part-number sheets are imported",
+                          "_records": []})
     pid = f"{int(time.time()*1000)}"
     PREVIEWS[pid] = {"path": str(path), "sheets": sheets}
     return {"preview_id": pid, "file": path.name,
@@ -546,7 +593,7 @@ def preview_file(path: Path, con: sqlite3.Connection) -> dict:
 
 def _already_stored(con: sqlite3.Connection, r: dict) -> bool:
     rows = con.execute(
-        "SELECT oem,key,desc,qty,assembly,pump,common,location,pb,gnum FROM records WHERE key=? AND IFNULL(pump,'')=IFNULL(?,'') "
+        "SELECT oem,key,desc,qty,assembly,pump,common,location,pb,gnum,document FROM records WHERE key=? AND IFNULL(pump,'')=IFNULL(?,'') "
         "AND IFNULL(assembly,'')=IFNULL(?,'')", (r["key"], r["pump"], r["assembly"])).fetchall()
     if not rows:
         return False
@@ -556,6 +603,13 @@ def _already_stored(con: sqlite3.Connection, r: dict) -> bool:
         # a row whose OEM was inferred from the sheet still matches the stored explicit OEM
         if r["oem"] is None:
             d["oem"] = None
+        # identifiers filled in later by the register still match a re-imported row without them
+        if r["pb"] is None:
+            d["pb"] = None
+        if r["gnum"] is None:
+            d["gnum"] = None
+        if r["document"] is None:
+            d["document"] = None
         if record_sig(d) == sig:
             return True
     return False
@@ -620,12 +674,12 @@ def _commit_sheets(pv: dict, choices: dict, con: sqlite3.Connection, path: Path,
             multi = multi_pumps(r["pump"])
             model, variant = (None, None) if multi else split_pump(r["pump"])
             c2 = con.execute(
-                "INSERT INTO records(import_id,oem,part,key,desc,qty,assembly,pump,pump_key,common,location,src_row,raw,model,model_key,variant,pb,gnum) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO records(import_id,oem,part,key,desc,qty,assembly,pump,pump_key,common,location,src_row,raw,model,model_key,variant,pb,gnum,document) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (iid, ro, r["part"], r["key"], r["desc"], r["qty"], r["assembly"], r["pump"],
                  pump_key(r["pump"]) if r["pump"] else None, r["common"], r["location"], r["row"],
                  json.dumps(r["raw"], default=str), model, pump_key(model) if model else None, variant,
-                 r.get("pb"), r.get("gnum")))
+                 r.get("pb"), r.get("gnum"), r.get("document")))
             rid = c2.lastrowid
             mk = {pump_key(p) for p in multi}
             con.executemany("INSERT INTO common_pumps VALUES(?,?,?,'pump')", [(rid, p, pump_key(p)) for p in multi])
@@ -659,6 +713,87 @@ def _commit_sheets(pv: dict, choices: dict, con: sqlite3.Connection, path: Path,
                 con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(?,?,?,?,?)",
                             (iid, kind, subj, det, ts))
         done.append({"sheet": s["sheet"], "oem": oem, "rows": s["rows"], "import_id": iid})
+    _apply_register(con, ts)
+
+
+def _apply_register(con: sqlite3.Connection, ts: str) -> None:
+    """Fill missing PB numbers on imported rows whose OEM part number the Register maps to a PB number."""
+    links: dict[str, set] = {}
+    dlinks: dict[str, set] = {}
+    rlinks: dict[str, set] = {}  # OEM part key -> the Register's own part/G numbers (the tissue to PB-numbered entries)
+    for pb, gn, raw in con.execute("SELECT part, gnum, raw FROM records WHERE pb IS NOT NULL AND raw IS NOT NULL"):
+        try:
+            rd = json.loads(raw)
+        except Exception:
+            continue
+        # the real PB#### often lives in the '3D Drawing #/ Ref' column rather than 'Part Number'
+        drawing = next((clean(v) for k, v in rd.items() if "drawing" in str(k).lower()), None)
+        for k, v in rd.items():
+            if re.match(r"^(?!\s*partsbender).+\s*part\s*number\s*/?\s*$", str(k), re.I) and v not in (None, ""):
+                links.setdefault(part_key(str(v)), set()).add(drawing if drawing and re.match(r"^PB\d", drawing, re.I) else pb)
+                rlinks.setdefault(part_key(str(v)), set()).add(gn or pb)
+                if drawing:
+                    dlinks.setdefault(part_key(str(v)), set()).add(drawing)
+    if not links:
+        return
+    # G numbers live on the standardized sheets, not in the Register — map them too so kit notes can show them
+    glinks: dict[str, set] = {}
+    for gnum, part in con.execute("SELECT gnum, part FROM records WHERE gnum IS NOT NULL"):
+        glinks.setdefault(part_key(part), set()).add(gnum)
+    # assembly/kit-style PBs (ASM-…, KIT-…, G4C07-…): on a conflict the plain PB is the part itself
+    asm_pb = re.compile(r"^(ASM-|KIT-|G\d+C)", re.I)
+    filled = 0
+    for rid, key in con.execute("SELECT id, key FROM records WHERE pb IS NULL").fetchall():
+        pbs = links.get(key)
+        if not pbs:
+            continue
+        pick = pbs if len(pbs) == 1 else {p for p in pbs if not asm_pb.match(p)}
+        if len(pick) == 1:
+            con.execute("UPDATE records SET pb=? WHERE id=?", (next(iter(pick)), rid))
+            filled += 1
+        else:
+            con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'register_conflict',?,?,?)",
+                        (key, "Register maps this part to several PB numbers: " + ", ".join(sorted(pbs)), ts))
+    docs = 0
+    for rid, key in con.execute("SELECT id, key FROM records WHERE document IS NULL").fetchall():
+        ds = dlinks.get(key)
+        if ds and len(ds) == 1:
+            con.execute("UPDATE records SET document=? WHERE id=?", (next(iter(ds)), rid))
+            docs += 1
+    if docs:
+        con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'doc_from_register',?,?,?)",
+                    ("register", f"Drawing/document references filled in from the Register for {docs} rows", ts))
+    # the Register's own part/G numbers link an OEM entry to its PB-numbered entry (same physical part)
+    gnums = 0
+    for rid, key in con.execute("SELECT id, key FROM records WHERE gnum IS NULL").fetchall():
+        rs = rlinks.get(key)
+        if rs and len(rs) == 1:
+            con.execute("UPDATE records SET gnum=? WHERE id=?", (next(iter(rs)), rid))
+            gnums += 1
+    if gnums:
+        con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'gnum_from_register',?,?,?)",
+                    ("register", f"G/part numbers linking to Register entries filled in for {gnums} rows", ts))
+    if filled:
+        con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'pb_from_register',?,?,?)",
+                    ("register", f"PB numbers filled in from the Register for {filled} rows", ts))
+    # kit contents: a row whose stored note is an 'OEM part numbers: a; b; c' list gets a note resolving
+    # each component to its PB / G number
+    for nid, subj, text in con.execute(
+            "SELECT id, subject, text FROM notes WHERE text LIKE 'OEM part numbers:%'").fetchall():
+        comps = [c.strip() for c in text.split(":", 1)[1].split(";") if c.strip()]
+        resolved = []
+        for c in comps:
+            cands = set(links.get(part_key(c), ()))
+            if len(cands) > 1:
+                cands = {p for p in cands if not asm_pb.match(p)} or cands
+            pb = next(iter(cands)) if len(cands) == 1 else ("several: " + ", ".join(sorted(cands)) if cands else None)
+            gn = next(iter(glinks[part_key(c)])) if len(glinks.get(part_key(c), ())) == 1 else None
+            resolved.append(f"{c} ({pb or gn or 'no PB/G number'})")
+        if any("no PB/G" not in r for r in resolved):
+            body = "Kit contents resolved via Register: " + "; ".join(resolved)
+            if not con.execute("SELECT 1 FROM notes WHERE kind='part' AND subject=? AND text=?", (subj, body)).fetchone():
+                con.execute("INSERT INTO notes(kind,subject,title,text,created_at,updated_at) VALUES('part',?,?,?,?,?)",
+                            (subj, "Kit contents", body, ts, ts))
 
 
 # --------------------------------------------------------------------------- #
@@ -744,6 +879,69 @@ def q_part(con, key: str) -> dict:
         alts = rec_dicts(con.execute(
             "SELECT key, MIN(part) part, oem FROM records WHERE desc=? AND oem=? AND key<>? GROUP BY key LIMIT 20",
             (d0, rows[0]["oem"], key)))
+    # equivalents: identifiers carried on these rows (pb/gnum/document) that are themselves part entries,
+    # plus entries whose pb/gnum/document point back at this part number — the 'same physical part' tissue
+    myrefs = set()
+    for r in rows:
+        for f in ("pb", "gnum", "document"):
+            if r[f]:
+                for v in re.split(r"\s*·\s*", str(r[f])):
+                    myrefs.add(part_key(v))
+    myrefs.discard(key)
+    equiv: dict[str, dict] = {}
+    if myrefs:
+        ph = ",".join("?" * len(myrefs))
+        for e in con.execute(
+                f"SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records WHERE key IN ({ph}) GROUP BY key",
+                tuple(myrefs)):
+            equiv[e[0]] = {"key": e[0], "part": e[1], "oem": e[2], "desc": e[3], "rows": e[4], "dir": "also"}
+    norm_sql = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(IFNULL({f},'')),'-',''),' ',''),'_',''),'.',''),'/','')"
+    back = con.execute(
+        "SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records WHERE key<>? AND ("
+        + " OR ".join(norm_sql.format(f=f) + "=?" for f in ("pb", "gnum", "document")) +
+        ") GROUP BY key LIMIT 50",
+        [key] * 4)
+    for e in back:
+        equiv.setdefault(e[0], {"key": e[0], "part": e[1], "oem": e[2], "desc": e[3], "rows": e[4], "dir": "ref"})
+    # same PB or G number on different part entries = the same physical part (e.g. BBA 1852600741 <-> G2C06-0009-BS via PB435)
+    for fld in ("pb", "gnum"):
+        vals = [r[fld] for r in rows if r[fld]]
+        for v in vals:
+            for e in con.execute(
+                    f"SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records "
+                    f"WHERE key<>? AND {fld}=? GROUP BY key LIMIT 20", (key, v)):
+                equiv.setdefault(e[0], {"key": e[0], "part": e[1], "oem": e[2], "desc": e[3], "rows": e[4], "dir": "ref"})
+    # suggested matches: shared number-bearing description tokens or the same decimal number family
+    # (e.g. SPP '19639.380K' ~ '19639.168'). Inferred — labelled 'possible', never merged automatically.
+    _stop = {"and", "to", "for", "the", "of", "in", "with", "suit", "suits", "part", "pump", "pumps", "assembly", "iaw"}
+    def _toks(s: str | None) -> set:
+        return {t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if len(t) > 1 and t not in _stop}
+    my_toks = set().union(*(_toks(d) for d in {r["desc"] for r in rows if r["desc"]})) if rows else set()
+    dig_toks = {t for t in my_toks if any(c.isdigit() for c in t)}
+    fams = {m.group(1) for r in rows for m in [re.match(r"^(\d{3,})\.\d", str(r["part"] or ""))] if m}
+    suggested: dict[str, dict] = {}
+    conds, params = [], []
+    for t in list(dig_toks)[:6]:
+        conds.append("desc LIKE ?")
+        params.append(f"%{t}%")
+    for fp in fams:
+        conds.append("part LIKE ?")
+        params.append(f"{fp}.%")
+    if conds:
+        cand = con.execute(
+            "SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records WHERE key<>? AND ("
+            + " OR ".join(conds) + ") GROUP BY key LIMIT 400",
+            [key] + params)
+        for c in cand:
+            ct = _toks(c[3])
+            shared, digshared = my_toks & ct, dig_toks & ct
+            cfam = re.match(r"^(\d{3,})\.\d", str(c[1] or ""))
+            same_fam = cfam and cfam.group(1) in fams
+            if (digshared and len(shared) >= 2) or (same_fam and shared):
+                score = len(digshared) * 3 + len(shared) * 2 + (5 if same_fam else 0)
+                if c[0] not in equiv:
+                    suggested[c[0]] = {"key": c[0], "part": c[1], "oem": c[2], "desc": c[3],
+                                       "shared": sorted(shared), "score": score}
     by_oem = []
     for o in sorted({r["oem"] for r in rows if r["oem"]}):
         orows = [r for r in rows if r["oem"] == o]
@@ -760,7 +958,8 @@ def q_part(con, key: str) -> dict:
             "pumps": pumps, "assemblies": assemblies, "common": common,
             "common_raw": sorted({r["common"] for r in rows if r["common"]}),
             "pb": sorted({r["pb"] for r in rows if r["pb"]}), "gnum": sorted({r["gnum"] for r in rows if r["gnum"]}),
-            "prices": prices, "related": related, "alternates": alts, "rows": rows,
+            "prices": prices, "related": related, "alternates": alts, "equiv": sorted(equiv.values(), key=lambda e: e["part"] or ""),
+            "suggested": sorted(suggested.values(), key=lambda e: -e["score"])[:15], "rows": rows,
             "notes": q_notes(con, "part", key)}
 
 
@@ -818,9 +1017,14 @@ def q_oem(con, oem: str) -> dict:
     tree = next((o for o in q_browse(con) if o["oem"] == oem), None)
     models = tree["models"] if tree else []
     asm = [r[0] for r in con.execute("SELECT DISTINCT assembly FROM records WHERE oem=? AND assembly IS NOT NULL ORDER BY assembly", (oem,))]
+    parts_list = rec_dicts(con.execute(
+        "SELECT key, MIN(part) part, MIN(desc) desc, MAX(pb) pb, MAX(gnum) gnum, "
+        "COUNT(*) rows, COUNT(DISTINCT pump_key) pumps FROM records WHERE oem=? "
+        "GROUP BY key ORDER BY part", (oem,)))
     return {"oem": oem,
             "rows": con.execute("SELECT COUNT(*) FROM records WHERE oem=?", (oem,)).fetchone()[0],
             "parts": con.execute("SELECT COUNT(DISTINCT key) FROM records WHERE oem=?", (oem,)).fetchone()[0],
+            "parts_list": parts_list,
             "models": models, "assemblies": asm,
             "imports": rec_dicts(con.execute("SELECT * FROM imports WHERE oem=? ORDER BY id DESC", (oem,))),
             "notes": q_notes(con, "oem", oem)}
@@ -857,10 +1061,10 @@ def q_browse(con) -> list[dict]:
 # Manual edits, notes
 # --------------------------------------------------------------------------- #
 
-EDITABLE = ("oem", "part", "desc", "qty", "assembly", "pump", "common", "location", "pb", "gnum")
+EDITABLE = ("oem", "part", "desc", "qty", "assembly", "pump", "common", "location", "pb", "gnum", "document")
 FIELD_LABELS = {"oem": "Company", "part": "OEM Part Number", "desc": "Description", "qty": "Quantity",
                 "assembly": "Assembly", "pump": "Pump", "common": "Common with", "location": "Location",
-                "pb": "PB Number", "gnum": "G-Number"}
+                "pb": "PB Number", "gnum": "G-Number", "document": "Document"}
 
 
 def _derive(con: sqlite3.Connection, rid: int) -> None:
@@ -1319,9 +1523,9 @@ const gstyle=(pump,asm)=>`style="--h:${hue(gkey(pump,asm))}"`;
 const NS='<span class="dim">Not specified in imported source.</span>';
 const fact=(l,v,b)=>`<span class="fl">${l}</span><span class="fv">${v?(b?`<b>${v}</b>`:v):'<span class="dim">Not specified in imported source</span>'}</span>`;
 // one coloured card per pump + assembly the part is used on: quantity and location(s) stay attached to their assembly
-function useCards(rows){const g={};rows.forEach(r=>{if(!r.pump&&!r.assembly&&!r.location&&!r.qty)return;const k=gkey(r.pump,r.assembly);(g[k]=g[k]||{pump:r.pump,asm:r.assembly,oem:r.oem,qty:new Set(),loc:new Set()});if(r.qty)g[k].qty.add(r.qty);if(r.location)g[k].loc.add(r.location)});
+function useCards(rows){const g={};rows.forEach(r=>{if(!r.pump&&!r.assembly&&!r.location&&!r.qty&&!r.document)return;const k=gkey(r.pump,r.assembly);(g[k]=g[k]||{pump:r.pump,asm:r.assembly,oem:r.oem,qty:new Set(),loc:new Set(),doc:new Set()});if(r.qty)g[k].qty.add(r.qty);if(r.location)g[k].loc.add(r.location);if(r.document)g[k].doc.add(r.document)});
  const cards=Object.values(g);if(!cards.length)return '';
- return `<div class="uses">${cards.map(c=>`<div class="grp" ${gstyle(c.pump,c.asm)}><div class="gp">${c.pump?chip(c.pump,'#/pump/'+encodeURIComponent(c.pump)):'<span class="dim">Pump not specified</span>'}<span class="dim small">${esc(c.oem||'')}</span></div><div class="ga"><span class="fl">Assembly</span>${esc(c.asm||'—')}</div><div class="gq"><span class="fl">Qty</span>${esc([...c.qty].join(' / ')||'—')}<span class="fl" style="margin-left:14px">Location</span>${esc([...c.loc].join(', ')||'—')}</div></div>`).join('')}</div>`}
+ return `<div class="uses">${cards.map(c=>`<div class="grp" ${gstyle(c.pump,c.asm)}><div class="gp">${c.pump?chip(c.pump,'#/pump/'+encodeURIComponent(c.pump)):'<span class="dim">Pump not specified</span>'}<span class="dim small">${esc(c.oem||'')}</span></div><div class="ga"><span class="fl">Assembly</span>${esc(c.asm||'—')}</div><div class="gq"><span class="fl">Qty</span>${esc([...c.qty].join(' / ')||'—')}<span class="fl" style="margin-left:14px">Location</span>${esc([...c.loc].join(', ')||'—')}${c.doc.size?`<span class="fl" style="margin-left:14px">Document</span>${esc([...c.doc].join(', '))}`:''}</div></div>`).join('')}</div>`}
 async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key));if(!d.found)return `<p class="dim">Part not found.</p>`;lastList=d.rows;
  const qtys=[...new Set(d.rows.filter(r=>r.qty).map(r=>r.qty))],locs=[...new Set(d.rows.filter(r=>r.location).map(r=>r.location))];
  let h=`<div><h2><span class="lbl">OEM Part Number</span>${esc(d.part)}</h2><p class="sub">${esc(d.descs.join(' · ')||'No description')}</p>
@@ -1330,6 +1534,12 @@ async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key))
  h+=sec('Used on pumps',d.pumps.length?`<div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div>`:'<span class="dim">Pump compatibility: Not specified in imported source.</span>');
  h+=sec('Common with (also fits these pumps)',d.common.length?`<div class="chips">${d.common.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div><p class="small">Source value: ${esc(d.common_raw.join(' | '))}</p>`:NS);
  h+=sec(`Pricing found · ${d.prices.length} <button class="chip act" style="margin-left:8px" onclick="addPrice(${d.rows[0].id})">+ Add a price</button>`,d.prices.length?`<table><tr><th>Company</th><th>Price type</th><th>Price</th><th>Price date</th><th>Imported</th><th>Source file</th><th></th></tr>${d.prices.map(p=>`<tr><td>${esc(p.oem||'')}</td><td>${esc(p.label)}</td><td class="g">${money(p)}</td><td class="dim">${esc(p.date||'—')}</td><td class="dim">${esc(p.imported_at)}</td><td class="dim">${esc(p.file)} › ${esc(p.sheet)}</td><td><button class="x" title="Remove this price" onclick="delPrice(${p.id})">✕</button></td></tr>`).join('')}</table>`:'<span class="dim">No pricing in imported source.</span>');
+ if(d.equiv.length){const also=d.equiv.filter(e=>e.dir==='also'),ref=d.equiv.filter(e=>e.dir==='ref');
+  h+=sec('Same part listed as <span class="dim">· linked through the Register (PB/G numbers)</span>',
+   `${also.length?`<p class="small">This part is also listed as:</p><div class="chips">${also.map(e=>chip(`${e.part}${e.oem?' ('+e.oem+')':''}`,'#/part/'+encodeURIComponent(e.key))).join('')}</div>`:''}
+    ${ref.length?`<p class="small">OEM/other numbers that resolve to this part:</p><div class="chips">${ref.map(e=>chip(`${e.part}${e.oem?' ('+e.oem+')':''}`,'#/part/'+encodeURIComponent(e.key))).join('')}</div>`:''}`);}
+ if(d.suggested.length)h+=sec(`Possibly the same part · ${d.suggested.length} <span class="dim">· matched on description/number family — verify before relying on it</span>`,
+  `<table><tr><th>Part</th><th>Company</th><th>Description</th><th>Matches on</th></tr>${d.suggested.map(e=>`<tr><td class="g">${chip(e.part,'#/part/'+encodeURIComponent(e.key))}</td><td>${esc(e.oem||'')}</td><td>${esc(e.desc||'')}</td><td class="dim">${esc(e.shared.join(', '))}</td></tr>`).join('')}</table>`);
  if(d.alternates.length)h+=sec('Same description, different part number (check — not confirmed alternates)',`<div class="chips">${d.alternates.map(a=>chip(a.part,'#/part/'+encodeURIComponent(a.key))).join('')}</div>`);
  if(d.related.length){const rg={};d.related.forEach(x=>{const k=gkey(x.pump,x.assembly);(rg[k]=rg[k]||{pump:x.pump,asm:x.assembly,items:[]}).items.push(x)});
   h+=sec('Related parts (same pump & assembly)',`<div class="uses">${Object.values(rg).map(g=>`<div class="grp" ${gstyle(g.pump,g.asm)}><div class="gp">${g.pump?chip(g.pump,'#/pump/'+encodeURIComponent(g.pump)):'<span class="dim">Pump not specified</span>'}<span class="dim small">${esc(g.asm||'')}</span></div><div class="chips">${g.items.map(x=>chip(x.part+(x.desc?' — '+x.desc:''),'#/part/'+encodeURIComponent(x.key))).join('')}</div></div>`).join('')}</div>`)}
@@ -1373,6 +1583,7 @@ async function viewOem(o){const d=await api('/oem/'+encodeURIComponent(o));
  h+=sec(`Pump types · ${d.models.length}`,d.models.length?`<div class="chips">${dm.map(mchip).join('')}</div>${vars.length?`<p class="small" style="margin-top:10px">Variants: ${vars.map(m=>`${esc(m.model)} → ${m.variants.map(v=>chip(v.variant||v.pump,'#/pump/'+encodeURIComponent(v.pump))).join(' ')}`).join(' &nbsp;·&nbsp; ')}</p>`:''}${cm.length?`<p class="small" style="margin-top:10px">Named in “Common” fields (parts shared with them):</p><div class="chips">${cm.map(mchip).join('')}</div>`:''}`:NS);
  h+=sec(`Assemblies · ${d.assemblies.length}`,d.assemblies.length?esc(d.assemblies.slice(0,80).join(' · ')):NS);
  h+=sec('Imports',`<table><tr><th>Date</th><th>File</th><th>Sheet</th><th>Rows</th></tr>${d.imports.map(i=>`<tr><td class="dim">${esc(i.imported_at)}</td><td>${esc(i.file)}</td><td>${esc(i.sheet)}</td><td class="g">${i.rows}</td></tr>`).join('')}</table>`);
+ h+=sec(`All parts · ${d.parts_list.length}`,d.parts_list.length?`<table><tr><th>Part number</th><th>Description</th><th>PB number</th><th>G-number</th><th>Rows</th><th>Pumps</th></tr>${d.parts_list.map(p=>`<tr><td class="g">${chip(p.part,'#/part/'+encodeURIComponent(p.key))}</td><td>${esc(p.desc||'')}</td><td>${esc(p.pb||'')}</td><td>${esc(p.gnum||'')}</td><td class="dim">${p.rows}</td><td class="dim">${p.pumps||''}</td></tr>`).join('')}</table>`:NS);
  return h}
 async function viewData(){const d=await api('/imports');const ed=await api('/edits');const nt=await api('/notes');
  let h=`<h2 style="font-size:20px">DATA</h2><p class="dim">Raw uploads are kept untouched in <code>PartsFinder/raw/</code>. Drop files here or into <code>PartsFinder/inbox/</code> and click Scan inbox.</p>
@@ -1421,7 +1632,7 @@ function toast(m,err,undoId){const t=document.createElement('div');t.className='
 async function post(p,body){const d=await api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});if(d.error){toast(d.error,true);throw new Error(d.error)}return d}
 async function undo(id){await post('/edits/'+id+'/undo');toast('Undone');browse=null;await loadStats();render()}
 // ---- editing ----
-const FIELDS=[['oem','Company'],['part','OEM Part Number'],['desc','Description'],['qty','Qty'],['assembly','Assembly'],['pump','Pump'],['common','Common with'],['location','Location'],['pb','PB Number'],['gnum','G-Number']];
+const FIELDS=[['oem','Company'],['part','OEM Part Number'],['desc','Description'],['qty','Qty'],['assembly','Assembly'],['pump','Pump'],['common','Common with'],['location','Location'],['pb','PB Number'],['gnum','G-Number'],['document','Document']];
 function edCell(r,f){return `<td><input class="ed" value="${esc(r[f]??'')}" data-rid="${r.id}" data-f="${f}" data-o="${esc(r[f]??'')}" title="Click to edit — Enter or click away to save, Esc to cancel" oninput="this.classList.toggle('dirty',this.value!==this.dataset.o)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value=this.dataset.o;this.classList.remove('dirty');this.blur()}" onblur="saveCell(this)"></td>`}
 async function saveCell(el){if(el.value===el.dataset.o)return;const f=el.dataset.f;try{const d=await post('/edit',{record_id:+el.dataset.rid,field:f,value:el.value});el.dataset.o=el.value;el.classList.remove('dirty');
  toast(`Saved ${FIELDS.find(x=>x[0]===f)[1]}`,false,d.edit_id);browse=null;await loadStats();if(location.hash.startsWith('#/part/')&&d.key!==decodeURIComponent(location.hash.slice(7)))nav('#/part/'+encodeURIComponent(d.key));else render()}catch(e){el.focus()}}
@@ -1442,7 +1653,7 @@ async function delNote(id){if(!confirm('Delete this note?'))return;await post('/
 // ---- export / print / keyboard ----
 function csv(rows,cols,name){const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};const s=[cols.map(c=>q(c[1])).join(',')].concat(rows.map(r=>cols.map(c=>q(typeof c[0]==='function'?c[0](r):r[c[0]])).join(','))).join('\r\n');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+s],{type:'text/csv'}));a.download=name.replace(/[^\w.-]+/g,'_')+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
-let lastList=[];const PCOLS=[['part','OEM Part Number'],['desc','Description'],['oem','Company'],['pump','Pump'],['assembly','Assembly'],['qty','Qty'],['common','Common with'],['location','Location'],['pb','PB Number'],['gnum','G-Number']];
+let lastList=[];const PCOLS=[['part','OEM Part Number'],['desc','Description'],['oem','Company'],['pump','Pump'],['assembly','Assembly'],['qty','Qty'],['common','Common with'],['location','Location'],['pb','PB Number'],['gnum','G-Number'],['document','Document']];
 function tools(name){return `<div class="tools"><button class="chip act" onclick="csv(lastList,PCOLS,'${esc(name)}')">⬇ Export list to CSV (Excel)</button><button class="chip act" onclick="print()">🖨 Print</button></div>`}
 document.addEventListener('keydown',e=>{if(e.target.matches('input,textarea'))return;if(e.key==='/'){e.preventDefault();const i=$('#q');if(i)i.focus();else{q='';nav('#/')}}if(e.key==='Escape'&&$('#q')){q='';render()}});
 async function render(){const h=location.hash||'#/';const app=$('#app');['search','browse','data','review'].forEach(n=>$('#n-'+n).classList.toggle('on',h.startsWith('#/'+n)||(n==='search'&&!/^#\/(browse|data|review)/.test(h))));
