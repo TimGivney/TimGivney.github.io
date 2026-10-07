@@ -603,9 +603,11 @@ def _already_stored(con: sqlite3.Connection, r: dict) -> bool:
         # a row whose OEM was inferred from the sheet still matches the stored explicit OEM
         if r["oem"] is None:
             d["oem"] = None
-        # a PB number or document filled in later by the register still matches a re-imported row without one
+        # identifiers filled in later by the register still match a re-imported row without them
         if r["pb"] is None:
             d["pb"] = None
+        if r["gnum"] is None:
+            d["gnum"] = None
         if r["document"] is None:
             d["document"] = None
         if record_sig(d) == sig:
@@ -718,7 +720,8 @@ def _apply_register(con: sqlite3.Connection, ts: str) -> None:
     """Fill missing PB numbers on imported rows whose OEM part number the Register maps to a PB number."""
     links: dict[str, set] = {}
     dlinks: dict[str, set] = {}
-    for pb, raw in con.execute("SELECT part, raw FROM records WHERE pb IS NOT NULL AND raw IS NOT NULL"):
+    rlinks: dict[str, set] = {}  # OEM part key -> the Register's own part/G numbers (the tissue to PB-numbered entries)
+    for pb, gn, raw in con.execute("SELECT part, gnum, raw FROM records WHERE pb IS NOT NULL AND raw IS NOT NULL"):
         try:
             rd = json.loads(raw)
         except Exception:
@@ -728,6 +731,7 @@ def _apply_register(con: sqlite3.Connection, ts: str) -> None:
         for k, v in rd.items():
             if re.match(r"^(?!\s*partsbender).+\s*part\s*number\s*/?\s*$", str(k), re.I) and v not in (None, ""):
                 links.setdefault(part_key(str(v)), set()).add(drawing if drawing and re.match(r"^PB\d", drawing, re.I) else pb)
+                rlinks.setdefault(part_key(str(v)), set()).add(gn or pb)
                 if drawing:
                     dlinks.setdefault(part_key(str(v)), set()).add(drawing)
     if not links:
@@ -759,6 +763,16 @@ def _apply_register(con: sqlite3.Connection, ts: str) -> None:
     if docs:
         con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'doc_from_register',?,?,?)",
                     ("register", f"Drawing/document references filled in from the Register for {docs} rows", ts))
+    # the Register's own part/G numbers link an OEM entry to its PB-numbered entry (same physical part)
+    gnums = 0
+    for rid, key in con.execute("SELECT id, key FROM records WHERE gnum IS NULL").fetchall():
+        rs = rlinks.get(key)
+        if rs and len(rs) == 1:
+            con.execute("UPDATE records SET gnum=? WHERE id=?", (next(iter(rs)), rid))
+            gnums += 1
+    if gnums:
+        con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'gnum_from_register',?,?,?)",
+                    ("register", f"G/part numbers linking to Register entries filled in for {gnums} rows", ts))
     if filled:
         con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'pb_from_register',?,?,?)",
                     ("register", f"PB numbers filled in from the Register for {filled} rows", ts))
@@ -865,6 +879,61 @@ def q_part(con, key: str) -> dict:
         alts = rec_dicts(con.execute(
             "SELECT key, MIN(part) part, oem FROM records WHERE desc=? AND oem=? AND key<>? GROUP BY key LIMIT 20",
             (d0, rows[0]["oem"], key)))
+    # equivalents: identifiers carried on these rows (pb/gnum/document) that are themselves part entries,
+    # plus entries whose pb/gnum/document point back at this part number — the 'same physical part' tissue
+    myrefs = set()
+    for r in rows:
+        for f in ("pb", "gnum", "document"):
+            if r[f]:
+                for v in re.split(r"\s*·\s*", str(r[f])):
+                    myrefs.add(part_key(v))
+    myrefs.discard(key)
+    equiv: dict[str, dict] = {}
+    if myrefs:
+        ph = ",".join("?" * len(myrefs))
+        for e in con.execute(
+                f"SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records WHERE key IN ({ph}) GROUP BY key",
+                tuple(myrefs)):
+            equiv[e[0]] = {"key": e[0], "part": e[1], "oem": e[2], "desc": e[3], "rows": e[4], "dir": "also"}
+    norm_sql = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(IFNULL({f},'')),'-',''),' ',''),'_',''),'.',''),'/','')"
+    back = con.execute(
+        "SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records WHERE key<>? AND ("
+        + " OR ".join(norm_sql.format(f=f) + "=?" for f in ("pb", "gnum", "document")) +
+        ") GROUP BY key LIMIT 50",
+        [key] * 4)
+    for e in back:
+        equiv.setdefault(e[0], {"key": e[0], "part": e[1], "oem": e[2], "desc": e[3], "rows": e[4], "dir": "ref"})
+    # suggested matches: shared number-bearing description tokens or the same decimal number family
+    # (e.g. SPP '19639.380K' ~ '19639.168'). Inferred — labelled 'possible', never merged automatically.
+    _stop = {"and", "to", "for", "the", "of", "in", "with", "suit", "suits", "part", "pump", "pumps", "assembly", "iaw"}
+    def _toks(s: str | None) -> set:
+        return {t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if len(t) > 1 and t not in _stop}
+    my_toks = set().union(*(_toks(d) for d in {r["desc"] for r in rows if r["desc"]})) if rows else set()
+    dig_toks = {t for t in my_toks if any(c.isdigit() for c in t)}
+    fams = {m.group(1) for r in rows for m in [re.match(r"^(\d{3,})\.\d", str(r["part"] or ""))] if m}
+    suggested: dict[str, dict] = {}
+    conds, params = [], []
+    for t in list(dig_toks)[:6]:
+        conds.append("desc LIKE ?")
+        params.append(f"%{t}%")
+    for fp in fams:
+        conds.append("part LIKE ?")
+        params.append(f"{fp}.%")
+    if conds:
+        cand = con.execute(
+            "SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records WHERE key<>? AND ("
+            + " OR ".join(conds) + ") GROUP BY key LIMIT 400",
+            [key] + params)
+        for c in cand:
+            ct = _toks(c[3])
+            shared, digshared = my_toks & ct, dig_toks & ct
+            cfam = re.match(r"^(\d{3,})\.\d", str(c[1] or ""))
+            same_fam = cfam and cfam.group(1) in fams
+            if (digshared and len(shared) >= 2) or (same_fam and shared):
+                score = len(digshared) * 3 + len(shared) * 2 + (5 if same_fam else 0)
+                if c[0] not in equiv:
+                    suggested[c[0]] = {"key": c[0], "part": c[1], "oem": c[2], "desc": c[3],
+                                       "shared": sorted(shared), "score": score}
     by_oem = []
     for o in sorted({r["oem"] for r in rows if r["oem"]}):
         orows = [r for r in rows if r["oem"] == o]
@@ -881,7 +950,8 @@ def q_part(con, key: str) -> dict:
             "pumps": pumps, "assemblies": assemblies, "common": common,
             "common_raw": sorted({r["common"] for r in rows if r["common"]}),
             "pb": sorted({r["pb"] for r in rows if r["pb"]}), "gnum": sorted({r["gnum"] for r in rows if r["gnum"]}),
-            "prices": prices, "related": related, "alternates": alts, "rows": rows,
+            "prices": prices, "related": related, "alternates": alts, "equiv": sorted(equiv.values(), key=lambda e: e["part"] or ""),
+            "suggested": sorted(suggested.values(), key=lambda e: -e["score"])[:15], "rows": rows,
             "notes": q_notes(con, "part", key)}
 
 
@@ -1456,6 +1526,12 @@ async function viewPart(key){const d=await api('/part/'+encodeURIComponent(key))
  h+=sec('Used on pumps',d.pumps.length?`<div class="chips">${d.pumps.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div>`:'<span class="dim">Pump compatibility: Not specified in imported source.</span>');
  h+=sec('Common with (also fits these pumps)',d.common.length?`<div class="chips">${d.common.map(p=>chip(p,'#/pump/'+encodeURIComponent(p))).join('')}</div><p class="small">Source value: ${esc(d.common_raw.join(' | '))}</p>`:NS);
  h+=sec(`Pricing found · ${d.prices.length} <button class="chip act" style="margin-left:8px" onclick="addPrice(${d.rows[0].id})">+ Add a price</button>`,d.prices.length?`<table><tr><th>Company</th><th>Price type</th><th>Price</th><th>Price date</th><th>Imported</th><th>Source file</th><th></th></tr>${d.prices.map(p=>`<tr><td>${esc(p.oem||'')}</td><td>${esc(p.label)}</td><td class="g">${money(p)}</td><td class="dim">${esc(p.date||'—')}</td><td class="dim">${esc(p.imported_at)}</td><td class="dim">${esc(p.file)} › ${esc(p.sheet)}</td><td><button class="x" title="Remove this price" onclick="delPrice(${p.id})">✕</button></td></tr>`).join('')}</table>`:'<span class="dim">No pricing in imported source.</span>');
+ if(d.equiv.length){const also=d.equiv.filter(e=>e.dir==='also'),ref=d.equiv.filter(e=>e.dir==='ref');
+  h+=sec('Same part listed as <span class="dim">· linked through the Register (PB/G numbers)</span>',
+   `${also.length?`<p class="small">This part is also listed as:</p><div class="chips">${also.map(e=>chip(`${e.part}${e.oem?' ('+e.oem+')':''}`,'#/part/'+encodeURIComponent(e.key))).join('')}</div>`:''}
+    ${ref.length?`<p class="small">OEM/other numbers that resolve to this part:</p><div class="chips">${ref.map(e=>chip(`${e.part}${e.oem?' ('+e.oem+')':''}`,'#/part/'+encodeURIComponent(e.key))).join('')}</div>`:''}`);}
+ if(d.suggested.length)h+=sec(`Possibly the same part · ${d.suggested.length} <span class="dim">· matched on description/number family — verify before relying on it</span>`,
+  `<table><tr><th>Part</th><th>Company</th><th>Description</th><th>Matches on</th></tr>${d.suggested.map(e=>`<tr><td class="g">${chip(e.part,'#/part/'+encodeURIComponent(e.key))}</td><td>${esc(e.oem||'')}</td><td>${esc(e.desc||'')}</td><td class="dim">${esc(e.shared.join(', '))}</td></tr>`).join('')}</table>`);
  if(d.alternates.length)h+=sec('Same description, different part number (check — not confirmed alternates)',`<div class="chips">${d.alternates.map(a=>chip(a.part,'#/part/'+encodeURIComponent(a.key))).join('')}</div>`);
  if(d.related.length){const rg={};d.related.forEach(x=>{const k=gkey(x.pump,x.assembly);(rg[k]=rg[k]||{pump:x.pump,asm:x.assembly,items:[]}).items.push(x)});
   h+=sec('Related parts (same pump & assembly)',`<div class="uses">${Object.values(rg).map(g=>`<div class="grp" ${gstyle(g.pump,g.asm)}><div class="gp">${g.pump?chip(g.pump,'#/pump/'+encodeURIComponent(g.pump)):'<span class="dim">Pump not specified</span>'}<span class="dim small">${esc(g.asm||'')}</span></div><div class="chips">${g.items.map(x=>chip(x.part+(x.desc?' — '+x.desc:''),'#/part/'+encodeURIComponent(x.key))).join('')}</div></div>`).join('')}</div>`)}
