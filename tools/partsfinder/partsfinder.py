@@ -702,20 +702,45 @@ def _apply_register(con: sqlite3.Connection, ts: str) -> None:
                 links.setdefault(part_key(str(v)), set()).add(pb)
     if not links:
         return
+    # G numbers live on the standardized sheets, not in the Register — map them too so kit notes can show them
+    glinks: dict[str, set] = {}
+    for gnum, part in con.execute("SELECT gnum, part FROM records WHERE gnum IS NOT NULL"):
+        glinks.setdefault(part_key(part), set()).add(gnum)
+    # assembly/kit-style PBs (ASM-…, KIT-…, G4C07-…): on a conflict the plain PB is the part itself
+    asm_pb = re.compile(r"^(ASM-|KIT-|G\d+C)", re.I)
     filled = 0
     for rid, key in con.execute("SELECT id, key FROM records WHERE pb IS NULL").fetchall():
         pbs = links.get(key)
         if not pbs:
             continue
-        if len(pbs) > 1:
+        pick = pbs if len(pbs) == 1 else {p for p in pbs if not asm_pb.match(p)}
+        if len(pick) == 1:
+            con.execute("UPDATE records SET pb=? WHERE id=?", (next(iter(pick)), rid))
+            filled += 1
+        else:
             con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'register_conflict',?,?,?)",
                         (key, "Register maps this part to several PB numbers: " + ", ".join(sorted(pbs)), ts))
-            continue
-        con.execute("UPDATE records SET pb=? WHERE id=?", (next(iter(pbs)), rid))
-        filled += 1
     if filled:
         con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'pb_from_register',?,?,?)",
                     ("register", f"PB numbers filled in from the Register for {filled} rows", ts))
+    # kit contents: a row whose stored note is an 'OEM part numbers: a; b; c' list gets a note resolving
+    # each component to its PB / G number
+    for nid, subj, text in con.execute(
+            "SELECT id, subject, text FROM notes WHERE text LIKE 'OEM part numbers:%'").fetchall():
+        comps = [c.strip() for c in text.split(":", 1)[1].split(";") if c.strip()]
+        resolved = []
+        for c in comps:
+            cands = set(links.get(part_key(c), ()))
+            if len(cands) > 1:
+                cands = {p for p in cands if not asm_pb.match(p)} or cands
+            pb = next(iter(cands)) if len(cands) == 1 else ("several: " + ", ".join(sorted(cands)) if cands else None)
+            gn = next(iter(glinks[part_key(c)])) if len(glinks.get(part_key(c), ())) == 1 else None
+            resolved.append(f"{c} ({pb or gn or 'no PB/G number'})")
+        if any("no PB/G" not in r for r in resolved):
+            body = "Kit contents resolved via Register: " + "; ".join(resolved)
+            if not con.execute("SELECT 1 FROM notes WHERE kind='part' AND subject=? AND text=?", (subj, body)).fetchone():
+                con.execute("INSERT INTO notes(kind,subject,title,text,created_at,updated_at) VALUES('part',?,?,?,?,?)",
+                            (subj, "Kit contents", body, ts, ts))
 
 
 # --------------------------------------------------------------------------- #

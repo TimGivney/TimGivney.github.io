@@ -128,8 +128,10 @@ REVIEW, never silently corrected**:
 - A **Register Part Numbers** workbook (sheets headed `PartsBender Part Number` mapping each PB number to
   per-OEM part numbers and descriptions) imports as PartsBender parts. Its other tabs (Category etc.) are
   lookup legends and are skipped. After every import, any row still missing a PB number whose OEM part
-  number the Register maps is filled in (`pb_from_register`); an OEM number mapping to several PB numbers
-  is flagged `register_conflict` instead of guessed.
+  number the Register maps is filled in (`pb_from_register`). On a conflict the non-assembly PB is picked
+  automatically (assembly/kit-style numbers are `ASM-…`, `KIT-…`, `G4C07-…`); still-ambiguous matches are
+  flagged `register_conflict`. Kit rows get a note resolving each component OEM number to its PB/G number.
+  Rows with no identifier at all stay skipped — no PB/G number is ever invented.
 - Text in a price column (`on demand`, `2016 List`) is not imported as a price – flagged
   (`non_numeric_price`). Sell price below cost is flagged. `Discount` and any other unknown column is
   kept in the row's raw data and listed as an `unmapped_column` issue.
