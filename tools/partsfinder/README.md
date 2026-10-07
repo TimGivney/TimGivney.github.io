@@ -10,11 +10,10 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
    e.g. `C:\PartsFinder\`.
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
-3. First run only: the exe loads the bundled `Register_Part Numbers.xlsx` (Master + Suppliers tabs)
-   followed by `Standardized_Pump_Data_v6_Canonical_OEM.xlsx` (all 12 OEM sheets; the OEM Audit /
-   Audit Notes / Controlled Lists info tabs are skipped).
-   Takes ~1 min; the console shows progress. On later runs any bundled sheet that has never been
-   imported into your data folder is added automatically (nothing already there is touched).
+3. The exe ships with **no data** — nothing is bundled, so your spreadsheets never leave your PC.
+   First run opens an empty app: go to the **DATA** tab, drop `Register_Part Numbers.xlsx` and
+   `Standardized_Pump_Data_v6_Canonical_OEM.xlsx` (Register first so it can fill in PB numbers),
+   preview and import. Info tabs (OEM Audit / Audit Notes / Controlled Lists) are skipped automatically.
    Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, a pump cell
    like `PP66S12_PP66S14_PP88S12` becomes three separate pumps, and common values like
    `BA_100_150_180_200_300` or `CD100M_150M_200M` expand to every pump listed — each of those
