@@ -903,6 +903,14 @@ def q_part(con, key: str) -> dict:
         [key] * 4)
     for e in back:
         equiv.setdefault(e[0], {"key": e[0], "part": e[1], "oem": e[2], "desc": e[3], "rows": e[4], "dir": "ref"})
+    # same PB or G number on different part entries = the same physical part (e.g. BBA 1852600741 <-> G2C06-0009-BS via PB435)
+    for fld in ("pb", "gnum"):
+        vals = [r[fld] for r in rows if r[fld]]
+        for v in vals:
+            for e in con.execute(
+                    f"SELECT key, MIN(part) part, MIN(oem) oem, MIN(desc) desc, COUNT(*) n FROM records "
+                    f"WHERE key<>? AND {fld}=? GROUP BY key LIMIT 20", (key, v)):
+                equiv.setdefault(e[0], {"key": e[0], "part": e[1], "oem": e[2], "desc": e[3], "rows": e[4], "dir": "ref"})
     # suggested matches: shared number-bearing description tokens or the same decimal number family
     # (e.g. SPP '19639.380K' ~ '19639.168'). Inferred — labelled 'possible', never merged automatically.
     _stop = {"and", "to", "for", "the", "of", "in", "with", "suit", "suits", "part", "pump", "pumps", "assembly", "iaw"}
