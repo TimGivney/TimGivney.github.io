@@ -558,11 +558,13 @@ def preview_file(path: Path, con: sqlite3.Connection) -> dict:
             "flags": a["flags"], "flag_counts": flag_counts,
             "_records": a["records"],
         })
-    # a Register-style workbook keys rows by 'PartsBender Part Number'; its other tabs are lookup legends
+    # a Register-style workbook keys rows by 'PartsBender Part Number'; any sheet that has neither an
+    # OEM part-number column nor that PB header is a lookup legend and is skipped
     if any("partsbender" in (s.get("columns", {}).get("pb") or "").lower() for s in sheets):
         for s in sheets:
-            if s["usable"] and "partsbender" not in (s.get("columns", {}).get("pb") or "").lower():
-                s.update({"usable": False, "reason": "register workbook lookup tab — only 'PartsBender Part Number' sheets are imported",
+            cols = s.get("columns", {})
+            if s["usable"] and "part" not in cols and "partsbender" not in (cols.get("pb") or "").lower():
+                s.update({"usable": False, "reason": "register workbook lookup tab — only part-number sheets are imported",
                           "_records": []})
     pid = f"{int(time.time()*1000)}"
     PREVIEWS[pid] = {"path": str(path), "sheets": sheets}
@@ -902,9 +904,14 @@ def q_oem(con, oem: str) -> dict:
     tree = next((o for o in q_browse(con) if o["oem"] == oem), None)
     models = tree["models"] if tree else []
     asm = [r[0] for r in con.execute("SELECT DISTINCT assembly FROM records WHERE oem=? AND assembly IS NOT NULL ORDER BY assembly", (oem,))]
+    parts_list = rec_dicts(con.execute(
+        "SELECT key, MIN(part) part, MIN(desc) desc, MAX(pb) pb, MAX(gnum) gnum, "
+        "COUNT(*) rows, COUNT(DISTINCT pump_key) pumps FROM records WHERE oem=? "
+        "GROUP BY key ORDER BY part", (oem,)))
     return {"oem": oem,
             "rows": con.execute("SELECT COUNT(*) FROM records WHERE oem=?", (oem,)).fetchone()[0],
             "parts": con.execute("SELECT COUNT(DISTINCT key) FROM records WHERE oem=?", (oem,)).fetchone()[0],
+            "parts_list": parts_list,
             "models": models, "assemblies": asm,
             "imports": rec_dicts(con.execute("SELECT * FROM imports WHERE oem=? ORDER BY id DESC", (oem,))),
             "notes": q_notes(con, "oem", oem)}
@@ -1457,6 +1464,7 @@ async function viewOem(o){const d=await api('/oem/'+encodeURIComponent(o));
  h+=sec(`Pump types · ${d.models.length}`,d.models.length?`<div class="chips">${dm.map(mchip).join('')}</div>${vars.length?`<p class="small" style="margin-top:10px">Variants: ${vars.map(m=>`${esc(m.model)} → ${m.variants.map(v=>chip(v.variant||v.pump,'#/pump/'+encodeURIComponent(v.pump))).join(' ')}`).join(' &nbsp;·&nbsp; ')}</p>`:''}${cm.length?`<p class="small" style="margin-top:10px">Named in “Common” fields (parts shared with them):</p><div class="chips">${cm.map(mchip).join('')}</div>`:''}`:NS);
  h+=sec(`Assemblies · ${d.assemblies.length}`,d.assemblies.length?esc(d.assemblies.slice(0,80).join(' · ')):NS);
  h+=sec('Imports',`<table><tr><th>Date</th><th>File</th><th>Sheet</th><th>Rows</th></tr>${d.imports.map(i=>`<tr><td class="dim">${esc(i.imported_at)}</td><td>${esc(i.file)}</td><td>${esc(i.sheet)}</td><td class="g">${i.rows}</td></tr>`).join('')}</table>`);
+ h+=sec(`All parts · ${d.parts_list.length}`,d.parts_list.length?`<table><tr><th>Part number</th><th>Description</th><th>PB number</th><th>G-number</th><th>Rows</th><th>Pumps</th></tr>${d.parts_list.map(p=>`<tr><td class="g">${chip(p.part,'#/part/'+encodeURIComponent(p.key))}</td><td>${esc(p.desc||'')}</td><td>${esc(p.pb||'')}</td><td>${esc(p.gnum||'')}</td><td class="dim">${p.rows}</td><td class="dim">${p.pumps||''}</td></tr>`).join('')}</table>`:NS);
  return h}
 async function viewData(){const d=await api('/imports');const ed=await api('/edits');const nt=await api('/notes');
  let h=`<h2 style="font-size:20px">DATA</h2><p class="dim">Raw uploads are kept untouched in <code>PartsFinder/raw/</code>. Drop files here or into <code>PartsFinder/inbox/</code> and click Scan inbox.</p>
