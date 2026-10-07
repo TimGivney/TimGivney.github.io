@@ -87,8 +87,8 @@ FIELD_PATTERNS = {
 }
 CURRENCY_RE = re.compile(r"\b(usd|aud|eur|eu|gbp|nzd)\b|[$€£]")
 DATE_RE = re.compile(r"(19|20)\d\d")
-PRICE_WORDS = re.compile(r"\b(cost|price|list|dealer|rrp)\b|\$|€")
-NON_PRICE_WORDS = re.compile(r"discount|margin|qty|extended")
+PRICE_WORDS = re.compile(r"\b(cost|price|list|dealer|rrp|discount)\b|\$|€")
+NON_PRICE_WORDS = re.compile(r"margin|qty|extended")
 
 KNOWN_OEMS = ["Godwin", "Sykes", "BBA", "Pioneer", "Cornell", "Atlas Copco", "SPP", "Hudig",
               "Multiflo", "Weir", "John Deere", "Selwood", "Xylem", "Flygt", "Grindex"]
@@ -107,10 +107,13 @@ def detect_header_row(rows: list[list]) -> int | None:
     return None
 
 
-def map_columns(header: list) -> tuple[dict[str, int], list[dict]]:
-    """Map header cells to normalised fields; every cost/price-like column becomes a price field."""
+def map_columns(header: list) -> tuple[dict[str, int], dict[str, list[int]], list[dict]]:
+    """Map header cells to normalised fields; every cost/price-like column becomes a price field.
+    Extra headers matching an already-claimed field are returned in `merged` — their values are
+    joined into the primary column (e.g. Weir's separate 'document' and 'Document Name')."""
     cols: dict[str, int] = {}
     ranks: dict[str, int] = {}
+    merged: dict[str, list[int]] = {}
     prices: list[dict] = []
     for idx, raw in enumerate(header):
         h = norm_header(raw)
@@ -134,9 +137,13 @@ def map_columns(header: list) -> tuple[dict[str, int], list[dict]]:
                 continue
             # patterns are ordered best-first: 'OEM Part Number' beats 'Part Number', 'OEM Description' beats 'PB Description'
             if field not in cols or rank < ranks[field]:
+                if field in cols:
+                    merged.setdefault(field, []).append(idx)
                 cols[field], ranks[field] = idx, rank
+            else:
+                merged.setdefault(field, []).append(idx)
             break
-    return cols, prices
+    return cols, merged, prices
 
 
 STANDARD_HEADER = ["OEM", "Location #", "Part Number", "Description", "Qty", "Assembly", "Pump Type", "Common",
@@ -270,7 +277,7 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
     if hdr is None:
         return {"sheet": sheet, "usable": False, "reason": "no part-number column found", "rows": len(rows)}
     header = rows[hdr]
-    cols, prices = map_columns(header)
+    cols, merged, prices = map_columns(header)
     body = rows[hdr + 1:]
     oem_vals = [o for r in body if "oem" in cols and len(r) > cols["oem"] for o in split_oems(clean(r[cols["oem"]]))]
     # only trust per-row OEM values that occur repeatedly; stray part numbers in the OEM column fall back to the sheet OEM
@@ -285,7 +292,12 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
         oem = "PartsBender"
     for i, row in enumerate(body, start=hdr + first_data_row):
         row = list(row) + [None] * (len(header) + 2)
-        g = lambda f: clean(row[cols[f]]) if f in cols else None  # noqa: E731
+        def g(f):
+            if f not in cols:
+                return None
+            vals = [clean(row[cols[f]])] + [clean(row[j]) for j in merged.get(f, [])]
+            uniq = [v for n, v in enumerate(vals) if v and v not in vals[:n]]
+            return " · ".join(uniq) or None
         rawpart = row[cols["part"]] if "part" in cols else None
         part = clean(rawpart)
         if part and norm_header(part) in ("part number", "part no.", "part no", "oem part number"):
@@ -399,7 +411,8 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
         "columns": {k: str(header[v]).replace("\n", " ").strip() for k, v in cols.items()},
         "price_columns": [p["label"] for p in prices],
         "extra_columns": [str(header[j]).strip() for j in range(len(header)) if header[j] is not None
-                          and j not in cols.values() and j not in {p["col"] for p in prices}],
+                          and j not in cols.values() and j not in {p["col"] for p in prices}
+                          and j not in {x for v in merged.values() for x in v}],
     }
 
 
