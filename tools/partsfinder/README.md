@@ -10,10 +10,10 @@ one `PartsFinder.exe`, a local SQLite database, and a browser tab. No internet, 
    e.g. `C:\PartsFinder\`.
 2. Double-click it. A console window stays open (that is the server) and your browser opens
    `http://localhost:8765/`. Close the console window to stop.
-3. First run only: the exe loads the **Master** sheets of the bundled `Parts_Rev4.xlsx`
-   (`Godwin/Sykes/BBA/Pioneer/Cornell Master`, `50CFM_Pioneer`, `50CFM Cornell`, `Atlas Copco`;
-   the unclean per-OEM tabs, planning tabs and `Cleaned Pump Data.xlsx` are not loaded).
-   Takes ~30 s; the console shows progress. On later runs any bundled sheet that has never been
+3. First run only: the exe loads the bundled `Register_Part Numbers.xlsx` (Master + Suppliers tabs)
+   followed by `Standardized_Pump_Data_v6_Canonical_OEM.xlsx` (all 12 OEM sheets; the OEM Audit /
+   Audit Notes / Controlled Lists info tabs are skipped).
+   Takes ~1 min; the console shows progress. On later runs any bundled sheet that has never been
    imported into your data folder is added automatically (nothing already there is touched).
    Pump names like `CP150i-285mm` / `BA100E D265` are split into model + variant, a pump cell
    like `PP66S12_PP66S14_PP88S12` becomes three separate pumps, and common values like

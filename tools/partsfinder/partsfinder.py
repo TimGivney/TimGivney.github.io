@@ -53,10 +53,12 @@ PLACEHOLDER_ASSEMBLY = re.compile(r"(sheet\s*\d+|data|oem mapping)", re.I)
 def seed_sheet_wanted(file_name: str, sheets: list[str], sheet: str) -> bool:
     """Only master data is pre-loaded: '* Master' sheets where a workbook has them, plus sheets that have
     no master counterpart (50CFM_Pioneer, 50CFM_Cornell, Atlas Copco); the unclean per-OEM sheets and
-    planning tabs are skipped."""
+    planning tabs are skipped. Register workbooks seed every usable tab (Category is unusable anyway)."""
     s = sheet.lower()
     if s in SKIP_SHEETS:
         return False
+    if "register" in file_name.lower():
+        return True
     has_masters = any(x.lower().endswith("master") for x in sheets)
     if not has_masters:
         return True
