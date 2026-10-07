@@ -83,7 +83,7 @@ FIELD_PATTERNS = {
     "pb": [r"^pb\s*(number|no\.?|#|num)?$", r"^partsbender\s*(number|no\.?|num)$", r"^pb-?number",
            r"^partsbender\s*part\s*(number|no\.?|num)$"],
     "gnum": [r"^g[\s-]*(number|no\.?|#|num)$", r"^g$"],
-    "document": [r"^document\s*(name)?$", r"^doc\s*name$", r"^exploded\s*view$"],
+    "document": [r"^document\s*(name)?$", r"^doc\s*name$", r"^exploded\s*view$", r"drawing", r"dxf", r"cad\s*file"],
 }
 CURRENCY_RE = re.compile(r"\b(usd|aud|eur|eu|gbp|nzd)\b|[$€£]")
 DATE_RE = re.compile(r"(19|20)\d\d")
@@ -356,12 +356,18 @@ def analyse_sheet(sheet: str, rows: list[list], file_name: str) -> dict:
                for j in range(len(header)) if header[j] is not None and row[j] is not None}
         # 'Cornell, Pioneer' in the OEM column = the same part is used by both companies: one record per company
         for o in row_oems:
+            pb_v, gn_v, doc_v = g("pb"), g("gnum"), g("document")
+            if is_register and doc_v and re.match(r"^PB\d", doc_v, re.I) and not re.match(r"^PB\d", pb_v or "", re.I):
+                # the '3D Drawing #/ Ref' column carries the real PB####; the Part Number column is usually the G-number
+                if pb_v and not gn_v:
+                    gn_v = pb_v
+                pb_v = doc_v
             rec = {
                 "oem": o if o in trusted_oems else None,
                 "part": part, "key": part_key(part),
                 "desc": desc, "qty": qty, "assembly": assembly,
                 "pump": g("pump"), "common": g("common"), "location": g("location"),
-                "pb": g("pb"), "gnum": g("gnum"), "comments": comments, "document": g("document"),
+                "pb": pb_v, "gnum": gn_v, "comments": comments, "document": doc_v,
                 "prices": pl, "row": i, "raw": raw,
             }
             rec["commonPumps"] = split_common(rec["common"])
@@ -597,9 +603,11 @@ def _already_stored(con: sqlite3.Connection, r: dict) -> bool:
         # a row whose OEM was inferred from the sheet still matches the stored explicit OEM
         if r["oem"] is None:
             d["oem"] = None
-        # a PB number filled in later by the register still matches a re-imported row without one
+        # a PB number or document filled in later by the register still matches a re-imported row without one
         if r["pb"] is None:
             d["pb"] = None
+        if r["document"] is None:
+            d["document"] = None
         if record_sig(d) == sig:
             return True
     return False
@@ -709,14 +717,19 @@ def _commit_sheets(pv: dict, choices: dict, con: sqlite3.Connection, path: Path,
 def _apply_register(con: sqlite3.Connection, ts: str) -> None:
     """Fill missing PB numbers on imported rows whose OEM part number the Register maps to a PB number."""
     links: dict[str, set] = {}
+    dlinks: dict[str, set] = {}
     for pb, raw in con.execute("SELECT part, raw FROM records WHERE pb IS NOT NULL AND raw IS NOT NULL"):
         try:
             rd = json.loads(raw)
         except Exception:
             continue
+        # the real PB#### often lives in the '3D Drawing #/ Ref' column rather than 'Part Number'
+        drawing = next((clean(v) for k, v in rd.items() if "drawing" in str(k).lower()), None)
         for k, v in rd.items():
             if re.match(r"^(?!\s*partsbender).+\s*part\s*number\s*/?\s*$", str(k), re.I) and v not in (None, ""):
-                links.setdefault(part_key(str(v)), set()).add(pb)
+                links.setdefault(part_key(str(v)), set()).add(drawing if drawing and re.match(r"^PB\d", drawing, re.I) else pb)
+                if drawing:
+                    dlinks.setdefault(part_key(str(v)), set()).add(drawing)
     if not links:
         return
     # G numbers live on the standardized sheets, not in the Register — map them too so kit notes can show them
@@ -737,6 +750,15 @@ def _apply_register(con: sqlite3.Connection, ts: str) -> None:
         else:
             con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'register_conflict',?,?,?)",
                         (key, "Register maps this part to several PB numbers: " + ", ".join(sorted(pbs)), ts))
+    docs = 0
+    for rid, key in con.execute("SELECT id, key FROM records WHERE document IS NULL").fetchall():
+        ds = dlinks.get(key)
+        if ds and len(ds) == 1:
+            con.execute("UPDATE records SET document=? WHERE id=?", (next(iter(ds)), rid))
+            docs += 1
+    if docs:
+        con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'doc_from_register',?,?,?)",
+                    ("register", f"Drawing/document references filled in from the Register for {docs} rows", ts))
     if filled:
         con.execute("INSERT INTO issues(import_id,kind,subject,detail,created_at) VALUES(NULL,'pb_from_register',?,?,?)",
                     ("register", f"PB numbers filled in from the Register for {filled} rows", ts))
