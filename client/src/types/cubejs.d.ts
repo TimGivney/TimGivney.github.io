@@ -8,7 +8,7 @@ declare module "cubejs" {
   }
 
   class Cube {
-    constructor();
+    constructor(state?: CubeStateJson);
     static fromString(facelets: string): Cube;
     static initSolver(): void;
     asString(): string;

@@ -1,3 +1,5 @@
+import type { CubieState } from "./physicalSolver";
+
 interface SolverMessage {
   id: number;
   type: "initializing" | "solved" | "error";
@@ -5,11 +7,16 @@ interface SolverMessage {
   message?: string;
 }
 
+interface SolverRequest {
+  facelets?: string;
+  cubies?: CubieState;
+}
+
 let worker: Worker | null = null;
 let nextRequestId = 1;
 
-export function solveFacelets(
-  facelets: string,
+function solveState(
+  state: SolverRequest,
   onInitializing: () => void
 ): Promise<string> {
   if (!worker)
@@ -32,6 +39,20 @@ export function solveFacelets(
       else reject(new Error(response.message ?? "The cube state is invalid."));
     };
     activeWorker.addEventListener("message", listener);
-    activeWorker.postMessage({ id, facelets });
+    activeWorker.postMessage({ id, ...state });
   });
+}
+
+export function solveFacelets(
+  facelets: string,
+  onInitializing: () => void
+): Promise<string> {
+  return solveState({ facelets }, onInitializing);
+}
+
+export function solveCubies(
+  cubies: CubieState,
+  onInitializing: () => void
+): Promise<string> {
+  return solveState({ cubies }, onInitializing);
 }
