@@ -124,7 +124,7 @@ Neither expected to be selected.
 
 Priya was a pharmacist from Melbourne. Samir operated agricultural drones on a farming cooperative outside Dubbo.
 
-For one year, they sat on rotating policy panels examining freshwater allocation, urban density expansion, and mental health reform. The experience changed both of them. They fell in love slowly. Not through dramatic romance, but through twelve-hour deliberation sessions, endless train rides, and watching each other argue passionately for strangers they would never meet.
+For three years, they sat on rotating policy panels examining freshwater allocation, urban density expansion, and mental health reform. The experience changed both of them. They fell in love slowly. Not through dramatic romance, but through twelve-hour deliberation sessions, endless train rides, and watching each other argue passionately for strangers they would never meet.
 
 Years later they married and had twin daughters.
 

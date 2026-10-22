@@ -12,6 +12,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SRC = os.path.join(ROOT, 'tools/meridian/docs')
 OUT = os.path.join(ROOT, 'client/public/meridian')
 READ = os.path.join(OUT, 'read')
+CANON = '  <p class="canon">This document follows <a href="meridian-charter.html">The Meridian Charter</a>. Where any document in the archive differs from the Charter, the Charter governs.</p>\n'
 HUMANINITY = 'the unexplainable truths and values that a functional human is. The quality the Custodian Lottery Republic exists to protect.'
 
 TEMPLATE = open(os.path.join(ROOT, 'tools/meridian/template.html')).read()
@@ -43,6 +44,7 @@ def build(path, pdf=False):
             .replace('{{slug}}', slug)
             .replace('{{meta}}', meta)
             .replace('{{humaninity}}', HUMANINITY)
+            .replace('{{canon}}', '' if slug == 'meridian-charter' else CANON)
             .replace('{{toc}}', '\n'.join(toc))
             .replace('{{body}}', body))
     os.makedirs(READ, exist_ok=True)
