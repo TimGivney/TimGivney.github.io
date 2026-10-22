@@ -20,13 +20,13 @@ The entity - whether a subset of the Civic Lottery, a panel of experts, or an AI
 
 ## 3. Geopolitical Volatility and Crisis Agility
 
-The CLR mandates single, non-renewable one-year terms for the Civic Lottery Pool to eliminate careerism. While effective at preventing political entrenchment, this mechanism systematically destroys institutional memory within the deliberative body.
+The CLR as first drafted mandated single, non-renewable one-year terms for the Civic Lottery Pool to eliminate careerism. While effective at preventing political entrenchment, this mechanism systematically destroys institutional memory within the deliberative body. (The Meridian Charter answers this with staggered three-year terms, one-third rotating each year; the critique is kept here because the trade-off it names is real.)
 
 In the event of a rapid global crisis - such as a sudden military threat, a pandemic, or a flash economic collapse - a deliberative body composed of citizens who may have only been in their roles for a few months lacks the experience, established relationships, and diplomatic nuance required for high-stakes, split-second decision-making. If the system defaults to the permanent Custodian layer to handle such emergencies due to the Lottery’s inherent slowness, the democratic layer is effectively suspended precisely when oversight is most critical. This creates a vulnerability where “technocratic capture” occurs by necessity during times of crisis.
 
 ## 4. The “Competency vs. Legitimacy” Paradox
 
-To ensure functional governance, the CLR requires a “baseline competency standard” or civic education assessment for entry into the lottery pool. This requirement presents a significant paradox.
+To ensure functional governance, the CLR as first drafted required a “baseline competency standard” or civic education assessment for entry into the lottery pool. This requirement presents a significant paradox, and it is the reason the Meridian Charter removed the filter altogether.
 
 If the competency threshold is set too low, the system risks empowering a deliberative body incapable of grasping complex legislative issues, leading to poor governance. Conversely, if the threshold is set too high, it inadvertently creates a new, exclusionary elite class, disenfranchising marginalized groups and undermining the very “Humaninity” and egalitarian representation the system was designed to protect. Balancing this threshold to ensure both competence and true demographic legitimacy remains a profound challenge.
 

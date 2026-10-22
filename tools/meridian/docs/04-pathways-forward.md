@@ -10,7 +10,7 @@ The preceding “Devil’s Advocate” report highlighted critical vulnerabiliti
 
 The risk of the permanent Custodian layer evolving into an unaccountable “Deep State” is significant. To counter this, several mechanisms can be implemented:
 
-- **Multi-Layered Oversight Councils:** Establish a dedicated **Custodian Oversight** **Council** , composed of randomly selected citizens (with longer, staggered terms than the Civic Lottery Pool for continuity) and supported by independent technical experts. This council would have full access to Custodian operations, data, and AI algorithms, with the power to audit, question, and flag concerns directly to the public and the Civic Lottery Pool.
+- **Multi-Layered Oversight Councils:** In the Meridian Charter this takes two forms: standing panels of the Assembly that supervise each Custodian directorate in public, and the **Humaninity Audit**, sixty citizens drawn by lot on staggered three-year terms with full access to Custodian operations, data and AI systems and the power to suspend any automated process for ninety days. Both are staffed by lot, not by technologists, because the thing being audited for is precisely what technologists are trained not to see.
 
 - **Constitutional Hard Limits:** Explicitly enshrine in the constitution that the Custodian layer’s mandate is strictly executive and administrative, with no policy-making authority. Any deviation would trigger automatic constitutional review and public referendum.
 
@@ -36,7 +36,7 @@ The challenge of providing truly neutral information packets and preventing narr
 
 The risk of institutional memory loss and slow decision-making during crises due to the Civic Lottery’s rotating terms requires robust protocols:
 
-- **Crisis Protocol for the Civic Lottery:** Develop a pre-defined “Crisis Protocol” that grants the Civic Lottery Pool emergency powers during declared national emergencies, but with strict time limits and immediate post-crisis public review and referendum for any actions taken. This protocol would also establish a dedicated, smaller **Crisis Sub-Committee** within the Lottery, with slightly longer, staggered terms, to maintain some institutional memory and expertise in critical areas.
+- **Crisis Protocol for the Civic Lottery:** A state of armed conflict is declared by referendum at sixty per cent. For its duration a **War Panel** of thirty, drawn from the sitting Assembly and rotating in thirds every six months, sits continuously, instructs the Defence Directorate and frames the emergency referendum questions that go to the public as often as weekly. Everything outside war and peace stays on the quarterly cycle. Because the Assembly itself now serves staggered three-year terms, no separate crisis sub-committee is needed for institutional memory.
 
 - **Intensive Training Simulations:** Implement mandatory, regular crisis simulation training for all Civic Lottery members, preparing them for rapid decision-making under pressure and familiarizing them with geopolitical dynamics.
 
@@ -48,7 +48,7 @@ The risk of institutional memory loss and slow decision-making during crises due
 
 The “Competency vs. Legitimacy” paradox can be addressed by shifting the focus from pre-qualification to in-system support and deliberative design:
 
-- **Focus on Civic Engagement, Not Prior Knowledge:** Instead of a stringent “competency test,” the entry criteria for the Civic Lottery should emphasize civic engagement and a willingness to learn. The initial “civic education assessment” should be foundational, ensuring basic understanding of governance, not a barrier to entry.
+- **Focus on Civic Engagement, Not Prior Knowledge:** There is no competency test and no entry assessment of any kind: every adult on the roll is in the lottery. Competence is supplied after the draw, through mandatory, compensated training, staff support and expert advisory panels, not before it through exclusion.
 
 - **Comprehensive, Compensated Training:** Provide extensive, mandatory, and fully compensated training for all selected Civic Lottery members. This training would cover policy analysis, critical thinking, ethical deliberation, and the use of AI decision-support tools. This bridges the knowledge gap without creating an elite.
 

@@ -1,14 +1,12 @@
-# A Republic of Servants: One Working Version of the Custodian Lottery Republic
+# The Meridian Charter: The Custodian Lottery Republic in Full
 
-**Author:** Devin, for Tim Givney (Meridian) **Contact:** timgivney@gmail.com
+**Author:** Tim Givney **Contact:** timgivney@gmail.com
 
-## Why this document exists
+## What this document is
 
-The other documents in this archive were written over time and do not entirely agree with each other. The Framework proposes a civic competency filter; Pathways withdraws it. The Framework says quarterly referendums; the war stories show weekly ones. Four documents restate the three pillars and none of them says who writes a bill, who appoints a judge, who signs a treaty, or who the head of state is.
+This is the canonical statement of the Custodian Lottery Republic. Every other document in the Meridian archive (the framework, the critique and its responses, the Australian pathway, the stories) is read against it: where an older document says something different, this one governs.
 
-This document is one coherent version of the whole thing, written by an outside reader after going through everything else and after several rounds with the author. Where the archive was silent, I have made a decision and said why. Where the archive disagreed with itself, I have picked a side. Where the author has a settled position (the agenda comes from the lottery pool; the head of state comes from the lottery pool; Custodians execute treaties but do not set them; AI is not optional; emergency referendums belong to war, quarterly ones to peace) I have taken it as a constraint and built around it.
-
-It is a working version, not the last word. It is meant to be the document a sceptic reads second, after the Devil's Advocate.
+It sets out the three roles, the bodies that hold them, how the gaps that any constitution has to fill (head of state, judiciary, treaties, war, the states) are filled here, what the design costs, and what real-world practice it stands on.
 
 ## The one-sentence version
 
@@ -18,7 +16,7 @@ Everything else is machinery to keep those three roles from leaking into each ot
 
 ## Humaninity, and why the system is shaped the way it is
 
-The archive uses a word that looks like a typo: *Humaninity*. It is deliberate. The author's definition is **"the unexplainable truths and values that a functional human is."** The extra syllable marks the thing that distinguishes it from "humanity" as a species or "humane" as a manner: it names the irreducible part of a person that no metric captures, no model predicts, and no administrator should be allowed to optimise.
+The Republic is named for a word that looks like a typo: *Humaninity*. It is deliberate. **Humaninity is the unexplainable truths and values that a functional human is.** The extra syllable marks the thing that distinguishes it from "humanity" as a species or "humane" as a manner: it names the irreducible part of a person that no metric captures, no model predicts, and no administrator should be allowed to optimise.
 
 This matters for design, not just for sentiment. Most governance failures are not failures of competence. They are failures where a system becomes very good at the thing it can measure and quietly drops the thing it cannot. Election systems optimise for winning elections. Bureaucracies optimise for defensibility. Markets optimise for price. An AI-administered state would, left alone, optimise for whatever it was told to optimise and would do it with terrifying consistency.
 
@@ -46,9 +44,9 @@ Why competing drafts matter: the Devil's Advocate is right that in practice the 
 
 **Who.** A merit-appointed, tenured public service, in the Westminster tradition Australia already has, with three changes: it is constitutionally insulated from the Assembly's ability to hire and fire individuals; it is constitutionally forbidden from initiating policy; and it is built, from the ground up, around an AI layer whose purpose is to make the service legible to the people it serves.
 
-**The service ethic.** The author's phrasing is exact: *the custodian is a public servant role with an emphasis on servant.* A Custodian's authority is wholly derivative. It comes from a Requirement adopted by the Assembly or a result returned by referendum. Where no Requirement exists, the Custodian's duty is to keep things running as they are and to report. A Custodian who acts without an instruction has not shown initiative; they have usurped.
+**The service ethic.** *The Custodian is a public servant, with the emphasis on servant.* A Custodian's authority is wholly derivative. It comes from a Requirement adopted by the Assembly or a result returned by referendum. Where no Requirement exists, the Custodian's duty is to keep things running as they are and to report. A Custodian who acts without an instruction has not shown initiative; they have usurped.
 
-**Why AI is not optional.** The earlier review suggested making the AI layer a later add-on so that the model would be easier to sell. The author rejected this and, having thought about it longer, I think he is right. The reason is not efficiency. It is transparency.
+**Why AI is not optional.** It would be easier to sell this model with the AI layer left out, or added later as an upgrade. We do not do that, and the reason is not efficiency. It is transparency.
 
 A human bureaucracy of 200,000 people cannot be audited. Its decisions are distributed across millions of emails, meetings and judgement calls that leave no coherent record. Oversight in such a system is theatre: a minister answers questions about things they could not possibly know. An AI-administered service is different in kind, because every decision passes through a system that can be required to record *what it did, what it was asked to do, what rule it applied, and what alternatives it rejected*, in a form a lottery panel can read. The AI is not there to be smarter than the Custodians. It is there so that the Custodians cannot be opaque. Remove it and the Custodian layer becomes exactly the unaccountable permanent class the Devil's Advocate fears.
 
@@ -80,7 +78,7 @@ This gives the AI a strange constitutional role: it is the Custodians' tool and 
 
 The Speaker's powers are deliberately few: to open and close the Assembly; to receive and formally sign laws and treaties into effect once the Assembly or the public has approved them; to represent the Republic abroad; to appoint, on the Judicial Commission's nomination and the Judicial Jury's confirmation, the judges; and, in one carefully bounded circumstance, to refuse. The Speaker may refuse to sign an instrument that has not followed the constitutional process (an Assembly vote without quorum; a referendum without a certified Information Panel packet) and must publish the reason. The Speaker may not refuse on the merits.
 
-The author's requirement that the head of state must come from the lottery pool is honoured, and the thing that usually goes wrong with lottery heads of state (that they are unknown and have no standing) is handled by drawing from people who have already served.
+The head of state comes from the lottery pool, and the thing that usually goes wrong with lottery heads of state (that they are unknown and have no standing) is handled by drawing from people who have already served.
 
 ### Who runs the judiciary?
 
@@ -96,7 +94,7 @@ The earlier documents gave this one sentence. The design here has four parts.
 
 ### Who runs foreign affairs and treaties?
 
-The author's rule: *Custodians for treaties, driven by requirements of the lottery pool.*
+The rule: *Custodians for treaties, driven by Requirements of the lottery pool.*
 
 The Assembly adopts a **Foreign Requirement** for each relationship or negotiation: what the Republic wants, what it will not accept, what it is prepared to trade. The Custodian Directorate of External Affairs negotiates within that envelope, reports progress to the Assembly's External Panel in closed session (with the AI's full record available to the Panel), and brings back a text. The Assembly votes on the text. A treaty that commits the Republic to the use of force, cedes jurisdiction, or binds a future Assembly for more than ten years also goes to referendum. The Speaker signs. Withdrawal follows the same path in reverse.
 
@@ -134,7 +132,7 @@ Every body on this list that holds power over direction is chosen by lot. Every 
 
 ## Economics, deliberately brief
 
-The archive hand-waves the economics and the author has said that is intentional: *within Australia, under a fair, just society, economics should and can be hand-waved.* I will keep it brief and say why that is defensible rather than lazy.
+The economics are stated broadly and that is intentional: within Australia, under a fair and just society, the economics can be. Here is why that is defensible rather than lazy.
 
 Australia is a continent-sized country of 27 million people with an extraordinary endowment of iron, gas, lithium, sunlight, wind, arable land and coastline, and it already runs a universal health system, a near-universal superannuation system, compulsory voting and a progressive income tax. The CLR's floor (universal housing, health and education; a caregiver income; income replacement for anyone serving on any lottery body) is a matter of political will and a resource-rent regime, not a matter of inventing wealth. Norway did the sovereign-wealth part fifty years ago. The question the CLR asks is not *can Australia afford to treat everyone decently* but *who gets to decide to*. The model's answer is: not the people who own the mines.
 
@@ -160,9 +158,9 @@ None of this is new. The archive's earlier documents cited only newDemocracy and
 
 The CLR goes further than any of these: it makes the lottery body sovereign rather than advisory, adds a permanent AI-transparent executive, and gives the public the last word by referendum. But each step it takes is a step something real has already taken part of the way.
 
-## What I still think is hard
+## What is still hard
 
-I have tried to make the design honest about its costs. Three remain.
+The design should be honest about its costs. Three remain.
 
 **The AI is a single point of trust.** Plural models, open logs and a lottery audit reduce the risk of capture; they do not remove it. A sufficiently sophisticated manipulation of the training or the objective function might not be visible to a panel of 60 citizens or to a second model trained on similar data. The Republic is betting that transparency plus diversity plus the Constitutional Jury is enough. It might not be. The Devil's Advocate's sixth section should be read as a standing warning, not a solved problem.
 
@@ -170,11 +168,11 @@ I have tried to make the design honest about its costs. Three remain.
 
 **The Assembly can be wrong, and there is no one to blame.** In an electoral system a bad decision has an author who can be voted out. In a CLR, a bad decision was made by 300 of your neighbours who have since gone home. The system's bet is that the quality of decision goes up enough to pay for the loss of a scapegoat, and that a culture can be built in which the public owns its decisions rather than outsourcing responsibility for them. That culture does not exist yet anywhere. Building it is the actual project, and it is a longer one than any constitutional amendment.
 
-## A closing note on tone
+## A closing note
 
-The earlier documents sometimes read as advocacy; the page that hosts them calls the whole thing a thought experiment. I have written this one as a design: here is a machine, here is what each part is for, here is where it might break. If it is a good design the reader does not need to be persuaded, and if it is a bad one persuasion should not help.
+This document is written as a design, not as advocacy: here is a machine, here is what each part is for, here is where it might break. If it is a good design the reader does not need to be persuaded, and if it is a bad one persuasion should not help.
 
-The author's purpose, as I understand it after this exercise, is not to say that this will happen. It is to say that a society which took the unexplainable value of each of its members as its first constitutional principle, and then built everything else to serve that, would look something like this, and that the pieces to build it with already exist. On that I think he is right.
+The purpose is not to say that this will happen. It is to say that a society which took the unexplainable value of each of its members as its first constitutional principle, and then built everything else to serve that, would look like this, and that the pieces to build it with already exist.
 
 ## References
 

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Overview Report: The Architecture of the Custodian Lottery Republic - Meridian</title>
-<meta name="description" content="This report serves as a guide to the components of the Custodian Lottery Republic (CLR) and explains how they integrate to form a resilient, human-centric society. The CLR is not merely a government; it is a “moral infrastructure” designed to protect the intrinsic value of every individu" />
+<title>The Architecture of the Custodian Lottery Republic - Meridian</title>
+<meta name="description" content="The Custodian Lottery Republic (CLR) is a design for a state in which ordinary people, chosen by lot, decide what the country will do; a permanent, radically transparent public service does it; and the whole population has the final say on the questions that matter most. This overview is the short, " />
 <link rel="canonical" href="https://timgivney.com/meridian/read/architecture-overview.html" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1b2b'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%23c9a14a' stroke-width='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='30' stroke='%23c9a14a' stroke-width='1.5'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="../reader.css" />
@@ -16,94 +16,162 @@
 </nav>
 <main class="doc">
   <p class="eyebrow">Meridian &middot; The Custodian Lottery Republic</p>
-  <h1>Overview Report: The Architecture of the Custodian Lottery Republic</h1>
-  <p class="meta"></p>
+  <h1>The Architecture of the Custodian Lottery Republic</h1>
+  <p class="meta">Tim Givney <b>Contact:</b> timgivney@gmail.com</p>
   <aside class="def"><b>Humaninity</b> &mdash; the unexplainable truths and values that a functional human is. The quality the Custodian Lottery Republic exists to protect.</aside>
+  <p class="canon">This document follows <a href="meridian-charter.html">The Meridian Charter</a>. Where any document in the archive differs from the Charter, the Charter governs.</p>
   <nav class="toc"><p>Contents</p><ol><li><a href="#introduction">Introduction</a></li>
-<li><a href="#the-three-pillars-of-the-clr">The Three Pillars of the CLR</a></li>
-<li><a href="#how-the-components-fit-together">How the Components Fit Together</a></li>
+<li><a href="#the-three-pillars">The Three Pillars</a></li>
+<li><a href="#how-the-pieces-fit">How the Pieces Fit</a></li>
+<li><a href="#the-gaps-every-constitution-has-to-fill">The Gaps Every Constitution Has to Fill</a></li>
 <li><a href="#key-concepts-and-definitions">Key Concepts and Definitions</a></li>
 <li><a href="#component-map-what-goes-with-what">Component Map: What Goes With What</a></li>
-<li><a href="#implementation-timeline">Implementation Timeline</a></li>
+<li><a href="#implementation-path">Implementation Path</a></li>
 <li><a href="#references">References</a></li></ol></nav>
   <article>
 <h2 id="introduction">Introduction</h2>
-<p>This report serves as a guide to the components of the Custodian Lottery Republic (CLR) and explains how they integrate to form a resilient, human-centric society. The CLR is not merely a government; it is a &ldquo;moral infrastructure&rdquo; designed to protect the intrinsic value of every individual, a concept referred to as <strong>Humaninity</strong>.</p>
-<h2 id="the-three-pillars-of-the-clr">The Three Pillars of the CLR</h2>
+<p>The Custodian Lottery Republic (CLR) is a design for a state in which ordinary people, chosen by lot, decide what the country will do; a permanent, radically transparent public service does it; and the whole population has the final say on the questions that matter most. This overview is the short, plain-language version. The full design, with every body, threshold and precedent, is <em>The Meridian Charter</em>, and where this document is briefer than the Charter, the Charter governs.</p>
+<p>The Republic exists to protect <strong>Humaninity</strong>: the unexplainable truths and values that a functional human is. Most governance failures are not failures of competence; they are failures where a system becomes very good at the thing it can measure and quietly drops the thing it cannot. Every part of the CLR is shaped to keep that from happening.</p>
+<h2 id="the-three-pillars">The Three Pillars</h2>
 <table>
 <thead>
 <tr>
 <th>Pillar</th>
-<th>Function</th>
-<th>Integration</th>
+<th>Who</th>
+<th>What it does</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Sortition (Civic Lottery)</strong></td>
-<td>Replaces professional politicians with a representative cross-section of ordinary citizens.</td>
-<td>Provides the moral and democratic mandate for all major policy decisions.</td>
+<td><strong>The Assembly (Sortition)</strong></td>
+<td>300 citizens drawn by stratified lottery from the electoral roll, no competency test, three-year terms with one-third rotating each year, no one serving twice.</td>
+<td>Sets the agenda. Nothing becomes law, policy or a referendum question unless the Assembly has put it there. Writes plain-language <em>Requirements</em>, commissions competing drafts, passes ordinary law, supervises every Custodian directorate in public.</td>
 </tr>
 <tr>
-<td><strong>The Custodian Layer</strong></td>
-<td>A stable, non-partisan administrative backbone (AI-augmented) that manages infrastructure.</td>
-<td>Executes the technical requirements of society while remaining accountable to the Sortition layer.</td>
+<td><strong>The Custodians (Permanent Service)</strong></td>
+<td>A merit-appointed, tenured public service built around an AI layer whose purpose is to make the service legible.</td>
+<td>Executes Requirements and referendum results. May report a problem; may never propose a solution unasked. <em>A public servant, with the emphasis on servant.</em></td>
 </tr>
 <tr>
-<td><strong>Direct Democracy</strong></td>
-<td>Public referendums based on &ldquo;neutral data packets&rdquo; synthesized by citizen assemblies.</td>
-<td>Ensures that the entire population remains engaged and has the final say on critical issues like war or constitutional change.</td>
+<td><strong>The Public (Direct Democracy)</strong></td>
+<td>Everyone, with compulsory voting as Australia already has.</td>
+<td>Four fixed referendum days a year in normal times. Emergency referendums, as often as weekly, on questions of war and peace only, once a state of armed conflict has been declared by referendum. Final say on the constitution, rights, war, and the structure of the Custodian layer itself.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="how-the-components-fit-together">How the Components Fit Together</h2>
-<h3 id="1-preventing-systemic-corruption">1. Preventing Systemic Corruption</h3>
-<p>The CLR separates wealth from power. While individuals can achieve financial success, there are hard ceilings on political influence. Because the legislature is randomly selected, there are no permanent politicians to lobby, and no campaign funds to donate.</p>
-<h3 id="2-managing-crisis-and-war">2. Managing Crisis and War</h3>
-<p>In times of conflict, the system&rsquo;s decentralization becomes its greatest asset.</p>
+<h2 id="how-the-pieces-fit">How the Pieces Fit</h2>
+<p><strong>The agenda belongs to the lottery.</strong> This is the single most important rule. In most systems the real power is deciding what gets decided; here that power sits only with people who were drawn, serve briefly, and go home.</p>
+<p><strong>Custodians serve, they do not steer.</strong> Their authority is wholly derivative. Where a Requirement is silent on who is to be served, their duty is to report the silence and hold course, not to fill it. A long-staggered <strong>Constitutional Jury</strong> of 48 citizens, advised by three judges, rules on whether any Custodian act was <em>execution</em> (permitted) or <em>policy</em> (forbidden).</p>
+<p><strong>The AI is the witness, not the sovereign.</strong> It is required, not optional, because a human bureaucracy of two hundred thousand people cannot be audited and an AI-administered one can: every decision records what was asked, what rule was applied and what was rejected, in a form a lottery panel can read. It may hold no objective the Assembly has not adopted, may decide nothing about a named person without a human signature, and is plural by law (at least two independent systems, disagreements published). A <strong>Humaninity Audit</strong> of sixty citizens drawn by lot hunts for places where the system is succeeding by its measures and failing by its people, and can suspend any automated process for ninety days.</p>
+<p><strong>The public holds the last word, and feels its weight.</strong> Quarterly referendums keep the normal rhythm calm. Wartime emergency referendums are exhausting by design: a Republic that could go to war without asking would not be a CLR.</p>
+<h2 id="the-gaps-every-constitution-has-to-fill">The Gaps Every Constitution Has to Fill</h2>
 <ul>
-<li>
-<p><strong>Antifragility:</strong> Local nodes (hromadas) can function independently if the network is attacked.</p>
-</li>
-<li>
-<p><strong>Humanity Audits:</strong> Even in war, the Custodian Layer&rsquo;s AI must pass &ldquo;humanity audits&rdquo; conducted by citizen assemblies to ensure it doesn&rsquo;t optimize for efficiency at the cost of human dignity.</p>
-</li>
+<li><strong>Head of state.</strong> The <strong>Speaker of the Republic</strong>, drawn by lot from citizens who have completed an Assembly term in the past ten years, confirmed by the Assembly, three years, non-renewable. Signs what the Assembly or the public has approved; may refuse only on process, never on the merits.</li>
+<li><strong>Judges.</strong> Nominated by a Custodian <strong>Judicial Commission</strong>, confirmed in public by a lottery <strong>Judicial Jury</strong> of 36, appointed by the Speaker, removable only by referendum.</li>
+<li><strong>Treaties and foreign affairs.</strong> The Assembly adopts a <em>Foreign Requirement</em>; the Custodian Directorate of External Affairs negotiates inside it and brings the text back for a vote; treaties involving force, jurisdiction or long commitments also go to referendum.</li>
+<li><strong>War.</strong> Declared by referendum at sixty per cent. A <strong>War Panel</strong> of thirty Assembly members, rotating in thirds every six months, instructs the Defence Directorate and frames the emergency questions. No one in uniform ever decides to begin or to stop.</li>
+<li><strong>The states.</strong> Unchanged. A state may adopt the model on its own, which is the implementation path proposed for Australia.</li>
 </ul>
-<h3 id="3-the-social-safety-net-anti-entropy-filter">3. The Social Safety Net (Anti-Entropy Filter)</h3>
-<p>The CLR provides universal guarantees for housing, healthcare, and education. This is not just &ldquo;welfare&rdquo;; it is a structural necessity that prevents &ldquo;personal collapse.&rdquo; By ensuring no one is crushed by poverty, the system maintains a stable, engaged citizenry capable of participating in the lottery and referendums.</p>
 <h2 id="key-concepts-and-definitions">Key Concepts and Definitions</h2>
-<p><strong>Humaninity:</strong> The core principle of the CLR, asserting that governance must serve to protect the intrinsic value and dignity of individuals, rather than treating them as economic inputs.</p>
-<p><strong>Algorithmic Drift:</strong> The tendency for automated systems to slowly prioritize efficiency or &ldquo;optimization&rdquo; over human values. The CLR uses &ldquo;Human-in-the-Loop&rdquo; audits to prevent this.</p>
-<p><strong>Neutral Data Packets:</strong> Information summaries prepared by experts and vetted by citizen assemblies to provide the public with balanced, factual context before a referendum.</p>
+<ul>
+<li><strong>Humaninity:</strong> the unexplainable truths and values that a functional human is; the first constitutional principle.</li>
+<li><strong>Requirement:</strong> a plain-language instruction from the Assembly saying what a law must achieve, what it must not do and whom it must protect. Public from the moment it is adopted.</li>
+<li><strong>Competing drafts:</strong> every bill is drafted at least twice, once by the Custodian Office of Legislative Counsel and once by an independent body, with the AI publishing a clause-by-clause comparison against the Requirement.</li>
+<li><strong>Staggered terms:</strong> three years, one-third rotating each year, so there are always members who have seen a budget, a crisis and a referendum before, and never a cohort old enough to become a class.</li>
+<li><strong>Execution vs policy:</strong> the boundary of Custodian power, policed by the Constitutional Jury.</li>
+<li><strong>The social floor:</strong> universal housing, health and education, a caregiver income, and full income replacement for anyone serving on any lottery body. Stated broadly on purpose: in Australia it is a question of political will and resource rents, not of inventing wealth.</li>
+</ul>
 <h2 id="component-map-what-goes-with-what">Component Map: What Goes With What</h2>
-<ul>
-<li>
-<p><strong>The Individual &amp; The System:</strong> The individual provides the &ldquo;lived experience&rdquo; for the Sortition layer; the system provides the &ldquo;universal guarantees&rdquo; that allow the individual to remain free and secure.</p>
-</li>
-<li>
-<p><strong>The Custodian &amp; The Citizen:</strong> The Custodian manages the &ldquo;how&rdquo; (technical execution); the Citizen decides the &ldquo;why&rdquo; (moral and strategic direction).</p>
-</li>
-<li>
-<p><strong>Fear &amp; Decentralization:</strong> In traditional systems, fear leads to the centralization of power. In the CLR, fear triggers the decentralization of nodes to ensure survival and continuity.</p>
-</li>
-</ul>
-<h2 id="implementation-timeline">Implementation Timeline</h2>
-<ul>
-<li>
-<p><strong>Pilot Phase:</strong> Local &ldquo;Shadow Assemblies&rdquo; to test sortition and data synthesis.</p>
-</li>
-<li>
-<p><strong>Infrastructure Phase:</strong> Deployment of the Custodian Layer for essential services (water, power, health).</p>
-</li>
-<li>
-<p><strong>Constitutional Phase:</strong> National referendum to formalize the CLR as the primary governance model.</p>
-</li>
-<li>
-<p><strong>Resilience Phase:</strong> Ongoing &ldquo;Humanity Audits&rdquo; and refinement of the AI-human interface.</p>
-</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Body</th>
+<th>Chosen by</th>
+<th>Term</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Assembly (300)</td>
+<td>Lottery</td>
+<td>3 yrs, staggered</td>
+<td>Agenda, Requirements, ordinary law</td>
+</tr>
+<tr>
+<td>Standing panels</td>
+<td>Lottery, from Assembly</td>
+<td>Member&rsquo;s term</td>
+<td>Supervise each directorate</td>
+</tr>
+<tr>
+<td>Humaninity Audit (60)</td>
+<td>Lottery</td>
+<td>3 yrs, staggered</td>
+<td>Find metric-success / human-failure; 90-day suspension</td>
+</tr>
+<tr>
+<td>Information Panels (24)</td>
+<td>Lottery</td>
+<td>Per question</td>
+<td>Certify referendum packets as fair</td>
+</tr>
+<tr>
+<td>Judicial Jury (36)</td>
+<td>Lottery</td>
+<td>Per vacancy</td>
+<td>Confirm judges</td>
+</tr>
+<tr>
+<td>Constitutional Jury (48)</td>
+<td>Lottery</td>
+<td>3 yrs, staggered</td>
+<td>Execution or policy?</td>
+</tr>
+<tr>
+<td>War Panel (30)</td>
+<td>Lottery, from Assembly</td>
+<td>Conflict, rotating</td>
+<td>Instruct Defence; frame emergency questions</td>
+</tr>
+<tr>
+<td>Speaker</td>
+<td>Lottery from ex-members</td>
+<td>3 yrs</td>
+<td>Head of state; signs; refuses on process only</td>
+</tr>
+<tr>
+<td>Custodian directorates</td>
+<td>Merit</td>
+<td>Career</td>
+<td>Execute; report; never initiate</td>
+</tr>
+<tr>
+<td>Judicial Commission (9)</td>
+<td>Senior Custodians</td>
+<td>6 yrs, staggered</td>
+<td>Nominate judges</td>
+</tr>
+<tr>
+<td>The public</td>
+<td>Everyone</td>
+<td>Life</td>
+<td>Quarterly and emergency referendums; final say</td>
+</tr>
+</tbody>
+</table>
+<p>Every body that holds power over direction is chosen by lot. Every body chosen by merit is forbidden from holding power over direction. That is the whole design.</p>
+<h2 id="implementation-path">Implementation Path</h2>
+<ol>
+<li><strong>Shadow assemblies.</strong> Lottery bodies run alongside existing parliaments, publishing Requirements the parliament is obliged to answer (the Ostbelgien model).</li>
+<li><strong>State pilots.</strong> One state adopts a lottery Assembly with agenda power over a defined domain, with its public service bound to execution-only within it.</li>
+<li><strong>Section 128.</strong> A federal referendum, carried nationally and in a majority of states, adopting the Charter.</li>
+</ol>
 <h2 id="references">References</h2>
-<p>[1] Givney, T. (n.d.). Executive Summary: The Custodian Lottery Republic in Practice.</p>
+<p>Givney, T. <em>The Meridian Charter: The Custodian Lottery Republic in Full</em>. Meridian archive.</p>
+<p>Van Reybrouck, D. (2016). <em>Against Elections: The Case for Democracy</em>. Bodley Head.</p>
+<p>Landemore, H. (2020). <em>Open Democracy</em>. Princeton University Press.</p>
+<p>Parlament der Deutschsprachigen Gemeinschaft. (2019). Ostbelgien permanent Citizens&rsquo; Council. https://www.buergerdialog.be</p>
   </article>
   <footer>Meridian &middot; A speculative governance project by Tim Givney &middot; <a href="../">All documents</a></footer>
 </main>
